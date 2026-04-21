@@ -1,0 +1,702 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  /* Global theme accent colors (defaults to green) */
+  --accent-color: #d7fe51;
+  --accent-color-rgb: 215, 254, 81;
+  --accent-color-dim: rgba(215, 254, 81, 0.15);
+}
+
+/* ============================================
+   COSMIC CRYSTAL AESTHETIC
+   Deep space nebula + data network + faceted crystal
+   ============================================ */
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #000000; /* Pure black night sky */
+  color: #ffffff;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Ensure all buttons are interactive */
+button, [role="button"] {
+  cursor: pointer;
+}
+
+/* Plain black background - no decorative overlays */
+
+@keyframes network-drift {
+  0% { background-position: 0 0, 0 0, 0 0; }
+  100% { background-position: 40px 60px, -30px 50px, 20px -40px; }
+}
+
+/* No crystal overlay - plain black */
+
+/* ============================================
+   iOS 26 LIQUID GLASS — Ultra-premium glassmorphism
+   ============================================ */
+
+.glass {
+  background: #000000;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 20px 60px -15px rgba(0, 0, 0, 0.75),
+    inset 0 2px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.3);
+  transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Layer 3: Neon green refraction edge */
+.glass .glass-edge {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid transparent;
+  background: linear-gradient(145deg, rgba(207,246,78,0.08), transparent, rgba(207,246,78,0.04)) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Hover: crystal light refraction */
+.glass:hover {
+  border-color: rgba(180, 220, 255, 0.45);
+  box-shadow:
+    0 16px 56px -8px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(230, 245, 255, 0.5),
+    inset 0 -1px 0 rgba(100, 140, 200, 0.25);
+}
+
+/* Focus: glowing crystal rim */
+.glass:focus-within {
+  border-color: rgba(200, 230, 255, 0.4);
+  box-shadow:
+    0 12px 48px -10px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(230, 245, 255, 0.45),
+    0 0 0 1px rgba(160, 200, 255, 0.15);
+}
+
+.glass > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ============================================
+   CRYSTAL VARIANTS
+   ============================================ */
+
+/* Subtle crystal (background panels) */
+.glass-subtle {
+  background: rgba(14, 20, 36, 0.6);
+  border: 1px solid rgba(140, 180, 230, 0.14);
+  backdrop-filter: blur(20px) saturate(150%);
+  box-shadow:
+    0 6px 24px -6px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(200, 220, 255, 0.2);
+}
+
+/* Deep crystal (modals, overlays) */
+.glass-deep {
+  background: rgba(12, 18, 32, 0.92);
+  border: 1px solid rgba(160, 200, 255, 0.28);
+  backdrop-filter: blur(36px) saturate(190%) brightness(1.08);
+  box-shadow:
+    0 28px 72px -14px rgba(0, 0, 0, 0.75),
+    inset 0 1px 0 rgba(230, 245, 255, 0.35),
+    inset 0 -1px 0 rgba(100, 140, 200, 0.25);
+}
+
+/* ============================================
+   CRYSTAL BUTTONS & INPUTS
+   ============================================ */
+
+.glass-btn {
+  background: rgba(22, 30, 50, 0.8);
+  border: 1px solid rgba(160, 200, 255, 0.25);
+  backdrop-filter: blur(24px) saturate(160%);
+  box-shadow:
+    0 4px 14px -4px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(220, 235, 255, 0.25);
+  transition: all 0.18s cubic-bezier(0.23, 1, 0.32, 1);
+  position: relative;
+}
+
+.glass-btn:hover {
+  background: rgba(30, 40, 62, 0.88);
+  border-color: rgba(180, 220, 255, 0.48);
+  transform: translateY(-1px);
+  box-shadow:
+    0 8px 24px -4px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(230, 245, 255, 0.42);
+}
+
+.glass-btn:active {
+  transform: translateY(0);
+  background: rgba(18, 26, 44, 0.9);
+}
+
+/* Crystal input */
+.glass-input {
+  background: rgba(14, 20, 36, 0.7);
+  border: 1px solid rgba(140, 180, 230, 0.18);
+  backdrop-filter: blur(16px);
+  transition: all 0.15s ease;
+}
+
+.glass-input:focus {
+  background: rgba(20, 28, 48, 0.85);
+  border-color: rgba(180, 220, 255, 0.35);
+  box-shadow: 0 0 0 3px rgba(160, 200, 255, 0.1);
+  outline: none;
+}
+
+/* ============================================
+   MUTED ACCENT (no neon glow)
+   ============================================ */
+
+.neon-green {
+  color: #ffffff;
+}
+
+/* ============================================
+   CRYSTAL PROGRESS BAR (Glowing tube)
+   ============================================ */
+
+.crystal-progress {
+  position: relative;
+  height: 8px;
+  background: rgba(20, 28, 50, 0.8);
+  border: 1px solid rgba(140, 180, 230, 0.25);
+  border-radius: 9999px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(200, 220, 255, 0.15);
+}
+
+.crystal-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ffffff, #e5e5e5, #ffffff);
+  border-radius: 9999px;
+  transition: width 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+  position: relative;
+}
+
+.crystal-progress-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 70%
+  );
+  animation: progress-shine 1.8s linear infinite;
+}
+
+@keyframes progress-shine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+
+/* ============================================
+   PHONE BEZEL / FRAME
+   ============================================ */
+
+.phone-frame {
+  position: relative;
+  /* Plain black — no brown/gray bezel */
+  background: #000000;
+  border: 8px solid #000000;
+  border-radius: 68px;
+  box-shadow: 
+    0 0 0 1px #000000,
+    0 60px 140px -25px rgba(0, 0, 0, 0.85),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+  overflow: hidden;
+}
+
+.phone-frame::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 140px;
+  height: 6px;
+  background: #000000;
+  border-radius: 4px;
+  z-index: 50;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.1);
+}
+
+.phone-frame::after {
+  content: '';
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 5px;
+  background: #000000;
+  border-radius: 3px;
+  z-index: 50;
+  box-shadow: inset 0 1px 1px rgba(0,0,0,0.6);
+}
+
+/* Side volume button */
+.phone-frame .volume-btn {
+  position: absolute;
+  right: -4px;
+  top: 180px;
+  width: 6px;
+  height: 36px;
+  background: #000000;
+  border-radius: 0 3px 3px 0;
+  box-shadow: 0 0 0 1px #000000;
+}
+
+/* Screen glass bevel */
+.phone-screen {
+  border-radius: 48px;
+  overflow: hidden;
+  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.6);
+  background: #000000;
+}
+
+/* Desktop: remove phone frame, show content directly */
+@media (min-width: 768px) {
+  .phone-frame {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    max-width: 100% !important;
+  }
+  .phone-frame::before,
+  .phone-frame::after,
+  .phone-frame .volume-btn {
+    display: none;
+  }
+  .phone-screen {
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+    min-height: auto;
+  }
+}
+
+/* ============================================
+   SPLIT-FLIP ODOMETER STYLES
+   ============================================ */
+
+.odometer-active {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.odometer-flank {
+  color: #9CA3AF;
+  opacity: 0.7;
+  font-size: 0.6em;
+  font-weight: 500;
+  vertical-align: baseline;
+}
+
+/* ============================================
+   SPECULAR HIGHLIGHTS & LENS FLARE
+   ============================================ */
+
+.specular {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(
+    circle at 40% 30%,
+    rgba(255,255,255,0.35) 0%,
+    rgba(255,255,255,0.12) 25%,
+    transparent 65%
+  );
+  pointer-events: none;
+  z-index: 2;
+  animation: specular-move 18s ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+
+@keyframes specular-move {
+  0%, 100% { transform: translate(20%, 15%) scale(1); opacity: 0.6; }
+  50% { transform: translate(70%, 40%) scale(1.2); opacity: 0.85; }
+}
+
+.lens-flare {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 
+    0 0 12px 4px rgba(255,255,255,0.9),
+    0 0 28px 12px rgba(180,220,255,0.5);
+  pointer-events: none;
+  z-index: 3;
+  animation: flare-pulse 4s ease-in-out infinite;
+}
+
+@keyframes flare-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.8); }
+  50% { opacity: 0.9; transform: scale(1.3); }
+}
+
+/* ============================================
+   THEME SWITCHER — accent color overrides
+   ============================================ */
+
+[data-theme="green"] .glass-btn-green,
+[data-theme="green"] .glass-btn-green:hover {
+  background: #d7fe51;
+  color: #000;
+  border-color: rgba(215, 254, 81, 0.6);
+}
+
+[data-theme="white"] .glass-btn-green,
+[data-theme="white"] .glass-btn-green:hover {
+  background: #e5e7eb;
+  color: #000;
+  border-color: rgba(229, 231, 235, 0.6);
+}
+
+[data-theme="orange"] .glass-btn-green,
+[data-theme="orange"] .glass-btn-green:hover {
+  background: #f97316;
+  color: #fff;
+  border-color: rgba(249, 115, 22, 0.6);
+}
+[data-theme="cyan"] .glass-btn-green,
+[data-theme="cyan"] .glass-btn-green:hover {
+  background: #51FEFE;
+  color: #000;
+  border-color: rgba(81, 254, 254, 0.6);
+}
+[data-theme="pink"] .glass-btn-green,
+[data-theme="pink"] .glass-btn-green:hover {
+  background: #FE51D7;
+  color: #000;
+  border-color: rgba(254, 81, 215, 0.6);
+}
+[data-theme="purple"] .glass-btn-green,
+[data-theme="purple"] .glass-btn-green:hover {
+  background: #9B51FE;
+  color: #fff;
+  border-color: rgba(155, 81, 254, 0.6);
+}
+
+/* Global accent CSS vars per theme */
+[data-theme="green"] {
+  --accent-color: #d7fe51;
+  --accent-color-rgb: 215, 254, 81;
+  --accent-color-dim: rgba(215, 254, 81, 0.15);
+}
+[data-theme="white"] {
+  --accent-color: #e5e7eb;
+  --accent-color-rgb: 229, 231, 235;
+  --accent-color-dim: rgba(229, 231, 235, 0.15);
+}
+[data-theme="orange"] {
+  --accent-color: #f97316;
+  --accent-color-rgb: 249, 115, 22;
+  --accent-color-dim: rgba(249, 115, 22, 0.15);
+}
+[data-theme="cyan"] {
+  --accent-color: #51FEFE;
+  --accent-color-rgb: 81, 254, 254;
+  --accent-color-dim: rgba(81, 254, 254, 0.15);
+}
+[data-theme="pink"] {
+  --accent-color: #FE51D7;
+  --accent-color-rgb: 254, 81, 215;
+  --accent-color-dim: rgba(254, 81, 215, 0.15);
+}
+[data-theme="purple"] {
+  --accent-color: #9B51FE;
+  --accent-color-rgb: 155, 81, 254;
+  --accent-color-dim: rgba(155, 81, 254, 0.15);
+}
+
+/* Emerald accent → theme color */
+[data-theme="white"] .text-emerald-400,
+[data-theme="white"] .text-emerald-500 {
+  color: #e5e7eb !important;
+}
+[data-theme="orange"] .text-emerald-400,
+[data-theme="orange"] .text-emerald-500 {
+  color: #fb923c !important;
+}
+[data-theme="cyan"] .text-emerald-400,
+[data-theme="cyan"] .text-emerald-500 {
+  color: #51FEFE !important;
+}
+[data-theme="pink"] .text-emerald-400,
+[data-theme="pink"] .text-emerald-500 {
+  color: #FE51D7 !important;
+}
+[data-theme="purple"] .text-emerald-400,
+[data-theme="purple"] .text-emerald-500 {
+  color: #9B51FE !important;
+}
+
+[data-theme="white"] .bg-emerald-400,
+[data-theme="white"] .bg-emerald-500 {
+  background-color: #e5e7eb !important;
+}
+[data-theme="orange"] .bg-emerald-400,
+[data-theme="orange"] .bg-emerald-500 {
+  background-color: #f97316 !important;
+}
+[data-theme="cyan"] .bg-emerald-400,
+[data-theme="cyan"] .bg-emerald-500 {
+  background-color: #51FEFE !important;
+}
+[data-theme="pink"] .bg-emerald-400,
+[data-theme="pink"] .bg-emerald-500 {
+  background-color: #FE51D7 !important;
+}
+[data-theme="purple"] .bg-emerald-400,
+[data-theme="purple"] .bg-emerald-500 {
+  background-color: #9B51FE !important;
+}
+
+[data-theme="white"] .border-emerald-400,
+[data-theme="white"] .border-emerald-500 {
+  border-color: #e5e7eb !important;
+}
+[data-theme="orange"] .border-emerald-400,
+[data-theme="orange"] .border-emerald-500 {
+  border-color: #f97316 !important;
+}
+[data-theme="cyan"] .border-emerald-400,
+[data-theme="cyan"] .border-emerald-500 {
+  border-color: #51FEFE !important;
+}
+[data-theme="pink"] .border-emerald-400,
+[data-theme="pink"] .border-emerald-500 {
+  border-color: #FE51D7 !important;
+}
+[data-theme="purple"] .border-emerald-400,
+[data-theme="purple"] .border-emerald-500 {
+  border-color: #9B51FE !important;
+}
+
+/* Subtle accent backgrounds */
+[data-theme="white"] .bg-emerald-500\/20 {
+  background-color: rgba(229, 231, 235, 0.2) !important;
+  color: #e5e7eb !important;
+}
+[data-theme="orange"] .bg-emerald-500\/20 {
+  background-color: rgba(249, 115, 22, 0.2) !important;
+  color: #fb923c !important;
+}
+[data-theme="cyan"] .bg-emerald-500\/20 {
+  background-color: rgba(81, 254, 254, 0.2) !important;
+  color: #51FEFE !important;
+}
+[data-theme="pink"] .bg-emerald-500\/20 {
+  background-color: rgba(254, 81, 215, 0.2) !important;
+  color: #FE51D7 !important;
+}
+[data-theme="purple"] .bg-emerald-500\/20 {
+  background-color: rgba(155, 81, 254, 0.2) !important;
+  color: #9B51FE !important;
+}
+
+/* Theme-colored highlights / neon text */
+[data-theme="green"] .neon-green {
+  color: #d7fe51 !important;
+}
+[data-theme="white"] .neon-green {
+  color: #e5e7eb !important;
+}
+[data-theme="orange"] .neon-green {
+  color: #f97316 !important;
+}
+[data-theme="cyan"] .neon-green {
+  color: #51FEFE !important;
+}
+[data-theme="pink"] .neon-green {
+  color: #FE51D7 !important;
+}
+[data-theme="purple"] .neon-green {
+  color: #9B51FE !important;
+}
+
+/* Theme-colored borders (border-white/* → theme color) */
+[data-theme="green"] .border-white {
+  border-color: #d7fe51 !important;
+}
+[data-theme="white"] .border-white {
+  border-color: #e5e7eb !important;
+}
+[data-theme="orange"] .border-white {
+  border-color: #f97316 !important;
+}
+[data-theme="cyan"] .border-white {
+  border-color: #51FEFE !important;
+}
+[data-theme="pink"] .border-white {
+  border-color: #FE51D7 !important;
+}
+[data-theme="purple"] .border-white {
+  border-color: #9B51FE !important;
+}
+
+[data-theme="green"] .border-white\/10 {
+  border-color: rgba(215, 254, 81, 0.1) !important;
+}
+[data-theme="white"] .border-white\/10 {
+  border-color: rgba(229, 231, 235, 0.1) !important;
+}
+[data-theme="orange"] .border-white\/10 {
+  border-color: rgba(249, 115, 22, 0.1) !important;
+}
+[data-theme="cyan"] .border-white\/10 {
+  border-color: rgba(81, 254, 254, 0.1) !important;
+}
+[data-theme="pink"] .border-white\/10 {
+  border-color: rgba(254, 81, 215, 0.1) !important;
+}
+[data-theme="purple"] .border-white\/10 {
+  border-color: rgba(155, 81, 254, 0.1) !important;
+}
+
+[data-theme="green"] .border-white\/20 {
+  border-color: rgba(215, 254, 81, 0.2) !important;
+}
+[data-theme="white"] .border-white\/20 {
+  border-color: rgba(229, 231, 235, 0.2) !important;
+}
+[data-theme="orange"] .border-white\/20 {
+  border-color: rgba(249, 115, 22, 0.2) !important;
+}
+[data-theme="cyan"] .border-white\/20 {
+  border-color: rgba(81, 254, 254, 0.2) !important;
+}
+[data-theme="pink"] .border-white\/20 {
+  border-color: rgba(254, 81, 215, 0.2) !important;
+}
+[data-theme="purple"] .border-white\/20 {
+  border-color: rgba(155, 81, 254, 0.2) !important;
+}
+
+[data-theme="green"] .border-white\/30 {
+  border-color: rgba(215, 254, 81, 0.3) !important;
+}
+[data-theme="white"] .border-white\/30 {
+  border-color: rgba(229, 231, 235, 0.3) !important;
+}
+[data-theme="orange"] .border-white\/30 {
+  border-color: rgba(249, 115, 22, 0.3) !important;
+}
+[data-theme="cyan"] .border-white\/30 {
+  border-color: rgba(81, 254, 254, 0.3) !important;
+}
+[data-theme="pink"] .border-white\/30 {
+  border-color: rgba(254, 81, 215, 0.3) !important;
+}
+[data-theme="purple"] .border-white\/30 {
+  border-color: rgba(155, 81, 254, 0.3) !important;
+}
+
+[data-theme="green"] .border-white\/40 {
+  border-color: rgba(215, 254, 81, 0.4) !important;
+}
+[data-theme="white"] .border-white\/40 {
+  border-color: rgba(229, 231, 235, 0.4) !important;
+}
+[data-theme="orange"] .border-white\/40 {
+  border-color: rgba(249, 115, 22, 0.4) !important;
+}
+[data-theme="cyan"] .border-white\/40 {
+  border-color: rgba(81, 254, 254, 0.4) !important;
+}
+[data-theme="pink"] .border-white\/40 {
+  border-color: rgba(254, 81, 215, 0.4) !important;
+}
+[data-theme="purple"] .border-white\/40 {
+  border-color: rgba(155, 81, 254, 0.4) !important;
+}
+
+[data-theme="green"] .border-white\/15 {
+  border-color: rgba(215, 254, 81, 0.15) !important;
+}
+[data-theme="white"] .border-white\/15 {
+  border-color: rgba(229, 231, 235, 0.15) !important;
+}
+[data-theme="orange"] .border-white\/15 {
+  border-color: rgba(249, 115, 22, 0.15) !important;
+}
+[data-theme="cyan"] .border-white\/15 {
+  border-color: rgba(81, 254, 254, 0.15) !important;
+}
+[data-theme="pink"] .border-white\/15 {
+  border-color: rgba(254, 81, 215, 0.15) !important;
+}
+[data-theme="purple"] .border-white\/15 {
+  border-color: rgba(155, 81, 254, 0.15) !important;
+}
+
+[data-theme="green"] .border-white\/70 {
+  border-color: rgba(215, 254, 81, 0.7) !important;
+}
+[data-theme="white"] .border-white\/70 {
+  border-color: rgba(229, 231, 235, 0.7) !important;
+}
+[data-theme="orange"] .border-white\/70 {
+  border-color: rgba(249, 115, 22, 0.7) !important;
+}
+[data-theme="cyan"] .border-white\/70 {
+  border-color: rgba(81, 254, 254, 0.7) !important;
+}
+[data-theme="pink"] .border-white\/70 {
+  border-color: rgba(254, 81, 215, 0.7) !important;
+}
+[data-theme="purple"] .border-white\/70 {
+  border-color: rgba(155, 81, 254, 0.7) !important;
+}
+
+/* Focus states with theme-colored borders */
+[data-theme="green"] .focus\:border-white\/30:focus,
+[data-theme="green"] .focus\:border-white\/40:focus {
+  border-color: rgba(215, 254, 81, 0.4) !important;
+}
+[data-theme="white"] .focus\:border-white\/30:focus,
+[data-theme="white"] .focus\:border-white\/40:focus {
+  border-color: rgba(229, 231, 235, 0.4) !important;
+}
+[data-theme="orange"] .focus\:border-white\/30:focus,
+[data-theme="orange"] .focus\:border-white\/40:focus {
+  border-color: rgba(249, 115, 22, 0.4) !important;
+}
+[data-theme="cyan"] .focus\:border-white\/30:focus,
+[data-theme="cyan"] .focus\:border-white\/40:focus {
+  border-color: rgba(81, 254, 254, 0.4) !important;
+}
+[data-theme="pink"] .focus\:border-white\/30:focus,
+[data-theme="pink"] .focus\:border-white\/40:focus {
+  border-color: rgba(254, 81, 215, 0.4) !important;
+}
+[data-theme="purple"] .focus\:border-white\/30:focus,
+[data-theme="purple"] .focus\:border-white\/40:focus {
+  border-color: rgba(155, 81, 254, 0.4) !important;
+}
+
+
