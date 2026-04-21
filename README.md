@@ -2,9 +2,6 @@
 
 **The Workday Killer** — A lightning-fast, zero-friction timesheet app for modern teams.
 
-**Team:** DoesItWorkday  
-**Members:** tdixon@teachx.ai, shsingh@teachx.ai
-
 ---
 
 ## What is GrokClock?
