@@ -1,9 +1,16 @@
 #!/bin/bash
 # Build script for grokclock
 set -e
+
+echo "Building frontend..."
 cd frontend
-echo "Installing dependencies..."
 npm install
-echo "Building project..."
 npm run build
+cd ..
+
+echo "Installing backend dependencies..."
+cd backend
+pip install -r requirements.txt
+cd ..
+
 echo "Done!"
