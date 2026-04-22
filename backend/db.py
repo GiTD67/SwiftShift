@@ -1,11 +1,15 @@
 import os
+import warnings
 import psycopg2
 import psycopg2.extras
 
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://root:root@localhost:5432/devdb"
-)
+_DEFAULT_DB_URL = "postgresql://root:root@localhost:5432/devdb"
+DATABASE_URL = os.environ.get("DATABASE_URL", _DEFAULT_DB_URL)
+if DATABASE_URL == _DEFAULT_DB_URL:
+    warnings.warn(
+        "DATABASE_URL is not set — using insecure default credentials. Set DATABASE_URL in production.",
+        stacklevel=1,
+    )
 
 
 class _CursorWrapper:

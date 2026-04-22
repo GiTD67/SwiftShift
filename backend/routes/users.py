@@ -21,9 +21,11 @@ def create_user():
     first_name = data.get("first_name")
     last_name = data.get("last_name")
     email = data.get("email")
-    password = data.get("password") or "changeme"
+    password = data.get("password")
     if not first_name or not last_name or not email:
         return jsonify({"error": "first_name, last_name, email required"}), 400
+    if not password:
+        return jsonify({"error": "password required"}), 400
     pw_hash = generate_password_hash(password)
     with get_db() as db:
         try:
@@ -54,16 +56,14 @@ def get_user(uid):
 @bp.route("/api/users/<int:uid>", methods=["PUT"])
 def update_user(uid):
     data = request.get_json() or {}
-    job_role = data.get("job_role")
-    manager_name = data.get("manager_name")
-    is_fulltime = data.get("is_fulltime")
-    pay = data.get("pay")
-    salary = data.get("salary")
+    allowed = {"job_role", "manager_name", "is_fulltime", "pay", "salary"}
+    fields = {k: v for k, v in data.items() if k in allowed}
+    if not fields:
+        return jsonify({"error": "no updatable fields provided"}), 400
+    set_clause = ", ".join(f"{k} = ?" for k in fields)
+    values = list(fields.values()) + [uid]
     with get_db() as db:
-        db.execute(
-            "UPDATE users SET job_role = ?, manager_name = ?, is_fulltime = ?, pay = ?, salary = ? WHERE id = ?",
-            (job_role, manager_name, is_fulltime, pay, salary, uid),
-        )
+        db.execute(f"UPDATE users SET {set_clause} WHERE id = ?", values)
         db.commit()
         row = db.execute(
             "SELECT id, first_name, last_name, email, job_role, manager_name, is_fulltime, pay, salary FROM users WHERE id = ?",

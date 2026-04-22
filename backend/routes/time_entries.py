@@ -27,7 +27,10 @@ def _compute_duration(start_time: str, end_time: str) -> int:
     try:
         s = datetime.strptime(start_time, "%H:%M")
         e = datetime.strptime(end_time, "%H:%M")
-        return int((e - s).total_seconds() / 60)
+        result = int((e - s).total_seconds() / 60)
+        if result < 0:
+            result += 24 * 60
+        return result
     except Exception:
         return 0
 

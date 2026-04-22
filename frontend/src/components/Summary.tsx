@@ -58,7 +58,7 @@ export function Summary({ totalHours, projectBreakdown }: SummaryProps) {
                   <motion.div
                     className="h-full bg-white/70 rounded-full"
                     initial={{ width: 0 }}
-                    animate={{ width: `${(hours / totalHours) * 100}%` }}
+                    animate={{ width: `${totalHours > 0 ? (hours / totalHours) * 100 : 0}%` }}
                     transition={{ delay: i * 0.05 }}
                   />
                 </div>

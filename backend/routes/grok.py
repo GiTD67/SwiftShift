@@ -6,6 +6,7 @@ from datetime import datetime
 
 from openai import OpenAI
 import chromadb
+from werkzeug.utils import secure_filename
 
 bp = Blueprint("grok", __name__)
 
@@ -93,7 +94,10 @@ def upload():
         # Save locally + reindex for RAG if user_id provided
         if user_id:
             user_dir = get_user_dir(user_id)
-            save_path = user_dir / f.filename
+            safe_name = secure_filename(f.filename)
+            if not safe_name:
+                return jsonify({"error": "invalid filename"}), 400
+            save_path = user_dir / safe_name
             f.save(str(save_path))
             reindex_user_chroma(user_id)
             f.stream.seek(0)  # reset for OpenAI upload
@@ -202,11 +206,14 @@ def tax_upload():
 
     try:
         user_dir = get_user_dir(user_id)
-        save_path = user_dir / f.filename
+        safe_name = secure_filename(f.filename)
+        if not safe_name:
+            return jsonify({"error": "invalid filename"}), 400
+        save_path = user_dir / safe_name
         f.save(str(save_path))
         # Index into ChromaDB so Grokky RAG can use it
         reindex_user_chroma(user_id)
-        return jsonify({"ok": True, "filename": f.filename})
+        return jsonify({"ok": True, "filename": safe_name})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -343,7 +350,7 @@ def tax_extract():
         )
         content = resp.choices[0].message.content or "{}"
         import json, re as _re
-        m = _re.search(r"\{[\s\S]*?\}", content)
+        m = _re.search(r"\{[\s\S]*\}", content)
         if m:
             parsed = json.loads(m.group(0))
             return jsonify({
@@ -384,7 +391,9 @@ def fill_1040():
 
         def tool_extract(args):
             fname = args.get("filename", "")
-            fpath = user_dir / fname
+            fpath = (user_dir / fname).resolve()
+            if not fpath.is_relative_to(user_dir.resolve()):
+                return {"error": "invalid filename"}
             if not fpath.exists():
                 return {"error": "file not found"}
             text = fpath.read_text(errors="ignore")[:8000]
@@ -397,7 +406,7 @@ def fill_1040():
                 )}],
             )
             import json, re as _re
-            m = _re.search(r"\{[\s\S]*?\}", resp.choices[0].message.content or "{}")
+            m = _re.search(r"\{[\s\S]*\}", resp.choices[0].message.content or "{}")
             return json.loads(m.group(0)) if m else {}
 
         def tool_reconcile(args):
