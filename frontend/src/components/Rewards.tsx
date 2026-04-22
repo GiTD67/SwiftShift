@@ -27,41 +27,11 @@ interface Position {
   price: number // price paid (cents)
 }
 
-// Kalshi API credentials (hardcoded for now) - used by authenticated endpoints
-export const KALSHI_API_KEY = '06d1ea36-4a7c-4eb4-9035-a6f0c6c87553'
-export const KALSHI_PRIVATE_KEY = `-----BEGIN RSA PRIVATE KEY-----
-MIIEogIBAAKCAQEA12oFLE942FrgCfNEeu3pc2PDUDApFgpV9anTkhlAGemxyimP
-Ltukdoys72aZhmS6BdAPeWZkMZ10hZ31Isjd3DmAF4RJeYDCp3+9HQxlGPx2MGaI
-JFrtvrzCyqM9bSZGEQ2HSGVVWNTS+Xua9fV/Of8n9yrG4rtrv93QDHe6t1L4YdE+
-rqusbkwM5TNllMIGCP3cJedlBiaRyVOPfR/f+P/7vVUKdnO/lm9k2e6SKuFCYkdU
-2e2s+hydLd/gdCVaJc6fCssKgugpCAoiLXm7FShLzweN43Jggf/JQCphuBk2+3lB
-waBvUZpNejizPfB3erwlYIq0MXs7PByFu1QHjQIDAQABAoIBACoLz6aufG/+jOxk
-R2GXPpH/Twg/3kUnD1A8Lce+lfx42PMU2ZXT2W4qVzcDV8QbtROdYOfZTIVCrpPG
-GSsI+gUaVB5C+/RzZYs8K7WXzcPqw0b/PGOcO/uW7I6Q/lRnvBVoBpfi752/LM71
-iXGo0YSIgUyFVPy8iHOS4CEO3asacuMzq/2pKlnlcTgZf2UfissCy5HYBZz+4WBr
-oMKhCZPG69IW9xCXzsg+0VDfX4kkd/dDpUJQbvnLnkbGV+FngFrg4pVSVRJIfIxG
-rx3+N1MNt7Nj0C7blQe9ilI/XhEfDJoSHC4lWKoDlGaDDjq/DbBd79FI9V6N7/Uc
-AZLD1iECgYEA/P+Gpi6B8CNnczcZL4JFSLuNv6Dpum8hODY22/mdBsHScdKtgvTT
-wfYlg90BzMIqycsqDZ9PAJKLIQWEYwOZ+JTbSFi6dOBCWmqD+jJiHA2LoKqUaORe
-fVBpkxYgVVMdt0z1isJFJH+/FmuLzcd/aUa6QZoOWGE31L0l6JZeTisCgYEA2fhV
-f6iQrft8ywpEAeg9+17G6f7BUctIn99hM072W0fRfT+cnpHRUGWUdElHYS0TTpHC
-QDm0lNNDg8toKjFROsY9MhGL0Ey5CuCzjoLpFfVrdnKCH1bls2rZ5IR2RQ9i+A31
-vbdw7fl55+0QtDIiHhCNfkmXmkMmIcCGaPnx3ScCgYA1F4ZxL0dTVoqqEgD2CFdz
-yPAZK7KAzjthaXcfuIUsWtZHzpdc6PXbOUVsI5/yETkbecgMbccNbrNFrbu3b5UL
-JmnSB9SxHDKweLPTeGlAS9NmVwWn8WymzY4qMLV+Ul/lDIBmqxgJbcly8gS3nUru
-k8oYZDTodRZbTYo8AfouWwKBgDL7m/v1EIoxVZokN43+pWjDXWFj/hHEq6MBW7nl
-kUf+f2h9VYPddYkJiXS9ox1+rpJlE3t0Q+G/nH4aOK4NxQMrVSr94acCGxIJRtZh
-lmVVdyJIXFk6ORYDOx3xQbybgbmlgkIyww5WmQX/dDXBuCsyEfZk/jnN1QB2CLpL
-JCBnAoGABWFDnKi1PaZej9vXstGYsMPZtDb7RUiwBZlejd4zj0UdwhmKpV36a+kX
-0mrIwosniy1Nk6f/25Di0roIeZq7ot+s5K/p7FrCJOKUTz118iQRNobp4KI9HshJ
-I2T3dDy7XSx3hcF6XbN+FwXyynesPVs5Y03PxCyiJF5QTxa/zMw=
------END RSA PRIVATE KEY-----`
-
-// Compute hourly rate from user: if salary set (salaried), hourly = salary/(160*52), else use pay (default $65)
+// Compute hourly rate from user: if salary set (salaried), hourly = salary/2080, else use pay (default $65)
 function computeHourlyRate(user: any): number {
   const salary = Number(user?.salary) || 0
   if (salary > 0) {
-    return salary / (160 * 52)
+    return salary / 2080
   }
   const pay = Number(user?.pay)
   return pay > 0 ? pay : 65

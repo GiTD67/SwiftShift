@@ -12,7 +12,8 @@ frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 
 app = Flask(__name__, static_folder=None)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB uploads
-CORS(app, origins="*")
+_allowed_origins = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
+CORS(app, origins=_allowed_origins)
 
 # Subpath for preview deployment (must be defined before routes)
 SUBPATH = "/hackathon/preview/doesitworkday"

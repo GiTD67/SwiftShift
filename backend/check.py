@@ -4,7 +4,9 @@ import os
 import sys
 
 def main():
-    src_files = sum(1 for _, _, files in os.walk("src") for f in files)
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    src_path = os.path.join(project_root, "frontend", "src")
+    src_files = sum(1 for _, _, files in os.walk(src_path) for f in files)
     print(f"Source files: {src_files}")
     print("Project check: OK")
     return 0
