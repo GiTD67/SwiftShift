@@ -2,10 +2,9 @@ import os
 import psycopg2
 import psycopg2.extras
 
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://root:root@localhost:5432/devdb"
-)
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL environment variable is not set")
 
 
 class _CursorWrapper:

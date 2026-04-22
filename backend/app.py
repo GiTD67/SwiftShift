@@ -5,14 +5,19 @@ from flask import Flask, jsonify, send_from_directory, request
 from flask_cors import CORS
 
 from db import get_db  # noqa: F401  # ensure db module is loaded
+from limiter import limiter
 from routes import health_bp, employees_bp, time_entries_bp, clock_sessions_bp, users_bp, grok_bp, jobs_bp
-from auth import bp as auth_bp
+from auth import bp as auth_bp, init_db
 
 frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 
 app = Flask(__name__, static_folder=None)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB uploads
-CORS(app, origins="*")
+
+allowed_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+CORS(app, origins=[o.strip() for o in allowed_origins])
+
+limiter.init_app(app)
 
 # Subpath for preview deployment (must be defined before routes)
 SUBPATH = "/hackathon/preview/doesitworkday"
@@ -74,6 +79,10 @@ app.register_blueprint(users_bp)
 app.register_blueprint(grok_bp)
 app.register_blueprint(jobs_bp)
 
+# Initialize database tables at startup
+with app.app_context():
+    init_db()
+
 
 # --- Frontend SPA ---
 @app.route("/", defaults={"path": ""})
@@ -104,4 +113,5 @@ def not_found(e):
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    debug = os.environ.get("FLASK_DEBUG", "0") == "1"
+    app.run(host="0.0.0.0", port=port, debug=debug)

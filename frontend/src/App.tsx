@@ -1,18 +1,24 @@
 import { useState, useEffect, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
+import { useLocation, useNavigate, Link } from 'react-router-dom'
 import './App.css'
 import './index.css'
 import confetti from 'canvas-confetti'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { useTimesheet } from './hooks/useTimesheet'
 import { Rewards } from './components/Rewards'
 import { LootDrop } from './components/LootDrop'
+import { orgData } from './data/orgData'
+import type { OrgNode } from './data/orgData'
+import type { User, Job, TaxFormData } from './types'
 
 const API_BASE = (() => {
   const m = window.location.pathname.match(/^(\/hackathon\/preview\/[^/]+)/)
   return m ? m[1] : ''
 })()
+
+// Biweekly pay period anchor date — update to match your company's actual schedule
+const PAY_PERIOD_ANCHOR = new Date(2026, 2, 22)
 
 type View = 'clock' | 'timesheet' | 'rewards' | 'admin' | 'profile' | 'insurance' | 'orgchart' | 'taxes' | 'groktax' | 'grokky' | 'applications' | 'jobs'
 
@@ -35,19 +41,17 @@ function greeting(hour: number): string {
 }
 
 function payPeriodFor(date: Date): { start: Date; end: Date } {
-  // Anchor: Mar 22, 2026 start of day
-  const anchor = new Date(2026, 2, 22) // month is 0-indexed
   const msPerDay = 86400000
-  const daysSince = Math.floor((date.getTime() - anchor.getTime()) / msPerDay)
+  const daysSince = Math.floor((date.getTime() - PAY_PERIOD_ANCHOR.getTime()) / msPerDay)
   const periodIndex = Math.floor(daysSince / 14)
-  const periodStart = new Date(anchor.getTime() + periodIndex * 14 * msPerDay)
+  const periodStart = new Date(PAY_PERIOD_ANCHOR.getTime() + periodIndex * 14 * msPerDay)
   const periodEnd = new Date(periodStart.getTime() + 13 * msPerDay) // 14 days inclusive
   return { start: periodStart, end: periodEnd }
 }
 
 // ===== Org Tree Chart (Vertical Tree) =====
 function OctopusChart({ node, expanded, setExpanded, search, expandedAll }: {
-  node: any
+  node: OrgNode
   expanded: Set<string>
   setExpanded: (s: Set<string>) => void
   search: string
@@ -196,10 +200,8 @@ function fmtRange(start: Date, end: Date): string {
 
 function usePayPeriodRange(periodOffset: number) {
   return useMemo(() => {
-    // Same anchor as payPeriodFor: Mar 22, 2026
-    const anchor = new Date(2026, 2, 22)
     const msPerDay = 86400000
-    const periodStart = new Date(anchor.getTime() + periodOffset * 14 * msPerDay)
+    const periodStart = new Date(PAY_PERIOD_ANCHOR.getTime() + periodOffset * 14 * msPerDay)
     periodStart.setHours(0, 0, 0, 0)
     const periodEnd = new Date(periodStart.getTime() + 13 * msPerDay)
     const dayDates = Array.from({ length: 14 }, (_, i) => new Date(periodStart.getTime() + i * msPerDay))
@@ -209,7 +211,7 @@ function usePayPeriodRange(periodOffset: number) {
 }
 
 // ===== TimesheetView component =====
-function TimesheetView({ user }: { user: any }) {
+function TimesheetView({ user }: { user: User }) {
   const [periodOffset, setPeriodOffset] = useState(0)
   const [entries, setEntries] = useState<Record<string, string>>({})
   const [certified, setCertified] = useState(false)
@@ -429,6 +431,7 @@ function TimesheetView({ user }: { user: any }) {
 
 // ===== Auth pages =====
 function LoginPage() {
+  const navigate = useNavigate()
   const [email, setEmail] = useState(() => localStorage.getItem('lastEmail') || '')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -455,7 +458,7 @@ function LoginPage() {
       } else {
         localStorage.setItem('user', JSON.stringify(data))
         localStorage.setItem('lastEmail', email)
-        window.location.href = '.'
+        navigate('/')
       }
     } catch {
       setError('Connection to Grok system failed')
@@ -601,7 +604,7 @@ function LoginPage() {
             {/* Links */}
             <div className="flex justify-between text-sm pt-1">
               <a href="#" className="text-zinc-500 hover:text-white transition-colors">Forgot password?</a>
-              <a href="signup" className="text-zinc-400 hover:text-white underline underline-offset-4">Create account</a>
+              <Link to="/signup" className="text-zinc-400 hover:text-white underline underline-offset-4">Create account</Link>
             </div>
           </form>
 
@@ -621,6 +624,7 @@ function LoginPage() {
 }
 
 function SignupPage() {
+  const navigate = useNavigate()
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
@@ -646,7 +650,7 @@ function SignupPage() {
       } else {
         localStorage.setItem('user', JSON.stringify(data))
         localStorage.setItem('lastEmail', email)
-        window.location.href = '.'
+        navigate('/')
       }
     } catch {
       setError('Connection to Grok system failed')
@@ -808,7 +812,7 @@ function SignupPage() {
             </button>
 
             <div className="text-center text-sm pt-1">
-              <a href="login" className="text-zinc-400 hover:text-white underline underline-offset-4">Already have an account?</a>
+              <Link to="/login" className="text-zinc-400 hover:text-white underline underline-offset-4">Already have an account?</Link>
             </div>
           </form>
 
@@ -826,41 +830,28 @@ function SignupPage() {
   )
 }
 
-// ===== Main App (existing) =====
+// ===== Router =====
 export default function App() {
-  const pathname = window.location.pathname
+  const { pathname } = useLocation()
   const userStr = localStorage.getItem('user')
-  const user = userStr ? JSON.parse(userStr) : null
-
-  // Route: auth pages (handle subpath deployments like /hackathon/preview/doesitworkday/)
-  const isRoot = pathname === '/' || pathname.endsWith('/')
-  const isLogin = pathname === '/login' || pathname.endsWith('/login')
+  const user: User | null = userStr ? JSON.parse(userStr) : null
   const isSignup = pathname === '/signup' || pathname.endsWith('/signup')
   const isAdmin = pathname === '/admin' || pathname.endsWith('/admin')
 
   if (isSignup) return <SignupPage />
+  if (!user) return <LoginPage />
+  return <MainApp user={user} isAdmin={isAdmin} />
+}
 
-  // Gate: nothing visible without login
-  if (!user) {
-    if (isLogin || isRoot) {
-      return <LoginPage />
-    }
-    // Any other path (admin, profile, etc.) without auth → login
-    return <LoginPage />
-  }
-
-  // If logged in and on login page, fall through to main app
-  if (isLogin || isRoot) {
-    // already logged in, continue
-  }
-
-  // Main app
+// ===== Main App =====
+function MainApp({ user, isAdmin }: { user: User; isAdmin: boolean }) {
+  const navigate = useNavigate()
   const [activeView, setActiveView] = useState<View>('clock')
   const [chatMessage, setChatMessage] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
   const [chatHistory, setChatHistory] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([])
   const [attachedFile, setAttachedFile] = useState<{ file_id: string; filename: string } | null>(null)
-  const [users, setUsers] = useState<any[]>([])
+  const [users, setUsers] = useState<User[]>([])
   const [theme, setTheme] = useState<'green' | 'white' | 'orange' | 'cyan' | 'pink' | 'purple'>(() => {
     const saved = localStorage.getItem('theme')
     return (saved === 'green' || saved === 'white' || saved === 'orange' || saved === 'cyan' || saved === 'pink' || saved === 'purple') ? saved : 'green'
@@ -869,107 +860,14 @@ export default function App() {
   const [orgExpandedAll, setOrgExpandedAll] = useState(true)
   const [orgSearch, setOrgSearch] = useState('')
   const [expandedJobs, setExpandedJobs] = useState<Set<number>>(new Set())
-  const [instaJobs, setInstaJobs] = useState<any[]>([])
+  const [instaJobs, setInstaJobs] = useState<Job[]>([])
   const [instaUploading, setInstaUploading] = useState(false)
 
   // Grok Tax - document upload + AI-filled 1040
   const [taxUploadedFiles, setTaxUploadedFiles] = useState<string[]>([])
-  const [taxFormData, setTaxFormData] = useState<any | null>(null)
+  const [taxFormData, setTaxFormData] = useState<TaxFormData | null>(null)
   const [taxLoading, setTaxLoading] = useState(false)
   const [selectedDoc, setSelectedDoc] = useState<{ label: string; content: string } | null>(null)
-
-  const orgData = {
-    id: 'ceo',
-    name: 'Trevor Dixon and Shubham Singh',
-    title: 'Co-CEOs & Co-Founders',
-    dept: 'Executive',
-    email: 'co-founders@grokclock.com',
-    reportsTo: null,
-    teamSize: 5,
-    children: [
-      {
-        id: 'eng',
-        name: 'Jordan Lee',
-        title: 'CTO',
-        dept: 'Engineering',
-        email: 'jordan@grokclock.com',
-        reportsTo: 'Alex Rivera',
-        teamSize: 3,
-        children: [
-          { id: 'fe', name: 'Sam Chen', title: 'Frontend Lead', dept: 'Engineering', email: 'sam@grokclock.com', reportsTo: 'Jordan Lee', teamSize: 3, children: [
-            { id: 'fe1', name: 'Parker Kim', title: 'Senior Frontend Engineer', dept: 'Engineering', email: 'parker@grokclock.com', reportsTo: 'Sam Chen', teamSize: 0, children: [] },
-            { id: 'fe2', name: 'Quinn Torres', title: 'Frontend Engineer', dept: 'Engineering', email: 'quinn@grokclock.com', reportsTo: 'Sam Chen', teamSize: 0, children: [] },
-          ] },
-          { id: 'be', name: 'Taylor Kim', title: 'Backend Lead', dept: 'Engineering', email: 'taylor@grokclock.com', reportsTo: 'Jordan Lee', teamSize: 4, children: [
-            { id: 'be1', name: 'Cameron Ellis', title: 'Senior Backend Engineer', dept: 'Engineering', email: 'cameron@grokclock.com', reportsTo: 'Taylor Kim', teamSize: 0, children: [] },
-            { id: 'be2', name: 'Jordan Vale', title: 'Backend Engineer', dept: 'Engineering', email: 'jordanv@grokclock.com', reportsTo: 'Taylor Kim', teamSize: 0, children: [] },
-            { id: 'be3', name: 'Morgan Ellis', title: 'Backend Engineer', dept: 'Engineering', email: 'morgan@grokclock.com', reportsTo: 'Taylor Kim', teamSize: 0, children: [] },
-          ] },
-          { id: 'infra', name: 'Casey Brooks', title: 'Infra Lead', dept: 'Engineering', email: 'casey@grokclock.com', reportsTo: 'Jordan Lee', teamSize: 2, children: [
-            { id: 'inf1', name: 'Riley Voss', title: 'DevOps Engineer', dept: 'Engineering', email: 'rileyv@grokclock.com', reportsTo: 'Casey Brooks', teamSize: 0, children: [] },
-          ] },
-        ]
-      },
-      {
-        id: 'sales',
-        name: 'Casey Morgan',
-        title: 'VP Sales',
-        dept: 'Sales',
-        email: 'casey@grokclock.com',
-        reportsTo: 'Alex Rivera',
-        teamSize: 2,
-        children: [
-          { id: 'na', name: 'Jamie Quinn', title: 'North America Sales', dept: 'Sales', email: 'jamie@grokclock.com', reportsTo: 'Casey Morgan', teamSize: 5, children: [
-            { id: 'na1', name: 'Skyler Reed', title: 'Account Executive', dept: 'Sales', email: 'skyler@grokclock.com', reportsTo: 'Jamie Quinn', teamSize: 0, children: [] },
-            { id: 'na2', name: 'Avery Lane', title: 'Account Executive', dept: 'Sales', email: 'avery@grokclock.com', reportsTo: 'Jamie Quinn', teamSize: 0, children: [] },
-          ] },
-          { id: 'eu', name: 'Riley Patel', title: 'Europe Sales', dept: 'Sales', email: 'riley@grokclock.com', reportsTo: 'Casey Morgan', teamSize: 4, children: [
-            { id: 'eu1', name: 'Dakota Lane', title: 'Account Executive', dept: 'Sales', email: 'dakota@grokclock.com', reportsTo: 'Riley Patel', teamSize: 0, children: [] },
-          ] },
-        ]
-      },
-      {
-        id: 'hr',
-        name: 'Dana Morales',
-        title: 'VP People',
-        dept: 'HR',
-        email: 'dana@grokclock.com',
-        reportsTo: 'Alex Rivera',
-        teamSize: 3,
-        children: [
-          { id: 'hr1', name: 'Peyton Blake', title: 'HR Manager', dept: 'HR', email: 'peyton@grokclock.com', reportsTo: 'Dana Morales', teamSize: 2, children: [] },
-          { id: 'hr2', name: 'Sage Rivera', title: 'Recruiter', dept: 'HR', email: 'sage@grokclock.com', reportsTo: 'Dana Morales', teamSize: 0, children: [] },
-        ]
-      },
-      {
-        id: 'mkt',
-        name: 'Drew Ellis',
-        title: 'VP Marketing',
-        dept: 'Marketing',
-        email: 'drew@grokclock.com',
-        reportsTo: 'Alex Rivera',
-        teamSize: 3,
-        children: [
-          { id: 'mkt1', name: 'Harper Vale', title: 'Growth Lead', dept: 'Marketing', email: 'harper@grokclock.com', reportsTo: 'Drew Ellis', teamSize: 2, children: [] },
-          { id: 'mkt2', name: 'Rowan Knox', title: 'Brand Designer', dept: 'Marketing', email: 'rowan@grokclock.com', reportsTo: 'Drew Ellis', teamSize: 0, children: [] },
-        ]
-      },
-      {
-        id: 'fin',
-        name: 'Emerson Holt',
-        title: 'CFO',
-        dept: 'Finance',
-        email: 'emerson@grokclock.com',
-        reportsTo: 'Alex Rivera',
-        teamSize: 2,
-        children: [
-          { id: 'fin1', name: 'Finley Quinn', title: 'Controller', dept: 'Finance', email: 'finley@grokclock.com', reportsTo: 'Emerson Holt', teamSize: 1, children: [] },
-        ]
-      },
-    ]
-  }
-
-  useTimesheet() // runs side effects (seeding)
 
   // Handle /admin URL
   useEffect(() => {
@@ -1293,7 +1191,7 @@ export default function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('user')
-    window.location.href = 'login'
+    navigate('/login')
   }
 
   return (
