@@ -1,6 +1,6 @@
-# GrokClock Backend
+# SwiftShift Backend
 
-Flask API server for the GrokClock HR platform (Workday killer).
+Flask API server for the SwiftShift HR platform (Workday killer).
 
 ## Overview
 

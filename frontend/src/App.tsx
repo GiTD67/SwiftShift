@@ -488,8 +488,8 @@ function LoginPage() {
       <div className="hidden lg:flex w-5/12 flex-col justify-between p-10 relative z-10">
         <div>
           <div className="flex items-center gap-3 mb-10">
-            <img src="logo.png" alt="GrokClock" className="h-9 w-auto" />
-            <span className="font-semibold text-2xl tracking-[1px]">GROKCLOCK</span>
+            <img src="logo.png" alt="SwiftShift" className="h-9 w-auto" />
+            <span className="font-semibold text-2xl tracking-[1px]">SWIFTSHIFT</span>
           </div>
           <div className="max-w-[380px]">
             <div className="uppercase tracking-[4px] text-xs text-zinc-500 mb-3"><span className="text-[#D7FE51]">AI POWERED</span> HR ENTERPRISE PLATFORM</div>
@@ -520,7 +520,7 @@ function LoginPage() {
         <div className="glass w-full max-w-[380px] rounded-3xl p-8 border border-white/10">
           {/* Header */}
           <div className="mb-6">
-            <div className="text-xs tracking-[2px] text-[#D7FE51] mb-1.5 uppercase">Sign In to GrokClock</div>
+            <div className="text-xs tracking-[2px] text-[#D7FE51] mb-1.5 uppercase">Sign In to SwiftShift</div>
             <h2 className="text-3xl font-semibold tracking-tight mb-1.5">Welcome back</h2>
             {isReturningUser && (
               <p className="text-zinc-400 text-sm">Good to see you. Ready to clock in?</p>
@@ -614,7 +614,7 @@ function LoginPage() {
 
       {/* Footer: bottom right corner */}
       <div className="absolute bottom-6 right-0 p-4 text-[10px] text-zinc-600">
-        © 2026 GrokClock. All rights reserved.
+        © 2026 SwiftShift. All rights reserved.
       </div>
     </div>
   )
@@ -672,8 +672,8 @@ function SignupPage() {
       <div className="hidden lg:flex w-5/12 flex-col justify-between p-10 relative z-10">
         <div>
           <div className="flex items-center gap-3 mb-10">
-            <img src="logo.png" alt="GrokClock" className="h-9 w-auto" />
-            <span className="font-semibold text-2xl tracking-[1px]">GROKCLOCK</span>
+            <img src="logo.png" alt="SwiftShift" className="h-9 w-auto" />
+            <span className="font-semibold text-2xl tracking-[1px]">SWIFTSHIFT</span>
           </div>
           <div className="max-w-[380px]">
             <div className="uppercase tracking-[4px] text-xs text-zinc-500 mb-3"><span className="text-[#D7FE51]">AI POWERED</span> HR ENTERPRISE PLATFORM</div>
@@ -820,7 +820,7 @@ function SignupPage() {
 
       {/* Footer: bottom right corner */}
       <div className="absolute bottom-6 right-0 p-4 text-[10px] text-zinc-600">
-        © 2026 GrokClock. All rights reserved.
+        © 2026 SwiftShift. All rights reserved.
       </div>
     </div>
   )
@@ -883,7 +883,7 @@ export default function App() {
     name: 'Trevor Dixon and Shubham Singh',
     title: 'Co-CEOs & Co-Founders',
     dept: 'Executive',
-    email: 'co-founders@grokclock.com',
+    email: 'co-founders@swiftshift.com',
     reportsTo: null,
     teamSize: 5,
     children: [
@@ -892,21 +892,21 @@ export default function App() {
         name: 'Jordan Lee',
         title: 'CTO',
         dept: 'Engineering',
-        email: 'jordan@grokclock.com',
+        email: 'jordan@swiftshift.com',
         reportsTo: 'Alex Rivera',
         teamSize: 3,
         children: [
-          { id: 'fe', name: 'Sam Chen', title: 'Frontend Lead', dept: 'Engineering', email: 'sam@grokclock.com', reportsTo: 'Jordan Lee', teamSize: 3, children: [
-            { id: 'fe1', name: 'Parker Kim', title: 'Senior Frontend Engineer', dept: 'Engineering', email: 'parker@grokclock.com', reportsTo: 'Sam Chen', teamSize: 0, children: [] },
-            { id: 'fe2', name: 'Quinn Torres', title: 'Frontend Engineer', dept: 'Engineering', email: 'quinn@grokclock.com', reportsTo: 'Sam Chen', teamSize: 0, children: [] },
+          { id: 'fe', name: 'Sam Chen', title: 'Frontend Lead', dept: 'Engineering', email: 'sam@swiftshift.com', reportsTo: 'Jordan Lee', teamSize: 3, children: [
+            { id: 'fe1', name: 'Parker Kim', title: 'Senior Frontend Engineer', dept: 'Engineering', email: 'parker@swiftshift.com', reportsTo: 'Sam Chen', teamSize: 0, children: [] },
+            { id: 'fe2', name: 'Quinn Torres', title: 'Frontend Engineer', dept: 'Engineering', email: 'quinn@swiftshift.com', reportsTo: 'Sam Chen', teamSize: 0, children: [] },
           ] },
-          { id: 'be', name: 'Taylor Kim', title: 'Backend Lead', dept: 'Engineering', email: 'taylor@grokclock.com', reportsTo: 'Jordan Lee', teamSize: 4, children: [
-            { id: 'be1', name: 'Cameron Ellis', title: 'Senior Backend Engineer', dept: 'Engineering', email: 'cameron@grokclock.com', reportsTo: 'Taylor Kim', teamSize: 0, children: [] },
-            { id: 'be2', name: 'Jordan Vale', title: 'Backend Engineer', dept: 'Engineering', email: 'jordanv@grokclock.com', reportsTo: 'Taylor Kim', teamSize: 0, children: [] },
-            { id: 'be3', name: 'Morgan Ellis', title: 'Backend Engineer', dept: 'Engineering', email: 'morgan@grokclock.com', reportsTo: 'Taylor Kim', teamSize: 0, children: [] },
+          { id: 'be', name: 'Taylor Kim', title: 'Backend Lead', dept: 'Engineering', email: 'taylor@swiftshift.com', reportsTo: 'Jordan Lee', teamSize: 4, children: [
+            { id: 'be1', name: 'Cameron Ellis', title: 'Senior Backend Engineer', dept: 'Engineering', email: 'cameron@swiftshift.com', reportsTo: 'Taylor Kim', teamSize: 0, children: [] },
+            { id: 'be2', name: 'Jordan Vale', title: 'Backend Engineer', dept: 'Engineering', email: 'jordanv@swiftshift.com', reportsTo: 'Taylor Kim', teamSize: 0, children: [] },
+            { id: 'be3', name: 'Morgan Ellis', title: 'Backend Engineer', dept: 'Engineering', email: 'morgan@swiftshift.com', reportsTo: 'Taylor Kim', teamSize: 0, children: [] },
           ] },
-          { id: 'infra', name: 'Casey Brooks', title: 'Infra Lead', dept: 'Engineering', email: 'casey@grokclock.com', reportsTo: 'Jordan Lee', teamSize: 2, children: [
-            { id: 'inf1', name: 'Riley Voss', title: 'DevOps Engineer', dept: 'Engineering', email: 'rileyv@grokclock.com', reportsTo: 'Casey Brooks', teamSize: 0, children: [] },
+          { id: 'infra', name: 'Casey Brooks', title: 'Infra Lead', dept: 'Engineering', email: 'casey@swiftshift.com', reportsTo: 'Jordan Lee', teamSize: 2, children: [
+            { id: 'inf1', name: 'Riley Voss', title: 'DevOps Engineer', dept: 'Engineering', email: 'rileyv@swiftshift.com', reportsTo: 'Casey Brooks', teamSize: 0, children: [] },
           ] },
         ]
       },
@@ -915,16 +915,16 @@ export default function App() {
         name: 'Casey Morgan',
         title: 'VP Sales',
         dept: 'Sales',
-        email: 'casey@grokclock.com',
+        email: 'casey@swiftshift.com',
         reportsTo: 'Alex Rivera',
         teamSize: 2,
         children: [
-          { id: 'na', name: 'Jamie Quinn', title: 'North America Sales', dept: 'Sales', email: 'jamie@grokclock.com', reportsTo: 'Casey Morgan', teamSize: 5, children: [
-            { id: 'na1', name: 'Skyler Reed', title: 'Account Executive', dept: 'Sales', email: 'skyler@grokclock.com', reportsTo: 'Jamie Quinn', teamSize: 0, children: [] },
-            { id: 'na2', name: 'Avery Lane', title: 'Account Executive', dept: 'Sales', email: 'avery@grokclock.com', reportsTo: 'Jamie Quinn', teamSize: 0, children: [] },
+          { id: 'na', name: 'Jamie Quinn', title: 'North America Sales', dept: 'Sales', email: 'jamie@swiftshift.com', reportsTo: 'Casey Morgan', teamSize: 5, children: [
+            { id: 'na1', name: 'Skyler Reed', title: 'Account Executive', dept: 'Sales', email: 'skyler@swiftshift.com', reportsTo: 'Jamie Quinn', teamSize: 0, children: [] },
+            { id: 'na2', name: 'Avery Lane', title: 'Account Executive', dept: 'Sales', email: 'avery@swiftshift.com', reportsTo: 'Jamie Quinn', teamSize: 0, children: [] },
           ] },
-          { id: 'eu', name: 'Riley Patel', title: 'Europe Sales', dept: 'Sales', email: 'riley@grokclock.com', reportsTo: 'Casey Morgan', teamSize: 4, children: [
-            { id: 'eu1', name: 'Dakota Lane', title: 'Account Executive', dept: 'Sales', email: 'dakota@grokclock.com', reportsTo: 'Riley Patel', teamSize: 0, children: [] },
+          { id: 'eu', name: 'Riley Patel', title: 'Europe Sales', dept: 'Sales', email: 'riley@swiftshift.com', reportsTo: 'Casey Morgan', teamSize: 4, children: [
+            { id: 'eu1', name: 'Dakota Lane', title: 'Account Executive', dept: 'Sales', email: 'dakota@swiftshift.com', reportsTo: 'Riley Patel', teamSize: 0, children: [] },
           ] },
         ]
       },
@@ -933,12 +933,12 @@ export default function App() {
         name: 'Dana Morales',
         title: 'VP People',
         dept: 'HR',
-        email: 'dana@grokclock.com',
+        email: 'dana@swiftshift.com',
         reportsTo: 'Alex Rivera',
         teamSize: 3,
         children: [
-          { id: 'hr1', name: 'Peyton Blake', title: 'HR Manager', dept: 'HR', email: 'peyton@grokclock.com', reportsTo: 'Dana Morales', teamSize: 2, children: [] },
-          { id: 'hr2', name: 'Sage Rivera', title: 'Recruiter', dept: 'HR', email: 'sage@grokclock.com', reportsTo: 'Dana Morales', teamSize: 0, children: [] },
+          { id: 'hr1', name: 'Peyton Blake', title: 'HR Manager', dept: 'HR', email: 'peyton@swiftshift.com', reportsTo: 'Dana Morales', teamSize: 2, children: [] },
+          { id: 'hr2', name: 'Sage Rivera', title: 'Recruiter', dept: 'HR', email: 'sage@swiftshift.com', reportsTo: 'Dana Morales', teamSize: 0, children: [] },
         ]
       },
       {
@@ -946,12 +946,12 @@ export default function App() {
         name: 'Drew Ellis',
         title: 'VP Marketing',
         dept: 'Marketing',
-        email: 'drew@grokclock.com',
+        email: 'drew@swiftshift.com',
         reportsTo: 'Alex Rivera',
         teamSize: 3,
         children: [
-          { id: 'mkt1', name: 'Harper Vale', title: 'Growth Lead', dept: 'Marketing', email: 'harper@grokclock.com', reportsTo: 'Drew Ellis', teamSize: 2, children: [] },
-          { id: 'mkt2', name: 'Rowan Knox', title: 'Brand Designer', dept: 'Marketing', email: 'rowan@grokclock.com', reportsTo: 'Drew Ellis', teamSize: 0, children: [] },
+          { id: 'mkt1', name: 'Harper Vale', title: 'Growth Lead', dept: 'Marketing', email: 'harper@swiftshift.com', reportsTo: 'Drew Ellis', teamSize: 2, children: [] },
+          { id: 'mkt2', name: 'Rowan Knox', title: 'Brand Designer', dept: 'Marketing', email: 'rowan@swiftshift.com', reportsTo: 'Drew Ellis', teamSize: 0, children: [] },
         ]
       },
       {
@@ -959,11 +959,11 @@ export default function App() {
         name: 'Emerson Holt',
         title: 'CFO',
         dept: 'Finance',
-        email: 'emerson@grokclock.com',
+        email: 'emerson@swiftshift.com',
         reportsTo: 'Alex Rivera',
         teamSize: 2,
         children: [
-          { id: 'fin1', name: 'Finley Quinn', title: 'Controller', dept: 'Finance', email: 'finley@grokclock.com', reportsTo: 'Emerson Holt', teamSize: 1, children: [] },
+          { id: 'fin1', name: 'Finley Quinn', title: 'Controller', dept: 'Finance', email: 'finley@swiftshift.com', reportsTo: 'Emerson Holt', teamSize: 1, children: [] },
         ]
       },
     ]
@@ -1300,8 +1300,8 @@ export default function App() {
     <div className="ta-app" data-theme={theme}>
       <nav className="ta-navbar">
         <div className="ta-navbar-brand cursor-pointer" onClick={() => setActiveView('clock')}>
-          <img src="logo.png" alt="GrokClock" className="h-10 w-auto" />
-          <span>GrokClock</span>
+          <img src="logo.png" alt="SwiftShift" className="h-10 w-auto" />
+          <span>SwiftShift</span>
         </div>
         <div className="ta-navbar-user">
           {/* Daily streak counter */}

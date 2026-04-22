@@ -3,7 +3,7 @@ import { TimeEntry, TimesheetState } from '../types'
 import { getSampleEntries } from '../utils/sampleData'
 import { calculateDuration } from '../utils/format'
 
-const TIMESHEET_STORAGE_KEY = 'grokclock-timesheet'
+const TIMESHEET_STORAGE_KEY = 'swiftshift-timesheet'
 
 export function useTimesheet() {
   const [state, setState] = useState<TimesheetState>(() => {

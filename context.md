@@ -1,4 +1,4 @@
-# GrokClock — Project Context
+# SwiftShift — Project Context
 
 > **For future agents:** This file summarizes the project state as of the end of the conversation. Use this to understand architecture, design decisions, and how to run/deploy.
 
@@ -6,7 +6,7 @@
 
 ## Project Overview
 
-**Name:** GrokClock  
+**Name:** SwiftShift  
 **Team:** DoesItWorkday  
 **Members:** tdixon@teachx.ai, shsingh@teachx.ai
 
