@@ -436,7 +436,6 @@ function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [focusedField, setFocusedField] = useState<string | null>(null)
   const [shockwaveActive] = useState(false)
-  const [showDemoHint, setShowDemoHint] = useState(true)
 
   const isReturningUser = !!localStorage.getItem('lastEmail')
 
@@ -502,7 +501,7 @@ function LoginPage() {
               <div>Effortless navigation.</div>
               <div>Frictionless clock in.</div>
               <div>Real time visualized earnings.</div>
-              <div>find the best matched jobs</div>
+              <div>Find the best-matched jobs.</div>
               <div>Taxes filed instantly with AI.</div>
               <div>AI assisted HR support with Grokky.</div>
             </div>
@@ -512,8 +511,7 @@ function LoginPage() {
         {/* Signature: System Status */}
         <div className="flex items-center gap-3 text-sm">
           <div className="w-2 h-2 rounded-full bg-[#D7FE51] animate-pulse" />
-          <span className="font-mono text-white tracking-[2px]">SYSTEM STATUS: OPERATIONAL</span>
-          <span className="text-zinc-600 font-mono text-xs ml-1">— GROK v1.2.8</span>
+          <span className="text-white/60 tracking-wide">System Status: Online</span>
         </div>
       </div>
 
@@ -522,10 +520,10 @@ function LoginPage() {
         <div className="glass w-full max-w-[380px] rounded-3xl p-8 border border-white/10">
           {/* Header */}
           <div className="mb-6">
-            <div className="font-mono text-xs tracking-[3px] text-[#D7FE51] mb-1.5">SECURE ACCESS PORTAL</div>
-            <h2 className="text-3xl font-semibold tracking-tight mb-1.5">Sign in</h2>
+            <div className="text-xs tracking-[2px] text-[#D7FE51] mb-1.5 uppercase">Sign In to GrokClock</div>
+            <h2 className="text-3xl font-semibold tracking-tight mb-1.5">Welcome back</h2>
             {isReturningUser && (
-              <p className="text-zinc-400 text-sm">Welcome back. Ready to clock in?</p>
+              <p className="text-zinc-400 text-sm">Good to see you. Ready to clock in?</p>
             )}
           </div>
 
@@ -538,7 +536,7 @@ function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  onFocus={() => { setFocusedField('email'); setShowDemoHint(false) }}
+                  onFocus={() => setFocusedField('email')}
                   onBlur={() => setFocusedField(null)}
                   className="glass-input w-full rounded-2xl px-4 py-3 text-sm placeholder:text-zinc-600 border border-white/10 focus:border-white/40 focus:shadow-[0_0_0_3px_rgba(255,255,255,0.08)] outline-none transition-all"
                   placeholder="you@company.com"
@@ -567,8 +565,19 @@ function LoginPage() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white transition-colors"
                   tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
-                  {showPassword ? '🙈' : '👁'}
+                  {showPassword ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/>
+                      <line x1="1" y1="1" x2="23" y2="23"/>
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                      <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                  )}
                 </button>
               </div>
             </div>
@@ -586,7 +595,7 @@ function LoginPage() {
               disabled={loading}
               className="glass-btn-green w-full py-3.5 rounded-2xl text-base font-semibold tracking-[0.5px] mt-1 transition-all active:scale-[0.985] disabled:opacity-60 disabled:cursor-not-allowed hover:shadow-[0_0_30px_-8px_rgba(215,254,81,0.6)]"
             >
-              {loading ? 'VERIFYING IDENTITY…' : 'ENTER SYSTEM'}
+              {loading ? 'Signing in…' : 'Sign In'}
             </button>
 
             {/* Links */}
@@ -597,26 +606,15 @@ function LoginPage() {
           </form>
 
           {/* Footer hint */}
-          <div className="mt-6 pt-5 border-t border-white/10 text-center text-[10px] text-zinc-500 font-mono tracking-[1px]">
-            BIOMETRIC • ENCRYPTED • AUDITED
+          <div className="mt-6 pt-5 border-t border-white/10 text-center text-[10px] text-zinc-500 tracking-[1px]">
+            Secure · Encrypted · Audited
           </div>
         </div>
-        {showDemoHint && (
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 w-[280px] max-w-[calc(100%-2rem)] z-50 p-3 text-[11px] leading-snug bg-black/90 border border-[#D7FE51]/40 rounded-2xl shadow-xl text-zinc-300">
-            <button type="button" onClick={() => setShowDemoHint(false)} className="absolute top-2 right-2 text-zinc-500 hover:text-white text-sm leading-none" aria-label="Close">×</button>
-            Dear Wonderful Grokathon Judges,<br /><br />
-            Feel free to test out GrokClock by creating your own account, or you're totally welcome to use the following demo account we created for you:<br /><br />
-            <span className="text-[#D7FE51]">Username: gork@demo.com</span><br />
-            <span className="text-[#D7FE51]">Password: demoaccount</span><br /><br />
-            Thank you very much! We hope you love it.<br />
-            <span className="text-zinc-500">— Trevor, Shubham, and Gork</span>
-          </div>
-        )}
       </div>
 
       {/* Footer: bottom right corner */}
-      <div className="absolute bottom-10 right-0 p-4 text-[10px] text-zinc-500">
-        Built with ❤️ for the xAI Grokathon.
+      <div className="absolute bottom-6 right-0 p-4 text-[10px] text-zinc-600">
+        © 2026 GrokClock. All rights reserved.
       </div>
     </div>
   )
@@ -632,8 +630,6 @@ function SignupPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [focusedField, setFocusedField] = useState<string | null>(null)
   const [shockwaveActive] = useState(false)
-  const [showDemoHint, setShowDemoHint] = useState(true)
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -646,7 +642,7 @@ function SignupPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error || 'Enrollment failed. Try again.')
+        setError(data.error || 'Registration failed. Please try again.')
       } else {
         localStorage.setItem('user', JSON.stringify(data))
         localStorage.setItem('lastEmail', email)
@@ -689,7 +685,7 @@ function SignupPage() {
               <div>Effortless navigation.</div>
               <div>Frictionless clock in.</div>
               <div>Real time visualized earnings.</div>
-              <div>find the best matched jobs</div>
+              <div>Find the best-matched jobs.</div>
               <div>Taxes filed instantly with AI.</div>
               <div>AI assisted HR support with Grokky.</div>
             </div>
@@ -699,8 +695,7 @@ function SignupPage() {
         {/* Signature: System Status */}
         <div className="flex items-center gap-3 text-sm">
           <div className="w-2 h-2 rounded-full bg-[#D7FE51] animate-pulse" />
-          <span className="font-mono text-white tracking-[2px]">SYSTEM STATUS: OPERATIONAL</span>
-          <span className="text-zinc-600 font-mono text-xs ml-1">— GROK v1.2.8</span>
+          <span className="text-white/60 tracking-wide">System Status: Online</span>
         </div>
       </div>
 
@@ -708,9 +703,9 @@ function SignupPage() {
       <div className="flex-1 flex items-center justify-center p-4 relative z-10">
         <div className="glass w-full max-w-[380px] rounded-3xl p-8 border border-white/10">
           <div className="mb-6">
-            <div className="font-mono text-xs tracking-[3px] text-[#D7FE51] mb-1.5">NEW OPERATOR ENROLLMENT</div>
-            <h2 className="text-3xl font-semibold tracking-tight mb-1.5">Create account</h2>
-            <p className="text-zinc-400 text-sm">Instant access. Zero onboarding delay.</p>
+            <div className="text-xs tracking-[2px] text-[#D7FE51] mb-1.5 uppercase">Create Your Account</div>
+            <h2 className="text-3xl font-semibold tracking-tight mb-1.5">Get started</h2>
+            <p className="text-zinc-400 text-sm">Set up your account in seconds.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -753,7 +748,7 @@ function SignupPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  onFocus={() => { setFocusedField('email'); setShowDemoHint(false) }}
+                  onFocus={() => setFocusedField('email')}
                   onBlur={() => setFocusedField(null)}
                   className="glass-input w-full rounded-2xl px-4 py-3 text-sm placeholder:text-zinc-600 border border-white/10 focus:border-white/40 focus:shadow-[0_0_0_3px_rgba(255,255,255,0.08)] outline-none transition-all"
                   placeholder="you@company.com"
@@ -781,8 +776,19 @@ function SignupPage() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white transition-colors"
                   tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
-                  {showPassword ? '🙈' : '👁'}
+                  {showPassword ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/>
+                      <line x1="1" y1="1" x2="23" y2="23"/>
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                      <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                  )}
                 </button>
               </div>
             </div>
@@ -798,7 +804,7 @@ function SignupPage() {
               disabled={loading}
               className="glass-btn-green w-full py-3.5 rounded-2xl text-base font-semibold tracking-[0.5px] mt-1 transition-all active:scale-[0.985] disabled:opacity-60 disabled:cursor-not-allowed hover:shadow-[0_0_30px_-8px_#D7FE51]"
             >
-              {loading ? 'INITIALIZING PROFILE…' : 'ACTIVATE ACCESS'}
+              {loading ? 'Creating account…' : 'Create Account'}
             </button>
 
             <div className="text-center text-sm pt-1">
@@ -806,26 +812,15 @@ function SignupPage() {
             </div>
           </form>
 
-          <div className="mt-6 pt-5 border-t border-white/10 text-center text-[10px] text-zinc-500 font-mono tracking-[1px]">
-            BIOMETRIC • ENCRYPTED • AUDITED
+          <div className="mt-6 pt-5 border-t border-white/10 text-center text-[10px] text-zinc-500 tracking-[1px]">
+            Secure · Encrypted · Audited
           </div>
         </div>
-        {showDemoHint && (
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 w-[280px] max-w-[calc(100%-2rem)] z-50 p-3 text-[11px] leading-snug bg-black/90 border border-[#D7FE51]/40 rounded-2xl shadow-xl text-zinc-300">
-            <button type="button" onClick={() => setShowDemoHint(false)} className="absolute top-2 right-2 text-zinc-500 hover:text-white text-sm leading-none" aria-label="Close">×</button>
-            Dear Wonderful Grokathon Judges,<br /><br />
-            Feel free to test out GrokClock by creating your own account, or you're totally welcome to use the following demo account we created for you:<br /><br />
-            <span className="text-[#D7FE51]">Username: gork@demo.com</span><br />
-            <span className="text-[#D7FE51]">Password: demoaccount</span><br /><br />
-            Thank you very much! We hope you love it.<br />
-            <span className="text-zinc-500">— Trevor, Shubham, and Gork</span>
-          </div>
-        )}
       </div>
 
       {/* Footer: bottom right corner */}
-      <div className="absolute bottom-10 right-0 p-4 text-[10px] text-zinc-500">
-        Built with ❤️ for the xAI Grokathon.
+      <div className="absolute bottom-6 right-0 p-4 text-[10px] text-zinc-600">
+        © 2026 GrokClock. All rights reserved.
       </div>
     </div>
   )
@@ -1310,10 +1305,10 @@ export default function App() {
         </div>
         <div className="ta-navbar-user">
           {/* Daily streak counter */}
-          <div className="flex items-center gap-1.5 px-3 py-1 text-sm text-white/80">
-            <span>Days clocked into work on time:</span>
-            <span className="font-semibold underline" style={{ color: 'var(--accent-color)' }}>{streak}</span>
-            <span>day streak {streak > 0 ? '🔥' : '🕐'}</span>
+          <div className="flex items-center gap-1.5 px-3 py-1 text-sm text-white/60 border border-white/10 rounded-full">
+            <span style={{ color: 'var(--accent-color)' }}>{streak > 0 ? '🔥' : '○'}</span>
+            <span className="font-semibold" style={{ color: 'var(--accent-color)' }}>{streak}</span>
+            <span className="text-white/40">day streak</span>
           </div>
           {/* User menu dropdown */}
           <div className="relative group">
@@ -1358,42 +1353,63 @@ export default function App() {
             className={`ta-nav-btn ${activeView === 'clock' ? 'active' : ''}`}
             onClick={() => setActiveView('clock')}
           >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
             Time Clock
           </button>
           <button
             className={`ta-nav-btn ${activeView === 'timesheet' ? 'active' : ''}`}
             onClick={() => setActiveView('timesheet')}
           >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+            </svg>
             Timesheet
           </button>
           <button
             className={`ta-nav-btn ${activeView === 'rewards' ? 'active' : ''}`}
             onClick={() => setActiveView('rewards')}
           >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+              <circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
+            </svg>
             Rewards
           </button>
           <button
             className={`ta-nav-btn ${activeView === 'insurance' ? 'active' : ''}`}
             onClick={() => setActiveView('insurance')}
           >
-            Insurance & Benefits
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            Insurance &amp; Benefits
           </button>
           <button
             className={`ta-nav-btn ${activeView === 'orgchart' ? 'active' : ''}`}
             onClick={() => setActiveView('orgchart')}
           >
-            Organization Chart
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+              <rect x="8" y="2" width="8" height="4" rx="1"/><rect x="2" y="14" width="8" height="4" rx="1"/><rect x="14" y="14" width="8" height="4" rx="1"/><line x1="12" y1="6" x2="12" y2="11"/><line x1="6" y1="14" x2="6" y2="11"/><line x1="18" y1="14" x2="18" y2="11"/><line x1="6" y1="11" x2="18" y2="11"/>
+            </svg>
+            Org Chart
           </button>
           <button
             className={`ta-nav-btn ${activeView === 'taxes' ? 'active' : ''}`}
             onClick={() => setActiveView('taxes')}
           >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+              <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+            </svg>
             Files
           </button>
           <button
             className={`ta-nav-btn mb-2 ${activeView === 'groktax' ? 'active' : ''}`}
             onClick={() => setActiveView('groktax')}
           >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+              <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+            </svg>
             Grok Tax
           </button>
           <div className="ta-nav-section">Job Applications</div>
@@ -1401,21 +1417,19 @@ export default function App() {
             className={`ta-nav-btn mb-2 ${activeView === 'applications' ? 'active' : ''}`}
             onClick={() => setActiveView('applications')}
           >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
             InstaApply
           </button>
-          {/* Post a Job hidden for now
-          <button
-            className={`ta-nav-btn ${activeView === 'jobs' ? 'active' : ''}`}
-            onClick={() => setActiveView('jobs')}
-          >
-            Post a Job
-          </button>
-          */}
           <div className="ta-nav-section">Admin</div>
           <button
             className={`ta-nav-btn ${activeView === 'admin' ? 'active' : ''}`}
             onClick={() => setActiveView('admin')}
           >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+              <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+            </svg>
             Admin
           </button>
         </nav>
@@ -1425,7 +1439,10 @@ export default function App() {
             onClick={() => setActiveView('grokky')}
             style={{ color: 'var(--accent-color)', textShadow: '0 0 8px var(--accent-color)' }}
           >
-            Grokky - AI Assistant
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+              <path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 011 1v3a1 1 0 01-1 1h-1a7 7 0 01-7 7H9a7 7 0 01-7-7H1a1 1 0 01-1-1v-3a1 1 0 011-1h1a7 7 0 017-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 012-2z"/><circle cx="9" cy="14" r="1" fill="currentColor"/><circle cx="15" cy="14" r="1" fill="currentColor"/>
+            </svg>
+            Grokky — AI Assistant
           </button>
         </div>
       </aside>
@@ -2237,8 +2254,10 @@ export default function App() {
                 <h1 className="text-2xl font-semibold mb-6 neon-green">Profile</h1>
 
                 <div className="flex items-center gap-6 mb-8">
-                  <div className="w-24 h-24 rounded-2xl bg-white/10 flex items-center justify-center text-4xl">
-                    👤
+                  <div className="w-24 h-24 rounded-2xl bg-white/10 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                    </svg>
                   </div>
                   <div>
                     <div className="text-2xl font-semibold">{user.first_name} {user.last_name}</div>
@@ -2276,7 +2295,7 @@ export default function App() {
               {/* Intro */}
               <div className="glass rounded-3xl p-8">
                 <h1 className="text-2xl font-semibold mb-2 neon-green">InstaApply</h1>
-                <p className="text-zinc-400 mb-6">find the best matched jobs</p>
+                <p className="text-zinc-400 mb-6">Find the best-matched jobs for your skills and experience.</p>
               </div>
 
               {/* Resume Upload */}
