@@ -1,11 +1,11 @@
 import os
-   import psycopg2
-   import psycopg2.extras
+import psycopg2
+import psycopg2.extras
 
-   DATABASE_URL = os.environ.get(
-       "DATABASE_URL",
-       "postgresql://root:root@localhost:5432/devdb"
-   )
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql://root:root@localhost:5432/devdb"
+)
 
 
 class _CursorWrapper:
