@@ -504,7 +504,7 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
         </div>
 
         <div className="text-center text-xs text-zinc-500 pt-6">
-          GrokClock - Instant gratification for your hard work.
+          SwiftShift - Instant gratification for your hard work.
         </div>
       </div>
     </div>

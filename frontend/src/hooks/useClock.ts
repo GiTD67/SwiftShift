@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ClockState } from '../types'
 
-const CLOCK_STORAGE_KEY = 'grokclock-clock'
+const CLOCK_STORAGE_KEY = 'swiftshift-clock'
 
 export function useClock() {
   const [clock, setClock] = useState<ClockState>(() => {

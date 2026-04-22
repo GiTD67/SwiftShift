@@ -1,6 +1,6 @@
-# GrokClock Frontend
+# SwiftShift Frontend
 
-**Project:** GrokClock — The Workday Killer  
+**Project:** SwiftShift — The Workday Killer  
 **Team:** DoesItWorkday  
 **Members:** tdixon@teachx.ai, shsingh@teachx.ai
 
@@ -8,7 +8,7 @@
 
 ## Overview
 
-GrokClock is an xAI enterprise HR platform — the Workday killer. This React + TypeScript frontend delivers a full HR suite: one-tap clock in/out, 14-day timesheets, AI assistant (Grokky), jobs posting, admin panel, and more. Zero 47-click workflows. Zero training manuals.
+SwiftShift is an xAI enterprise HR platform — the Workday killer. This React + TypeScript frontend delivers a full HR suite: one-tap clock in/out, 14-day timesheets, AI assistant (Grokky), jobs posting, admin panel, and more. Zero 47-click workflows. Zero training manuals.
 
 The mission: **precision attendance, intelligent insights, zero friction.** Built with cosmic glassmorphism (iOS 26 Liquid Glass) on pure black with neon green accents.
 
