@@ -189,73 +189,14 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="text-2xl font-semibold neon-green">Rewards</div>
-          <div className="flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-zinc-500">PTO:</span>
-              <div className="flex items-center bg-zinc-900 rounded-xl px-3 py-1.5">
-                <span className="text-zinc-400">1 hr /</span>
-                <input
-                  type="number"
-                  value={(1 / ptoAccrualRate).toFixed(0)}
-                  onChange={(e) => setPtoAccrualRate(Math.max(0.001, 1 / Math.max(1, parseFloat(e.target.value) || 30)))}
-                  className="w-12 bg-transparent text-right font-mono focus:outline-none"
-                  min="1"
-                />
-                <span className="text-zinc-400">hrs</span>
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-[10px] text-zinc-500">Weekly earnings</div>
-              <div className="font-semibold tabular-nums neon-green">${totalEarnings.toFixed(0)}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── HOURLY RATE — prominent editable card ── */}
-        <div
-          ref={rateCardRef}
-          className="rounded-2xl mb-4 px-5 py-4 flex items-center justify-between gap-4 transition-all duration-300"
-          style={{
-            background: highlightRate
-              ? `linear-gradient(135deg, ${accentColor}22 0%, ${accentColor}0A 100%)`
-              : 'rgba(255,255,255,0.04)',
-            border: highlightRate
-              ? `1.5px solid ${accentColor}`
-              : '1.5px solid rgba(255,255,255,0.08)',
-            boxShadow: highlightRate
-              ? `0 0 20px ${accentColor}40, 0 0 40px ${accentColor}20`
-              : 'none',
-          }}
-        >
-          <div>
-            <div className="text-xs uppercase tracking-[2px] text-zinc-400 mb-0.5">Your Hourly Rate</div>
-            <div className="text-xs text-zinc-600">Click the amount to edit your rate</div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div
-              className="flex items-center rounded-xl px-4 py-2.5 gap-1 transition-all duration-300"
-              style={{
-                background: highlightRate ? `${accentColor}18` : 'rgba(0,0,0,0.4)',
-                border: highlightRate ? `1.5px solid ${accentColor}80` : '1.5px solid rgba(255,255,255,0.1)',
-              }}
-            >
-              <span className="text-zinc-300 text-xl font-light">$</span>
-              <input
-                ref={rateInputRef}
-                type="number"
-                value={hourlyRate}
-                onChange={(e) => setHourlyRate(Math.max(1, parseInt(e.target.value) || 0))}
-                className="w-20 bg-transparent text-right font-mono text-3xl font-bold focus:outline-none"
-                style={{ color: accentColor }}
-                min="1"
-              />
-              <span className="text-zinc-400 text-base">/hr</span>
-            </div>
+          <div className="text-right">
+            <div className="text-[10px] text-zinc-500">Weekly earnings</div>
+            <div className="font-semibold tabular-nums neon-green">${totalEarnings.toFixed(0)}</div>
           </div>
         </div>
 
         {/* Three modules side-by-side */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-4 mb-4">
 
           {/* ── REAL TIME REWARDS ── */}
           <div className="glass rounded-3xl p-6 relative overflow-hidden">
@@ -370,28 +311,79 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
             <div className="text-[10px] text-zinc-600 mt-1.5 text-right">{Math.round(paycheckProgress)}% of pay cycle</div>
           </div>
         </div>
-      </div>
 
-      {/* ═══════════════════════════════════════════
-          PTO VAULT
-          ═══════════════════════════════════════════ */}
-      <div className="glass rounded-3xl p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-lg font-semibold neon-green uppercase tracking-[2px] mb-1">PTO Vault</div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold neon-green tabular-nums">{accruedPTO.toFixed(3)}</span>
-              <span className="text-lg text-zinc-400">hrs</span>
+        {/* ── HOURLY RATE + PTO VAULT — side by side below the 3 modules ── */}
+        <div className="grid grid-cols-2 gap-4 mt-4">
+
+          {/* HOURLY RATE */}
+          <div
+            ref={rateCardRef}
+            className="rounded-2xl px-5 py-4 flex flex-col gap-3 transition-all duration-300"
+            style={{
+              background: highlightRate
+                ? `linear-gradient(135deg, ${accentColor}22 0%, ${accentColor}0A 100%)`
+                : 'rgba(255,255,255,0.04)',
+              border: highlightRate
+                ? `1.5px solid ${accentColor}`
+                : '1.5px solid rgba(255,255,255,0.08)',
+              boxShadow: highlightRate
+                ? `0 0 20px ${accentColor}40, 0 0 40px ${accentColor}20`
+                : 'none',
+            }}
+          >
+            <div>
+              <div className="text-xs uppercase tracking-[2px] text-zinc-400 mb-0.5">Your Hourly Rate</div>
+              <div className="text-xs text-zinc-600">Click the amount to edit your rate</div>
             </div>
-            <div className="text-xs text-zinc-500 mt-1">
-              Accruing 1 hr per {(1 / ptoAccrualRate).toFixed(0)} hrs worked
+            <div
+              className="flex items-center rounded-xl px-4 py-2.5 gap-1 transition-all duration-300"
+              style={{
+                background: highlightRate ? `${accentColor}18` : 'rgba(0,0,0,0.4)',
+                border: highlightRate ? `1.5px solid ${accentColor}80` : '1.5px solid rgba(255,255,255,0.1)',
+              }}
+            >
+              <span className="text-zinc-300 text-xl font-light">$</span>
+              <input
+                ref={rateInputRef}
+                type="number"
+                value={hourlyRate}
+                onChange={(e) => setHourlyRate(Math.max(1, parseInt(e.target.value) || 0))}
+                className="w-full bg-transparent text-right font-mono text-3xl font-bold focus:outline-none"
+                style={{ color: accentColor }}
+                min="1"
+              />
+              <span className="text-zinc-400 text-base">/hr</span>
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-xs text-zinc-500 mb-1">Projected annual PTO</div>
-            <div className="text-2xl font-semibold neon-green">{(2080 * ptoAccrualRate).toFixed(1)} hrs</div>
-            <div className="text-xs text-zinc-600 mt-0.5">{(2080 * ptoAccrualRate / 8).toFixed(1)} days / year</div>
+
+          {/* PTO VAULT */}
+          <div className="rounded-2xl px-5 py-4 flex flex-col gap-3 transition-all duration-300"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(255,255,255,0.08)' }}
+          >
+            <div>
+              <div className="text-xs uppercase tracking-[2px] text-zinc-400 mb-0.5">PTO Vault</div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-3xl font-bold neon-green tabular-nums">{accruedPTO.toFixed(3)}</span>
+                <span className="text-sm text-zinc-400">hrs</span>
+              </div>
+              <div className="text-xs text-zinc-600 mt-0.5">{(2080 * ptoAccrualRate).toFixed(1)} hrs projected / yr</div>
+            </div>
+            <div>
+              <div className="text-xs text-zinc-500 mb-1.5">Accrual rate</div>
+              <div className="flex items-center bg-zinc-900 rounded-xl px-3 py-1.5 gap-1">
+                <span className="text-zinc-400 text-xs">1 hr per</span>
+                <input
+                  type="number"
+                  value={(1 / ptoAccrualRate).toFixed(0)}
+                  onChange={(e) => setPtoAccrualRate(Math.max(0.001, 1 / Math.max(1, parseFloat(e.target.value) || 30)))}
+                  className="w-12 bg-transparent text-right font-mono text-sm focus:outline-none text-white"
+                  min="1"
+                />
+                <span className="text-zinc-400 text-xs">hrs worked</span>
+              </div>
+            </div>
           </div>
+
         </div>
       </div>
 

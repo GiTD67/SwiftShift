@@ -717,3 +717,75 @@ button, [role="button"] {
 [data-theme="cyan"] .border-emerald-500\/30 { border-color: rgba(81,254,254,0.3) !important; }
 [data-theme="pink"] .border-emerald-500\/30 { border-color: rgba(254,81,215,0.3) !important; }
 [data-theme="purple"] .border-emerald-500\/30 { border-color: rgba(155,81,254,0.3) !important; }
+
+/* ============================================
+   OVERTIME OVERDRIVE MODE — Gold Electric Theme
+   Activates after 8 hours via data-overdrive="true"
+   ============================================ */
+
+[data-overdrive="true"] {
+  --accent-color: #FFD700;
+  --accent-color-rgb: 255, 215, 0;
+  --accent-color-dim: rgba(255, 215, 0, 0.15);
+}
+
+[data-overdrive="true"] .glass-btn-green,
+[data-overdrive="true"] .glass-btn-green:hover {
+  background: #FFD700;
+  color: #000;
+  border-color: rgba(255, 215, 0, 0.6);
+}
+
+@keyframes overdrive-glow-pulse {
+  0%, 100% {
+    box-shadow:
+      0 20px 60px -15px rgba(0, 0, 0, 0.75),
+      inset 0 2px 0 rgba(255, 255, 255, 0.45),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.3),
+      0 0 12px rgba(255, 215, 0, 0.2),
+      0 0 30px rgba(255, 165, 0, 0.1);
+  }
+  50% {
+    box-shadow:
+      0 20px 60px -15px rgba(0, 0, 0, 0.75),
+      inset 0 2px 0 rgba(255, 255, 255, 0.45),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.3),
+      0 0 30px rgba(255, 215, 0, 0.55),
+      0 0 80px rgba(255, 165, 0, 0.3),
+      0 0 120px rgba(255, 215, 0, 0.1);
+  }
+}
+
+@keyframes overdrive-border-flicker {
+  0%, 100% { border-color: rgba(255, 215, 0, 0.18); }
+  20%       { border-color: rgba(255, 215, 0, 0.55); }
+  40%       { border-color: rgba(255, 165, 0, 0.35); }
+  60%       { border-color: rgba(255, 215, 0, 0.75); }
+  80%       { border-color: rgba(255, 200, 0, 0.45); }
+}
+
+[data-overdrive="true"] .glass {
+  animation: overdrive-glow-pulse 2.4s ease-in-out infinite,
+             overdrive-border-flicker 3.2s ease-in-out infinite;
+}
+
+[data-overdrive="true"] .ta-navbar {
+  background: #080600;
+  border-bottom-color: rgba(255, 215, 0, 0.25);
+  box-shadow: 0 2px 20px rgba(255, 215, 0, 0.1);
+}
+
+[data-overdrive="true"] .ta-sidebar {
+  background: #080600;
+  border-right-color: rgba(255, 215, 0, 0.2);
+}
+
+[data-overdrive="true"] .ta-nav-btn.active {
+  box-shadow: inset 3px 0 0 #FFD700;
+  background: rgba(255, 215, 0, 0.08);
+}
+
+[data-overdrive="true"] .crystal-progress-fill {
+  background: linear-gradient(90deg, #FFA500, #FFD700, #FFEC6E);
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.7), 0 0 24px rgba(255, 165, 0, 0.4);
+}

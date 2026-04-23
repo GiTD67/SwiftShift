@@ -1237,6 +1237,7 @@ export default function App() {
     ? Math.max(0, now.getTime() - clockInAt.getTime() - breakMsAccum - unpaidActiveBreakMs)
     : 0
   const todayTotalMs = todayWorkedMs + sessionWorkedMs
+  const isOvertimeOverdrive = todayTotalMs >= 8 * 3600000
 
   const statusText = !isClockedIn
     ? 'Not clocked in'
@@ -1256,7 +1257,6 @@ export default function App() {
           duration: 8000,
           style: {
             background: '#111111',
-            border: `1px solid ${getThemeAccentHex(theme)}`,
             color: '#ffffff',
           },
         })
@@ -1608,7 +1608,7 @@ export default function App() {
   }
 
   return (
-    <div className="ta-app" data-theme={theme}>
+    <div className="ta-app" data-theme={theme} data-overdrive={isOvertimeOverdrive ? 'true' : undefined}>
       <nav className="ta-navbar">
         <div className="flex items-center gap-2">
           {/* Hamburger (mobile only) */}
@@ -2047,47 +2047,42 @@ export default function App() {
 
               </div>
 
-              {/* Right sidebar: This pay period + Real Time Rewards */}
+              {/* Right sidebar: Real Time Rewards (top) + This pay period */}
               <aside className="xl:w-80 shrink-0 flex flex-col sm:flex-row xl:flex-col gap-4">
+                {/* Real Time Rewards module — at top */}
                 <div className="glass rounded-3xl p-8 flex-1">
-                  <div className="text-sm uppercase tracking-[2px] text-white mb-3">This pay period</div>
-                  <div className="text-lg font-medium mb-2 neon-green">{periodLabel}</div>
-                  <div className="text-sm text-zinc-400 mb-4">Regular hours: <span className="font-mono neon-green">{periodHours}</span> hrs</div>
-                  <button
-                    onClick={() => navTo('timesheet')}
-                    className="text-sm underline decoration-white/30 hover:decoration-white"
+                  <div className="text-sm uppercase tracking-[2px] text-white mb-5">Real Time Rewards</div>
+                  <motion.div
+                    key={Math.floor((todayTotalMs / 3600000) * clockHourlyRate * 10)}
+                    initial={isClockedIn ? { scale: 1.08, color: 'var(--accent-color)' } : false}
+                    animate={{ scale: 1, color: 'var(--accent-color)' }}
+                    transition={{ duration: 0.25 }}
+                    className="font-mono text-5xl font-bold tabular-nums neon-green mb-5"
                   >
-                    See my time →
-                  </button>
-                </div>
-
-                {/* Real Time Rewards module */}
-                <div className="glass rounded-3xl p-8 flex-1">
-                  <div className="text-sm uppercase tracking-[2px] text-white mb-3">Real Time Rewards</div>
-                  <div className="mb-3">
+                    ${((todayTotalMs / 3600000) * clockHourlyRate).toFixed(2)}
+                  </motion.div>
+                  <div className="flex items-center justify-between mb-5">
                     <button
                       onClick={navToRewardsWithHighlight}
-                      className="text-xs text-zinc-400 hover:text-white mb-1 text-left underline decoration-zinc-600 hover:decoration-white transition-colors cursor-pointer leading-snug"
+                      className="text-xs text-zinc-400 hover:text-white text-left underline decoration-zinc-600 hover:decoration-white transition-colors cursor-pointer leading-snug"
                       title="Click to update your hourly rate on the Rewards tab"
                     >
                       Today's earnings so far at ${clockHourlyRate}/hr
                     </button>
-                    <motion.div
-                      key={Math.floor((todayTotalMs / 3600000) * clockHourlyRate * 10)}
-                      initial={isClockedIn ? { scale: 1.08, color: 'var(--accent-color)' } : false}
-                      animate={{ scale: 1, color: 'var(--accent-color)' }}
-                      transition={{ duration: 0.25 }}
-                      className="font-mono text-5xl font-bold tabular-nums neon-green"
-                    >
-                      ${((todayTotalMs / 3600000) * clockHourlyRate).toFixed(2)}
-                    </motion.div>
                     {isClockedIn && (
-                      <div className="flex items-center gap-1.5 mt-0.5">
+                      <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
                         <span
                           className="w-2.5 h-2.5 rounded-full animate-pulse inline-block"
-                          style={{ background: '#22ff7a', boxShadow: '0 0 8px #22ff7a, 0 0 16px #22ff7a60' }}
+                          style={{
+                            background: isOvertimeOverdrive ? '#FFD700' : '#22ff7a',
+                            boxShadow: isOvertimeOverdrive
+                              ? '0 0 8px #FFD700, 0 0 16px #FFD70060'
+                              : '0 0 8px #22ff7a, 0 0 16px #22ff7a60',
+                          }}
                         />
-                        <span className="text-xs uppercase tracking-widest text-zinc-300 font-medium">live</span>
+                        <span className="text-xs uppercase tracking-widest text-zinc-300 font-medium">
+                          {isOvertimeOverdrive ? 'overdrive' : 'live'}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -2102,6 +2097,44 @@ export default function App() {
                     className="text-sm underline decoration-white/30 hover:decoration-white"
                   >
                     See rewards →
+                  </button>
+                </div>
+
+                {/* This pay period — below Real Time Rewards */}
+                <div className="glass rounded-3xl p-8 flex-1">
+                  <div className="text-sm uppercase tracking-[2px] text-white mb-4">This pay period</div>
+                  <div className="text-base font-medium mb-4 neon-green">{periodLabel}</div>
+                  <div className="space-y-3 mb-4">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-zinc-400">Regular hours</span>
+                      <span className="font-mono neon-green">{periodHours} hrs</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-zinc-400">Earned this period</span>
+                      <span className="font-mono neon-green">${(parseFloat(periodHours) * clockHourlyRate).toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-zinc-400">Days remaining</span>
+                      <span className="font-mono neon-green">
+                        {Math.max(0, Math.ceil((period.end.getTime() - now.getTime()) / 86400000))} days
+                      </span>
+                    </div>
+                  </div>
+                  <div className="crystal-progress mb-4">
+                    <div
+                      className="crystal-progress-fill"
+                      style={{
+                        width: `${Math.min(100, Math.round(
+                          (1 - Math.max(0, Math.ceil((period.end.getTime() - now.getTime()) / 86400000)) / 14) * 100
+                        ))}%`,
+                      }}
+                    />
+                  </div>
+                  <button
+                    onClick={() => navTo('timesheet')}
+                    className="text-sm underline decoration-white/30 hover:decoration-white"
+                  >
+                    See my time →
                   </button>
                 </div>
               </aside>
