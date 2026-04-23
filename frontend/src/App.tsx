@@ -529,13 +529,13 @@ function LoginPage() {
               Time is money.
             </h1>
             <div className="text-base text-zinc-400 space-y-2">
-              <div>Log in one time, and STAY logged in.</div>
-              <div>Effortless navigation.</div>
-              <div>Frictionless clock in.</div>
-              <div>Real time visualized earnings.</div>
-              <div>Find the best-matched jobs.</div>
-              <div>Taxes filed instantly with AI.</div>
-              <div>AI assisted HR support with Swifty.</div>
+              <div>No 9-step PTO requests. <span className="text-white">One form, done.</span></div>
+              <div>Clock in with one tap. <span className="text-white">Not seven clicks.</span></div>
+              <div>PTO balance visible <span className="text-white">right on your dashboard.</span></div>
+              <div>Real-time earnings. <span className="text-white">Not end-of-month guesses.</span></div>
+              <div>Stay logged in. <span className="text-white">Forever.</span></div>
+              <div>AI-filed taxes. <span className="text-white">AI-matched jobs.</span></div>
+              <div>Press <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-white text-xs font-mono">Space</kbd> to clock in. <span className="text-white">Zero friction.</span></div>
             </div>
           </div>
         </div>
@@ -714,13 +714,13 @@ function SignupPage() {
               Time is money.
             </h1>
             <div className="text-base text-zinc-400 space-y-2">
-              <div>Log in one time, and STAY logged in.</div>
-              <div>Effortless navigation.</div>
-              <div>Frictionless clock in.</div>
-              <div>Real time visualized earnings.</div>
-              <div>Find the best-matched jobs.</div>
-              <div>Taxes filed instantly with AI.</div>
-              <div>AI assisted HR support with Swifty.</div>
+              <div>No 9-step PTO requests. <span className="text-white">One form, done.</span></div>
+              <div>Clock in with one tap. <span className="text-white">Not seven clicks.</span></div>
+              <div>PTO balance visible <span className="text-white">right on your dashboard.</span></div>
+              <div>Real-time earnings. <span className="text-white">Not end-of-month guesses.</span></div>
+              <div>Stay logged in. <span className="text-white">Forever.</span></div>
+              <div>AI-filed taxes. <span className="text-white">AI-matched jobs.</span></div>
+              <div>Press <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-white text-xs font-mono">Space</kbd> to clock in. <span className="text-white">Zero friction.</span></div>
             </div>
           </div>
         </div>
@@ -910,6 +910,14 @@ export default function App() {
   const [taxFormData, setTaxFormData] = useState<any | null>(null)
   const [taxLoading, setTaxLoading] = useState(false)
   const [selectedDoc, setSelectedDoc] = useState<{ label: string; content: string } | null>(null)
+
+  // Leave request state (anti-Workday: 3-field form instead of 9-step flow)
+  const [showLeaveModal, setShowLeaveModal] = useState(false)
+  const [leaveType, setLeaveType] = useState('Vacation')
+  const [leaveStart, setLeaveStart] = useState('')
+  const [leaveEnd, setLeaveEnd] = useState('')
+  const [leaveNote, setLeaveNote] = useState('')
+  const [myLeaveRequests, setMyLeaveRequests] = useState<Array<{ type: string; start: string; end: string; days: number; status: string; note: string }>>([])
 
   const orgData = {
     id: 'ceo',
@@ -1237,6 +1245,25 @@ export default function App() {
       setShowLootDrop(true)
     }
   }
+
+  // Spacebar = clock in/out when on clock view and not typing
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== 'Space' || e.repeat) return
+      const tag = (document.activeElement as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (activeView !== 'clock') return
+      e.preventDefault()
+      if (!isClockedIn) {
+        handleClockIn()
+      } else if (!isOnBreak) {
+        handleClockOut()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeView, isClockedIn, isOnBreak])
 
   const handleSendChat = async () => {
     const msg = chatMessage.trim()
@@ -1577,7 +1604,7 @@ export default function App() {
                         </span>
                       </div>
 
-                  <div className="flex flex-wrap gap-3">
+                  <div className="flex flex-wrap gap-3 items-center">
                     {!isClockedIn && (
                       <button
                         onClick={handleClockIn}
@@ -1585,6 +1612,11 @@ export default function App() {
                       >
                         Clock in
                       </button>
+                    )}
+                    {!isClockedIn && (
+                      <span className="text-xs text-zinc-600 flex items-center gap-1">
+                        or press <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-white/60 font-mono text-[10px]">Space</kbd>
+                      </span>
                     )}
                     {isClockedIn && !isOnBreak && (
                       <>
@@ -1695,6 +1727,30 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* My Schedule: week at a glance (Workday makes you hunt for this) */}
+                <div className="glass rounded-3xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="text-sm uppercase tracking-[2px] text-white">My Schedule This Week</div>
+                    <button onClick={() => setActiveView('schedules')} className="text-xs text-zinc-500 hover:text-white underline underline-offset-2">Full schedule →</button>
+                  </div>
+                  <div className="grid grid-cols-7 gap-2">
+                    {(['Mon','Tue','Wed','Thu','Fri','Sat','Sun']).map((day, i) => {
+                      const isToday = new Date().getDay() === (i === 6 ? 0 : i + 1)
+                      const shift = i < 5 ? (i % 2 === 0 ? '6–2' : '2–10') : null
+                      return (
+                        <div key={day} className={`rounded-xl p-2 text-center text-xs ${isToday ? 'border' : 'bg-white/5'}`}
+                          style={isToday ? { borderColor: 'var(--accent-color)', backgroundColor: 'var(--accent-color-dim)' } : undefined}>
+                          <div className={`font-semibold mb-1 ${isToday ? '' : 'text-zinc-500'}`} style={isToday ? { color: 'var(--accent-color)' } : undefined}>{day}</div>
+                          {shift ? (
+                            <div className="text-[10px]" style={{ color: isToday ? 'var(--accent-color)' : undefined }}>{shift}</div>
+                          ) : (
+                            <div className="text-[10px] text-zinc-700">Off</div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
               </div>
 
               {/* Right sidebar: This pay period + Real Time Rewards */}
@@ -1732,6 +1788,42 @@ export default function App() {
                   >
                     See rewards →
                   </button>
+                </div>
+
+                {/* PTO Balance card */}
+                <div className="glass rounded-3xl p-8 flex-1">
+                  <div className="text-sm uppercase tracking-[2px] text-white mb-3">PTO Balance</div>
+                  <div className="text-3xl font-bold mb-1 neon-green">
+                    {(80 - myLeaveRequests.filter(r => r.status === 'Approved').reduce((sum, r) => sum + r.days, 0) + parseFloat(((todayTotalMs / 3600000) / 30).toFixed(1))).toFixed(1)}
+                    <span className="text-sm font-normal text-zinc-400 ml-1">hrs</span>
+                  </div>
+                  <div className="text-xs text-zinc-500 mb-3">Accruing at 1 hr per 30 worked</div>
+                  <button
+                    onClick={() => { setActiveView('leaves'); setShowLeaveModal(true) }}
+                    className="text-sm px-3 py-1.5 rounded-xl font-medium w-full text-center transition-all hover:opacity-80"
+                    style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
+                  >
+                    Request Time Off →
+                  </button>
+                </div>
+
+                {/* Next Payday countdown */}
+                <div className="glass rounded-3xl p-8 flex-1">
+                  <div className="text-sm uppercase tracking-[2px] text-white mb-3">Next Payday</div>
+                  {(() => {
+                    const daysLeft = Math.max(0, Math.ceil((period.end.getTime() - now.getTime()) / 86400000))
+                    const pctThrough = Math.min(1, (now.getTime() - period.start.getTime()) / (14 * 86400000))
+                    return (
+                      <>
+                        <div className="text-3xl font-bold mb-1 neon-green">{daysLeft}<span className="text-sm font-normal text-zinc-400 ml-1">days</span></div>
+                        <div className="text-xs text-zinc-500 mb-3">{period.end.toLocaleDateString([], { month: 'short', day: 'numeric' })}</div>
+                        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${Math.round(pctThrough * 100)}%`, backgroundColor: 'var(--accent-color)' }} />
+                        </div>
+                        <div className="text-xs text-zinc-600 mt-1">{Math.round(pctThrough * 100)}% through pay period</div>
+                      </>
+                    )
+                  })()}
                 </div>
               </aside>
             </div>
@@ -2011,30 +2103,158 @@ export default function App() {
           )}
           {activeView === 'leaves' && (
             <div className="max-w-5xl mx-auto space-y-6">
+              {/* Request Time Off modal */}
+              {showLeaveModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80" onClick={() => setShowLeaveModal(false)}>
+                  <div className="glass rounded-3xl p-8 w-full max-w-md border border-white/20 shadow-2xl" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <h2 className="text-xl font-semibold" style={{ color: 'var(--accent-color)' }}>Request Time Off</h2>
+                        <p className="text-xs text-zinc-500 mt-0.5">3 fields. No approval maze. Just done.</p>
+                      </div>
+                      <button onClick={() => setShowLeaveModal(false)} className="text-zinc-400 hover:text-white text-2xl leading-none">×</button>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs text-zinc-400 mb-1.5 uppercase tracking-wider">Leave Type</label>
+                        <select
+                          value={leaveType}
+                          onChange={e => setLeaveType(e.target.value)}
+                          className="glass-input w-full rounded-2xl px-4 py-3 text-sm border border-white/10 focus:border-white/30 outline-none bg-black/40"
+                        >
+                          <option>Vacation</option>
+                          <option>Sick Leave</option>
+                          <option>Personal</option>
+                          <option>Bereavement</option>
+                          <option>Parental</option>
+                          <option>Mental Health Day</option>
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs text-zinc-400 mb-1.5 uppercase tracking-wider">Start Date</label>
+                          <input
+                            type="date"
+                            value={leaveStart}
+                            onChange={e => setLeaveStart(e.target.value)}
+                            className="glass-input w-full rounded-2xl px-4 py-3 text-sm border border-white/10 focus:border-white/30 outline-none bg-black/40"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-zinc-400 mb-1.5 uppercase tracking-wider">End Date</label>
+                          <input
+                            type="date"
+                            value={leaveEnd}
+                            onChange={e => setLeaveEnd(e.target.value)}
+                            className="glass-input w-full rounded-2xl px-4 py-3 text-sm border border-white/10 focus:border-white/30 outline-none bg-black/40"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-zinc-400 mb-1.5 uppercase tracking-wider">Note (optional)</label>
+                        <input
+                          type="text"
+                          value={leaveNote}
+                          onChange={e => setLeaveNote(e.target.value)}
+                          placeholder="e.g. Family trip, doctor appointment…"
+                          className="glass-input w-full rounded-2xl px-4 py-3 text-sm border border-white/10 focus:border-white/30 outline-none bg-black/40 placeholder:text-zinc-600"
+                        />
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (!leaveStart || !leaveEnd) return
+                          const start = new Date(leaveStart)
+                          const end = new Date(leaveEnd)
+                          const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1)
+                          setMyLeaveRequests(prev => [...prev, { type: leaveType, start: leaveStart, end: leaveEnd, days, status: 'Pending', note: leaveNote }])
+                          setLeaveStart('')
+                          setLeaveEnd('')
+                          setLeaveNote('')
+                          setShowLeaveModal(false)
+                          toast.success(`${leaveType} request submitted! Your manager will be notified.`)
+                        }}
+                        disabled={!leaveStart || !leaveEnd}
+                        className="w-full py-3.5 rounded-2xl font-semibold text-sm transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                        style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
+                      >
+                        Submit Request
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-2xl font-semibold neon-green">Leave Management</h1>
-                  <p className="text-sm text-zinc-400">Manage PTO requests and absence tracking</p>
+                  <p className="text-sm text-zinc-400">Your PTO balance, requests, and team coverage</p>
                 </div>
+                <button
+                  onClick={() => setShowLeaveModal(true)}
+                  className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.97]"
+                  style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
+                >
+                  + Request Time Off
+                </button>
               </div>
+
+              {/* My PTO balance + stats */}
               <div className="grid grid-cols-4 gap-4">
-                {[['Pending Requests', '5'], ['Approved This Month', '12'], ['Denied This Month', '2'], ['Avg PTO Balance', '14.2 days']].map(([label, val]) => (
+                {[
+                  ['My PTO Balance', `${(80 - myLeaveRequests.filter(r => r.status === 'Approved').reduce((s, r) => s + r.days, 0)).toFixed(0)} days`],
+                  ['Pending Requests', `${myLeaveRequests.filter(r => r.status === 'Pending').length + 5}`],
+                  ['Approved This Month', '12'],
+                  ['Avg Team Balance', '14.2 days'],
+                ].map(([label, val]) => (
                   <div key={label} className="glass rounded-2xl p-4 text-center">
                     <div className="text-2xl font-bold" style={{ color: 'var(--accent-color)' }}>{val}</div>
                     <div className="text-xs text-zinc-400 mt-1">{label}</div>
                   </div>
                 ))}
               </div>
+
+              {/* My Requests */}
               <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Pending Leave Requests</h2>
+                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>My Requests</h2>
+                {myLeaveRequests.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="text-zinc-500 mb-3">No requests yet.</div>
+                    <button
+                      onClick={() => setShowLeaveModal(true)}
+                      className="px-4 py-2 rounded-xl text-sm font-medium transition-all hover:opacity-90"
+                      style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
+                    >
+                      Request Time Off
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {myLeaveRequests.map((req, i) => (
+                      <div key={i} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
+                        <div>
+                          <div className="font-medium text-sm">{req.type}</div>
+                          <div className="text-xs text-zinc-400">{req.start} – {req.end} · {req.days} day{req.days > 1 ? 's' : ''}{req.note ? ` · ${req.note}` : ''}</div>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${req.status === 'Approved' ? 'bg-emerald-500/20 text-emerald-400' : req.status === 'Denied' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                          {req.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Admin: Pending team requests */}
+              <div className="glass rounded-3xl p-6">
+                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Team Pending Requests</h2>
                 <div className="space-y-3">
                   {[
-                    { name: 'Parker Kim', type: 'Vacation', dates: 'May 5–9, 2026', days: 5, status: 'Pending' },
-                    { name: 'Quinn Torres', type: 'Sick Leave', dates: 'Apr 24, 2026', days: 1, status: 'Pending' },
-                    { name: 'Skyler Reed', type: 'Personal', dates: 'May 12, 2026', days: 1, status: 'Pending' },
-                    { name: 'Avery Lane', type: 'Vacation', dates: 'May 19–23, 2026', days: 5, status: 'Pending' },
-                    { name: 'Dakota Lane', type: 'Bereavement', dates: 'Apr 25–27, 2026', days: 3, status: 'Pending' },
-                  ].map(({ name, type, dates, days, status }) => (
+                    { name: 'Parker Kim', type: 'Vacation', dates: 'May 5–9, 2026', days: 5 },
+                    { name: 'Quinn Torres', type: 'Sick Leave', dates: 'Apr 24, 2026', days: 1 },
+                    { name: 'Skyler Reed', type: 'Personal', dates: 'May 12, 2026', days: 1 },
+                    { name: 'Avery Lane', type: 'Vacation', dates: 'May 19–23, 2026', days: 5 },
+                    { name: 'Dakota Lane', type: 'Bereavement', dates: 'Apr 25–27, 2026', days: 3 },
+                  ].map(({ name, type, dates, days }) => (
                     <div key={name} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
                       <div>
                         <div className="font-medium">{name}</div>
