@@ -3,13 +3,15 @@ import ReactMarkdown from 'react-markdown'
 import './App.css'
 import './index.css'
 import confetti from 'canvas-confetti'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { useTimesheet } from './hooks/useTimesheet'
 import { Rewards } from './components/Rewards'
 import { LootDrop } from './components/LootDrop'
 import { Tour } from './components/Tour'
 import { FeaturePreview } from './components/FeaturePreview'
+import { BreakReminderModal } from './components/BreakReminderModal'
+import { STATE_BREAK_RULES, STATE_CODES } from './data/stateBreakRules'
 
 const API_BASE = (() => {
   const m = window.location.pathname.match(/^(\/hackathon\/preview\/[^/]+)/)
@@ -1127,6 +1129,13 @@ export default function App() {
   const [targetRingConfettiFired, setTargetRingConfettiFired] = useState(false)
   const [overdriveConfettiFired, setOverdriveConfettiFired] = useState(false)
 
+  // State-specific break reminder
+  const [workState, setWorkState] = useState<string>(() => localStorage.getItem('swiftshift-work-state') || 'CA')
+  const [showBreakReminder, setShowBreakReminder] = useState(false)
+  const [breakReminderIsSecond, setBreakReminderIsSecond] = useState(false)
+  // Tracks which reminder thresholds have already fired this clock session (reset on clock-in)
+  const breakReminderFiredRef = useRef<Set<string>>(new Set())
+
   // Daily streak counter (gamified punctuality)
   const [streak, setStreak] = useState<number>(() => {
     const saved = localStorage.getItem('streak')
@@ -1383,6 +1392,46 @@ export default function App() {
       })
     }
   }
+
+  // Persist work state to localStorage
+  useEffect(() => {
+    localStorage.setItem('swiftshift-work-state', workState)
+  }, [workState])
+
+  // Reset break reminder tracking when clocking in
+  useEffect(() => {
+    if (isClockedIn) {
+      breakReminderFiredRef.current = new Set()
+      setShowBreakReminder(false)
+    }
+  }, [isClockedIn])
+
+  // State-specific break reminder logic
+  useEffect(() => {
+    if (!isClockedIn || isOnBreak) return
+    const rule = STATE_BREAK_RULES[workState]
+    if (!rule || rule.triggerAfterHours === 0) return
+
+    const hoursWorked = sessionWorkedMs / 3600000
+
+    // First meal break check
+    if (hoursWorked >= rule.triggerAfterHours && !breakReminderFiredRef.current.has('first')) {
+      breakReminderFiredRef.current.add('first')
+      setBreakReminderIsSecond(false)
+      setShowBreakReminder(true)
+    }
+
+    // Second meal break check (California and similar states)
+    if (
+      rule.secondBreakTriggerHours > 0 &&
+      hoursWorked >= rule.secondBreakTriggerHours &&
+      !breakReminderFiredRef.current.has('second')
+    ) {
+      breakReminderFiredRef.current.add('second')
+      setBreakReminderIsSecond(true)
+      setShowBreakReminder(true)
+    }
+  }, [sessionWorkedMs, isClockedIn, isOnBreak, workState])
 
   const handleClockOut = () => {
     if (isClockedIn) {
@@ -1803,6 +1852,29 @@ export default function App() {
                           Clock out
                         </motion.button>
                       </>
+                    )}
+                  </div>
+
+                  {/* Work state selector for break law compliance */}
+                  <div className="mt-4 flex items-center gap-2">
+                    <span className="text-xs text-zinc-500">Work state:</span>
+                    <select
+                      value={workState}
+                      onChange={e => setWorkState(e.target.value)}
+                      className="text-xs bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-zinc-300 focus:border-white/30 focus:outline-none"
+                    >
+                      {STATE_CODES.map(code => (
+                        <option key={code} value={code}>
+                          {code} — {STATE_BREAK_RULES[code].name}
+                        </option>
+                      ))}
+                    </select>
+                    {STATE_BREAK_RULES[workState]?.triggerAfterHours > 0 ? (
+                      <span className="text-xs text-zinc-500">
+                        · {STATE_BREAK_RULES[workState].mealBreakMinutes}-min break required by hour {STATE_BREAK_RULES[workState].triggerAfterHours + 1}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-zinc-600">· No state break law</span>
                     )}
                   </div>
                     </div>
@@ -3126,6 +3198,19 @@ export default function App() {
             accentHex={themeAccentHex}
           />
         )}
+
+        {/* State-specific meal break reminder */}
+        <BreakReminderModal
+          isOpen={showBreakReminder}
+          rule={STATE_BREAK_RULES[workState]}
+          hoursWorked={sessionWorkedMs / 3600000}
+          isSecondBreak={breakReminderIsSecond}
+          onStartBreak={() => {
+            setShowBreakReminder(false)
+            handleStartBreak()
+          }}
+          onDismiss={() => setShowBreakReminder(false)}
+        />
 
         {/* Clock-out Loot Drop modal */}
         <LootDrop
