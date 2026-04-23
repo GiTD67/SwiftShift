@@ -927,6 +927,15 @@ export default function App() {
 
   // Main app
   const [activeView, setActiveView] = useState<View>('clock')
+  const [clockHourlyRate, setClockHourlyRate] = useState<number>(() => {
+    const saved = localStorage.getItem('swiftshift-hourly-rate')
+    if (saved) return parseFloat(saved)
+    const salary = Number(user?.salary) || 0
+    if (salary > 0) return salary / 2080
+    const pay = Number(user?.pay)
+    return pay > 0 ? pay : 65
+  })
+  const [highlightRate, setHighlightRate] = useState(false)
   const [showTour, setShowTour] = useState(() => localStorage.getItem('swiftshift-tour-pending') === '1')
   const [chatMessage, setChatMessage] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
@@ -955,6 +964,18 @@ export default function App() {
     setActiveView(view)
     setMobileMenuOpen(false)
   }
+
+  const navToRewardsWithHighlight = () => {
+    setHighlightRate(true)
+    navTo('rewards')
+  }
+
+  // Auto-clear highlight after animation completes
+  useEffect(() => {
+    if (!highlightRate) return
+    const timer = setTimeout(() => setHighlightRate(false), 2500)
+    return () => clearTimeout(timer)
+  }, [highlightRate])
 
   const orgData = {
     id: 'ceo',
@@ -1474,10 +1495,9 @@ export default function App() {
       setPaidBreakMsAccum(0)
 
       // Show LootDrop modal with earnings and PTO
-      const hourlyRate = 65
       const ptoAccrualRate = 0.0385
       const hoursWorked = session / 3600000
-      setLootEarnings(Math.round(hoursWorked * hourlyRate * 100) / 100)
+      setLootEarnings(Math.round(hoursWorked * clockHourlyRate * 100) / 100)
       setLootPtoHours(Math.round(hoursWorked * ptoAccrualRate * 100) / 100)
       setLootDurationMin(Math.round(session / 60000))
       setShowLootDrop(true)
@@ -2048,15 +2068,21 @@ export default function App() {
                 <div className="glass rounded-3xl p-8 flex-1">
                   <div className="text-sm uppercase tracking-[2px] text-white mb-3">Real Time Rewards</div>
                   <div className="mb-3">
-                    <div className="text-xs text-zinc-400 mb-1">Today's Earnings</div>
+                    <button
+                      onClick={navToRewardsWithHighlight}
+                      className="text-xs text-zinc-400 hover:text-white mb-1 text-left underline decoration-zinc-600 hover:decoration-white transition-colors cursor-pointer leading-snug"
+                      title="Click to update your hourly rate on the Rewards tab"
+                    >
+                      Today's earnings so far at ${clockHourlyRate}/hr
+                    </button>
                     <motion.div
-                      key={Math.floor((todayTotalMs / 3600000) * 65 * 10)}
+                      key={Math.floor((todayTotalMs / 3600000) * clockHourlyRate * 10)}
                       initial={isClockedIn ? { scale: 1.08, color: 'var(--accent-color)' } : false}
                       animate={{ scale: 1, color: 'var(--accent-color)' }}
                       transition={{ duration: 0.25 }}
                       className="font-mono text-5xl font-bold tabular-nums neon-green"
                     >
-                      ${((todayTotalMs / 3600000) * 65).toFixed(2)}
+                      ${((todayTotalMs / 3600000) * clockHourlyRate).toFixed(2)}
                     </motion.div>
                     {isClockedIn && (
                       <div className="flex items-center gap-1.5 mt-0.5">
@@ -2096,6 +2122,8 @@ export default function App() {
               isClockedIn={isClockedIn}
               theme={theme}
               user={user}
+              highlightRate={highlightRate}
+              onRateChange={(rate) => setClockHourlyRate(rate)}
             />
           )}
           {activeView === 'admin' && (

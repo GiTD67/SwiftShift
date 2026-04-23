@@ -9,9 +9,15 @@ interface RewardsProps {
   theme?: 'green' | 'white' | 'orange' | 'cyan' | 'pink' | 'purple'
   user?: any
   onFocus?: () => void
+  highlightRate?: boolean
+  onRateChange?: (rate: number) => void
 }
 
+const HOURLY_RATE_KEY = 'swiftshift-hourly-rate'
+
 function computeHourlyRate(user: any): number {
+  const saved = localStorage.getItem(HOURLY_RATE_KEY)
+  if (saved) return parseFloat(saved)
   const salary = Number(user?.salary) || 0
   if (salary > 0) return salary / 2080
   const pay = Number(user?.pay)
@@ -20,13 +26,15 @@ function computeHourlyRate(user: any): number {
 
 const LEVEL_NAMES = ['Rookie', 'Associate', 'Pro', 'Senior', 'Expert', 'Elite', 'Master', 'Legend']
 
-export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'green', user, onFocus }: RewardsProps) {
+export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'green', user, onFocus, highlightRate, onRateChange }: RewardsProps) {
   const [hourlyRate, setHourlyRate] = useState(() => computeHourlyRate(user))
   const [ptoAccrualRate, setPtoAccrualRate] = useState(1 / 30)
   const [hasFiredConfetti, setHasFiredConfetti] = useState(false)
   const [streak, setStreak] = useState(0)
   const prevCentsRef = useRef(0)
   const containerRef = useRef<HTMLDivElement>(null)
+  const rateInputRef = useRef<HTMLInputElement>(null)
+  const rateCardRef = useRef<HTMLDivElement>(null)
 
   const liveTodayEarnings = isClockedIn ? (elapsedSeconds / 3600) * hourlyRate : 0
   const earnedToday = liveTodayEarnings
@@ -139,6 +147,23 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
     triggerHaptic(Math.floor(earnedToday * 100) % 100)
   }, [earnedToday, isClockedIn, triggerHaptic])
 
+  // Persist hourly rate changes and notify parent
+  useEffect(() => {
+    localStorage.setItem(HOURLY_RATE_KEY, String(hourlyRate))
+    onRateChange?.(hourlyRate)
+  }, [hourlyRate]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Scroll to and highlight rate input when triggered from clock view
+  useEffect(() => {
+    if (!highlightRate) return
+    const timer = setTimeout(() => {
+      rateCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      rateInputRef.current?.focus()
+      rateInputRef.current?.select()
+    }, 150)
+    return () => clearTimeout(timer)
+  }, [highlightRate])
+
   // Confetti on tab focus
   useEffect(() => {
     if (onFocus && !hasFiredConfetti) {
@@ -162,23 +187,9 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
           ═══════════════════════════════════════════ */}
       <div className="glass rounded-3xl p-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <div className="text-2xl font-semibold neon-green">Rewards</div>
           <div className="flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-zinc-500">Rate:</span>
-              <div className="flex items-center bg-zinc-900 rounded-xl px-3 py-1.5">
-                <span className="text-zinc-400">$</span>
-                <input
-                  type="number"
-                  value={hourlyRate}
-                  onChange={(e) => setHourlyRate(Math.max(1, parseInt(e.target.value) || 0))}
-                  className="w-16 bg-transparent text-right font-mono focus:outline-none"
-                  min="1"
-                />
-                <span className="text-zinc-400">/hr</span>
-              </div>
-            </div>
             <div className="flex items-center gap-2">
               <span className="text-zinc-500">PTO:</span>
               <div className="flex items-center bg-zinc-900 rounded-xl px-3 py-1.5">
@@ -196,6 +207,49 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
             <div className="text-right">
               <div className="text-[10px] text-zinc-500">Weekly earnings</div>
               <div className="font-semibold tabular-nums neon-green">${totalEarnings.toFixed(0)}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── HOURLY RATE — prominent editable card ── */}
+        <div
+          ref={rateCardRef}
+          className="rounded-2xl mb-4 px-5 py-4 flex items-center justify-between gap-4 transition-all duration-300"
+          style={{
+            background: highlightRate
+              ? `linear-gradient(135deg, ${accentColor}22 0%, ${accentColor}0A 100%)`
+              : 'rgba(255,255,255,0.04)',
+            border: highlightRate
+              ? `1.5px solid ${accentColor}`
+              : '1.5px solid rgba(255,255,255,0.08)',
+            boxShadow: highlightRate
+              ? `0 0 20px ${accentColor}40, 0 0 40px ${accentColor}20`
+              : 'none',
+          }}
+        >
+          <div>
+            <div className="text-xs uppercase tracking-[2px] text-zinc-400 mb-0.5">Your Hourly Rate</div>
+            <div className="text-xs text-zinc-600">Click the amount to edit your rate</div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div
+              className="flex items-center rounded-xl px-4 py-2.5 gap-1 transition-all duration-300"
+              style={{
+                background: highlightRate ? `${accentColor}18` : 'rgba(0,0,0,0.4)',
+                border: highlightRate ? `1.5px solid ${accentColor}80` : '1.5px solid rgba(255,255,255,0.1)',
+              }}
+            >
+              <span className="text-zinc-300 text-xl font-light">$</span>
+              <input
+                ref={rateInputRef}
+                type="number"
+                value={hourlyRate}
+                onChange={(e) => setHourlyRate(Math.max(1, parseInt(e.target.value) || 0))}
+                className="w-20 bg-transparent text-right font-mono text-3xl font-bold focus:outline-none"
+                style={{ color: accentColor }}
+                min="1"
+              />
+              <span className="text-zinc-400 text-base">/hr</span>
             </div>
           </div>
         </div>
