@@ -2233,7 +2233,7 @@ export default function App() {
                         <span className="text-zinc-400">{used}h / {total}h</span>
                       </div>
                       <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all" style={{ width: `${Math.round((used as number / total as number) * 100)}%`, backgroundColor: 'var(--accent-color)' }} />
+                        <div className="h-full rounded-full transition-all" style={{ width: `${Math.round(((used as number) / (total as number)) * 100)}%`, backgroundColor: 'var(--accent-color)' }} />
                       </div>
                     </div>
                   ))}
@@ -2266,7 +2266,7 @@ export default function App() {
                     { name: 'Skyler Reed', type: 'Personal', dates: 'May 12, 2026', days: 1, status: 'Pending' },
                     { name: 'Avery Lane', type: 'Vacation', dates: 'May 19–23, 2026', days: 5, status: 'Pending' },
                     { name: 'Dakota Lane', type: 'Bereavement', dates: 'Apr 25–27, 2026', days: 3, status: 'Pending' },
-                  ].map(({ name, type, dates, days, status }) => (
+                  ].map(({ name, type, dates, days }) => (
                     <div key={name} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
                       <div>
                         <div className="font-medium">{name}</div>
