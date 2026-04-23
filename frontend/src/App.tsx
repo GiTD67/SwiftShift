@@ -1519,6 +1519,7 @@ export default function App() {
 
   // Clock state
   const [clockInAt, setClockInAt] = useState<Date | null>(null)
+  const [clockSessionId, setClockSessionId] = useState<number | null>(null)
   const [breakStartedAt, setBreakStartedAt] = useState<Date | null>(null)
   const [breakType, setBreakType] = useState<'paid' | 'unpaid' | null>(null)
   const [breakMsAccum, setBreakMsAccum] = useState(0)
@@ -1528,6 +1529,29 @@ export default function App() {
   const [now, setNow] = useState(new Date())
   const [_shockwaveActive, setShockwaveActive] = useState(false)
   const [ripplePos, setRipplePos] = useState<{ x: number; y: number } | null>(null)
+
+  // PTO bank (loaded from DB, updated on clock-out)
+  const [ptoBalance, setPtoBalance] = useState<number>(0)
+  const PTO_ACCRUAL_RATE = 0.0385 // hours per hour worked
+
+  // Profile sub-state
+  const [profileTab, setProfileTab] = useState<'info' | 'schedule' | 'deposit' | 'availability'>('info')
+  const [workSchedule, setWorkSchedule] = useState({ work_start: '09:00', work_end: '17:00', work_days: [1,2,3,4,5] })
+  const [directDeposit, setDirectDeposit] = useState({ bank_name: '', account_type: 'checking', routing_number: '', account_number: '' })
+  const [availabilityGrid, setAvailabilityGrid] = useState<Record<string, boolean>>({})
+  const [profileSaving, setProfileSaving] = useState(false)
+
+  // Schedules sub-state
+  const [shiftSwaps, setShiftSwaps] = useState<any[]>([])
+  const [timesheetSubs, setTimesheetSubs] = useState<any[]>([])
+  const [showSwapModal, setShowSwapModal] = useState(false)
+  const [swapForm, setSwapForm] = useState({ shift_date: '', shift_label: '', reason: '' })
+
+  // Leave management sub-state
+  const [ptoRequests, setPtoRequests] = useState<any[]>([])
+  const [showPtoModal, setShowPtoModal] = useState(false)
+  const [ptoForm, setPtoForm] = useState({ hours: '', reason: '' })
+  const [ptoPayoutHours, setPtoPayoutHours] = useState('')
 
   // Milestone tracking refs (persist across renders, reset on new clock session)
   const hoursMilestoneFiredRef = useRef<Set<number>>(new Set())
@@ -1602,17 +1626,25 @@ export default function App() {
             todayMs += activeElapsedMs
           }
           setClockInAt(clockInDate)
+          setClockSessionId(active.id)
           setBreakStartedAt(null)
           setBreakType(null)
           setBreakMsAccum(0)
           setPaidBreakMsAccum(0)
         } else {
           setClockInAt(null)
+          setClockSessionId(null)
         }
 
         setTodayWorkedMs(todayMs)
         setPeriodTotalMs(periodMs)
       })
+      .catch(() => {})
+
+    // Load PTO balance
+    fetch(`${API_BASE}/api/pto/balance?user_id=${uid}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setPtoBalance(Number(data.hours_balance) || 0) })
       .catch(() => {})
   }, [user?.id])
 
@@ -1717,10 +1749,127 @@ export default function App() {
     }
   }, [Math.floor((todayTotalMs / 3600000) * 65 / 50)])
 
+  // Overtime warning at 7.5 hrs
+  const overtimeWarningFiredRef = useRef(false)
+  useEffect(() => {
+    if (!isClockedIn) { overtimeWarningFiredRef.current = false; return }
+    const hoursWorked = todayTotalMs / 3600000
+    if (hoursWorked >= 7.5 && !overtimeWarningFiredRef.current) {
+      overtimeWarningFiredRef.current = true
+      toast('⚡ Overtime territory!', { description: 'You\'ve hit 7.5 hrs — next hours earn 1.5×.' })
+    }
+  }, [Math.floor(todayTotalMs / (0.5 * 3600000))])
+
+  // Payday notification (2nd and last Friday of month)
+  useEffect(() => {
+    const today = new Date()
+    if (today.getDay() !== 5) return // must be Friday
+    const month = today.getMonth()
+    const year = today.getFullYear()
+    const fridays: Date[] = []
+    const d = new Date(year, month, 1)
+    while (d.getMonth() === month) {
+      if (d.getDay() === 5) fridays.push(new Date(d))
+      d.setDate(d.getDate() + 1)
+    }
+    const isPayday = fridays.length >= 2 && (
+      today.toDateString() === fridays[1].toDateString() ||
+      today.toDateString() === fridays[fridays.length - 1].toDateString()
+    )
+    if (isPayday) {
+      setTimeout(() => {
+        toast.success('Payday! 💸', { description: 'Your paycheck has been deposited.', duration: 10000 })
+        confetti({ particleCount: 200, spread: 90, origin: { y: 0.5 }, colors: ['#FFD700', '#22c55e', '#D7FE51'] })
+      }, 2000)
+    }
+  }, [])
+
+  // Clock-in reminder based on work schedule
+  useEffect(() => {
+    if (isClockedIn) return
+    const uid = user?.id
+    if (!uid) return
+    fetch(`${API_BASE}/api/work-schedule?user_id=${uid}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data?.work_start) return
+        const [h, m] = data.work_start.split(':').map(Number)
+        const now2 = new Date()
+        const startTime = new Date(now2)
+        startTime.setHours(h, m, 0, 0)
+        const msUntilStart = startTime.getTime() - now2.getTime()
+        if (msUntilStart > 0 && msUntilStart < 3600000) {
+          setTimeout(() => {
+            if (!isClockedIn) toast('⏰ Time to clock in!', { description: `Your shift starts at ${data.work_start}.` })
+          }, msUntilStart)
+        }
+      })
+      .catch(() => {})
+  }, [user?.id])
+
+  // Load PTO requests when leaves view is active
+  useEffect(() => {
+    if (activeView !== 'leaves' || !user?.id) return
+    fetch(`${API_BASE}/api/pto/requests?user_id=${user.id}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setPtoRequests(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }, [activeView, user?.id])
+
+  // Load shift swaps and timesheet submissions when schedules view is active
+  useEffect(() => {
+    if (activeView !== 'schedules' || !user?.id) return
+    fetch(`${API_BASE}/api/shift-swaps?user_id=${user.id}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setShiftSwaps(Array.isArray(data) ? data : []))
+      .catch(() => {})
+    fetch(`${API_BASE}/api/timesheet-submissions?user_id=${user.id}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setTimesheetSubs(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }, [activeView, user?.id])
+
+  // Load profile data when profile view is active
+  useEffect(() => {
+    if (activeView !== 'profile' || !user?.id) return
+    fetch(`${API_BASE}/api/work-schedule?user_id=${user.id}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) {
+          let days = [1,2,3,4,5]
+          try { days = JSON.parse(data.work_days || '[1,2,3,4,5]') } catch {}
+          setWorkSchedule({ work_start: data.work_start || '09:00', work_end: data.work_end || '17:00', work_days: days })
+        }
+      })
+      .catch(() => {})
+    fetch(`${API_BASE}/api/direct-deposit?user_id=${user.id}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.bank_name) setDirectDeposit({ bank_name: data.bank_name, account_type: data.account_type || 'checking', routing_number: data.routing_number || '', account_number: data.account_number || '' })
+      })
+      .catch(() => {})
+    fetch(`${API_BASE}/api/availability?user_id=${user.id}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.availability_json) {
+          try { setAvailabilityGrid(JSON.parse(data.availability_json)) } catch {}
+        }
+      })
+      .catch(() => {})
+  }, [activeView, user?.id])
+
+  // Overtime earnings helper (1.5× after 8 hrs/day)
+  function calcEarningsWithOT(hours: number, rate: number): number {
+    const regular = Math.min(hours, 8) * rate
+    const overtime = Math.max(0, hours - 8) * rate * 1.5
+    return regular + overtime
+  }
+
   // Pay period
   const period = useMemo(() => payPeriodFor(now), [now])
   const periodLabel = `${period.start.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })} – ${period.end.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })}`
   const periodHours = ((periodTotalMs + sessionWorkedMs) / 3600000).toFixed(1)
+  const periodEarnings = calcEarningsWithOT(parseFloat(periodHours), clockHourlyRate)
 
   // Actions
   const handleClockIn = (e?: React.MouseEvent<HTMLButtonElement>) => {
@@ -1730,6 +1879,18 @@ export default function App() {
       setBreakType(null)
       setBreakMsAccum(0)
       setPaidBreakMsAccum(0)
+
+      // Persist clock-in to DB
+      if (user?.id) {
+        fetch(`${API_BASE}/api/clock-sessions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ employee_id: user.id }),
+        })
+          .then(r => r.ok ? r.json() : null)
+          .then(data => { if (data?.id) setClockSessionId(data.id) })
+          .catch(() => {})
+      }
 
       // Update daily streak (freeze over weekends)
       const todayStr = now.toISOString().slice(0, 10)
@@ -1887,12 +2048,28 @@ export default function App() {
       setPaidBreakMsAccum(0)
 
       // Show LootDrop modal with earnings and PTO
-      const ptoAccrualRate = 0.0385
       const hoursWorked = session / 3600000
-      setLootEarnings(Math.round(hoursWorked * clockHourlyRate * 100) / 100)
-      setLootPtoHours(Math.round(hoursWorked * ptoAccrualRate * 100) / 100)
+      const ptoAccrued = Math.round(hoursWorked * PTO_ACCRUAL_RATE * 100) / 100
+      setLootEarnings(Math.round(calcEarningsWithOT(hoursWorked, clockHourlyRate) * 100) / 100)
+      setLootPtoHours(ptoAccrued)
       setLootDurationMin(Math.round(session / 60000))
       setShowLootDrop(true)
+
+      // Persist clock-out to DB and accrue PTO
+      if (user?.id) {
+        if (clockSessionId) {
+          fetch(`${API_BASE}/api/clock-sessions/${clockSessionId}`, { method: 'PUT' }).catch(() => {})
+        }
+        fetch(`${API_BASE}/api/pto/accrue`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: user.id, hours: ptoAccrued }),
+        })
+          .then(r => r.ok ? r.json() : null)
+          .then(data => { if (data) setPtoBalance(Number(data.hours_balance) || 0) })
+          .catch(() => {})
+        setClockSessionId(null)
+      }
     }
   }
 
@@ -2482,9 +2659,9 @@ export default function App() {
                     )}
                   </div>
                   <div className="flex justify-between items-center mb-4">
-                    <div className="text-sm text-zinc-400">PTO Accrued:</div>
+                    <div className="text-sm text-zinc-400">PTO Balance:</div>
                     <div className="text-sm font-semibold neon-green">
-                      {((todayTotalMs / 3600000) / 30).toFixed(3)} hrs
+                      {(ptoBalance + (todayTotalMs / 3600000) * PTO_ACCRUAL_RATE).toFixed(2)} hrs
                     </div>
                   </div>
                   <button
@@ -2501,12 +2678,18 @@ export default function App() {
                   <div className="text-base font-medium mb-4 neon-green">{periodLabel}</div>
                   <div className="space-y-3 mb-4">
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-zinc-400">Regular hours</span>
+                      <span className="text-zinc-400">Hours worked</span>
                       <span className="font-mono neon-green">{periodHours} hrs</span>
                     </div>
+                    {parseFloat(periodHours) > 80 && (
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-zinc-400">OT×1.5 hrs</span>
+                        <span className="font-mono text-amber-400">{Math.max(0, parseFloat(periodHours) - 80).toFixed(1)} hrs</span>
+                      </div>
+                    )}
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-zinc-400">Earned this period</span>
-                      <span className="font-mono neon-green">${(parseFloat(periodHours) * clockHourlyRate).toFixed(0)}</span>
+                      <span className="font-mono neon-green">${periodEarnings.toFixed(0)}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-zinc-400">Days remaining</span>
@@ -2684,98 +2867,259 @@ export default function App() {
             <div className="max-w-5xl mx-auto space-y-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h1 className="text-2xl font-semibold neon-green">Schedule Management</h1>
-                  <p className="text-sm text-zinc-400">Manage shifts and employee schedules</p>
+                  <h1 className="text-2xl font-semibold neon-green">My Schedule</h1>
+                  <p className="text-sm text-zinc-400">Weekly availability, shift swaps, and timesheet submissions</p>
                 </div>
-                <button className="px-4 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
-                  + Add Shift
+                <button onClick={() => setShowSwapModal(true)} className="px-4 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
+                  + Request Swap
                 </button>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-                  <div key={day} className="glass rounded-2xl p-3">
-                    <div className="text-xs font-semibold text-zinc-400 mb-2 uppercase">{day}</div>
-                    {['Morning 6–2', 'Afternoon 2–10'].map((shift, i) => (
-                      <div key={i} className="text-xs rounded-lg px-2 py-1.5 mb-1.5 cursor-pointer hover:opacity-80 transition-opacity"
-                        style={{ backgroundColor: 'var(--accent-color-dim)', borderLeft: '3px solid var(--accent-color)', color: 'var(--accent-color)' }}>
-                        {shift}
-                        <div className="text-zinc-400 mt-0.5">{i === 0 ? '3 assigned' : '2 assigned'}</div>
-                      </div>
-                    ))}
-                    <div className="text-xs text-zinc-600 mt-2 text-center cursor-pointer hover:text-zinc-400">+ add</div>
-                  </div>
-                ))}
-              </div>
+
+              {/* Weekly availability grid */}
               <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Shift Coverage Summary</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {[['Total Shifts This Week', '14'], ['Filled Shifts', '11'], ['Open Shifts', '3']].map(([label, val]) => (
-                    <div key={label} className="bg-white/5 rounded-2xl p-4 text-center">
-                      <div className="text-2xl font-bold" style={{ color: 'var(--accent-color)' }}>{val}</div>
-                      <div className="text-xs text-zinc-400 mt-1">{label}</div>
-                    </div>
-                  ))}
+                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>My Week ({workSchedule.work_start} – {workSchedule.work_end})</h2>
+                <div className="grid grid-cols-7 gap-2">
+                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => {
+                    const dayNum = i + 1 === 7 ? 0 : i + 1
+                    const isWorkDay = workSchedule.work_days.includes(dayNum)
+                    const isAvail = availabilityGrid[day] !== false && isWorkDay
+                    return (
+                      <div key={day} className={`rounded-2xl p-3 text-center ${isAvail ? 'border border-white/20' : 'opacity-40'}`}
+                        style={{ background: isAvail ? 'var(--accent-color-dim, rgba(215,254,81,0.08))' : 'rgba(255,255,255,0.03)' }}>
+                        <div className="text-xs font-semibold text-zinc-400 mb-1 uppercase">{day}</div>
+                        {isAvail ? (
+                          <div className="text-xs font-medium" style={{ color: 'var(--accent-color)' }}>{workSchedule.work_start}<br/>–<br/>{workSchedule.work_end}</div>
+                        ) : (
+                          <div className="text-xs text-zinc-600">Off</div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
+
+              {/* Shift swap requests */}
+              <div className="glass rounded-3xl p-6">
+                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Shift Swap Requests</h2>
+                {shiftSwaps.length === 0 ? (
+                  <div className="text-zinc-500 text-sm py-4 text-center">No swap requests. Click &quot;+ Request Swap&quot; to create one.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {shiftSwaps.map((swap: any) => (
+                      <div key={swap.id} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
+                        <div>
+                          <div className="font-medium">{swap.shift_label || 'Shift'} — {swap.shift_date}</div>
+                          <div className="text-xs text-zinc-400">{swap.reason || ''} · {swap.created_at?.slice(0,10)}</div>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${swap.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : swap.status === 'denied' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                          {swap.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Timesheet submissions */}
+              <div className="glass rounded-3xl p-6">
+                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Timesheet Submissions</h2>
+                {timesheetSubs.length === 0 ? (
+                  <div className="text-zinc-500 text-sm py-4 text-center">No timesheet submissions yet.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {timesheetSubs.map((sub: any) => (
+                      <div key={sub.id} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
+                        <div>
+                          <div className="font-medium">{sub.period_start} – {sub.period_end}</div>
+                          <div className="text-xs text-zinc-400">{sub.total_hours} hrs · submitted {sub.submitted_at?.slice(0,10)}</div>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${sub.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : sub.status === 'rejected' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                          {sub.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Shift swap modal */}
+              {showSwapModal && (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70" onClick={() => setShowSwapModal(false)}>
+                  <div className="glass rounded-2xl p-6 w-96 border border-white/20" onClick={e => e.stopPropagation()}>
+                    <h3 className="text-lg font-semibold mb-4 neon-green">Request Shift Swap</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="text-xs text-zinc-400 mb-1">Shift date</div>
+                        <input type="date" value={swapForm.shift_date} onChange={e => setSwapForm(f => ({ ...f, shift_date: e.target.value }))}
+                          className="w-full px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white focus:outline-none" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-zinc-400 mb-1">Shift label</div>
+                        <input type="text" value={swapForm.shift_label} onChange={e => setSwapForm(f => ({ ...f, shift_label: e.target.value }))}
+                          placeholder="e.g. Morning 6–2"
+                          className="w-full px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white focus:outline-none placeholder-zinc-600" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-zinc-400 mb-1">Reason</div>
+                        <input type="text" value={swapForm.reason} onChange={e => setSwapForm(f => ({ ...f, reason: e.target.value }))}
+                          placeholder="Why do you need the swap?"
+                          className="w-full px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white focus:outline-none placeholder-zinc-600" />
+                      </div>
+                    </div>
+                    <div className="flex gap-3 mt-5">
+                      <button onClick={() => setShowSwapModal(false)} className="flex-1 py-2 rounded-xl bg-white/10 text-sm">Cancel</button>
+                      <button
+                        onClick={() => {
+                          fetch(`${API_BASE}/api/shift-swaps`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ requester_id: user.id, shift_date: swapForm.shift_date, shift_label: swapForm.shift_label, reason: swapForm.reason }),
+                          })
+                            .then(r => r.ok ? r.json() : null)
+                            .then(data => {
+                              if (data) {
+                                setShiftSwaps(prev => [data, ...prev])
+                                toast.success('Shift swap request submitted!')
+                                setShowSwapModal(false)
+                                setSwapForm({ shift_date: '', shift_label: '', reason: '' })
+                              }
+                            })
+                            .catch(() => toast.error('Failed to submit'))
+                        }}
+                        className="flex-1 py-2 rounded-xl text-sm font-medium"
+                        style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
+                      >
+                        Submit
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
-          {activeView === 'payroll' && (
+          {activeView === 'payroll' && (() => {
+            // 2026 federal tax brackets (single filer, annualized)
+            const annualGross = periodEarnings * 26 // biweekly × 26
+            const federalTax = (() => {
+              const brackets = [
+                { limit: 11925, rate: 0.10 },
+                { limit: 48475, rate: 0.12 },
+                { limit: 103350, rate: 0.22 },
+                { limit: 197300, rate: 0.24 },
+                { limit: 250525, rate: 0.32 },
+                { limit: 626350, rate: 0.35 },
+                { limit: Infinity, rate: 0.37 },
+              ]
+              let tax = 0; let prev = 0
+              for (const b of brackets) {
+                if (annualGross <= prev) break
+                tax += (Math.min(annualGross, b.limit) - prev) * b.rate
+                prev = b.limit
+              }
+              return tax / 26
+            })()
+            const socialSecurity = Math.min(periodEarnings * 0.062, 168600 * 0.062 / 26)
+            const medicare = periodEarnings * 0.0145
+            const state401k = periodEarnings * 0.06
+            const totalDeductions = federalTax + socialSecurity + medicare + state401k
+            const netPay = periodEarnings - totalDeductions
+            const effectiveRate = annualGross > 0 ? (federalTax * 26 / annualGross * 100) : 0
+            return (
             <div className="max-w-5xl mx-auto space-y-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h1 className="text-2xl font-semibold neon-green">Payroll</h1>
-                  <p className="text-sm text-zinc-400">Current pay period: Apr 15 – Apr 30, 2026</p>
+                  <p className="text-sm text-zinc-400">{periodLabel}</p>
                 </div>
-                <button className="px-4 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
-                  Run Payroll
+                <button onClick={() => window.print()} className="px-4 py-2 rounded-xl text-sm font-medium bg-white/10 hover:bg-white/20">
+                  🖨 Print Paystub
                 </button>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {[['Total Payroll', '$48,320'], ['Employees Paid', '24'], ['Avg Hours/Employee', '38.5h'], ['Overtime Hours', '42h']].map(([label, val]) => (
-                  <div key={label} className="glass rounded-2xl p-4 text-center">
-                    <div className="text-2xl font-bold" style={{ color: 'var(--accent-color)' }}>{val}</div>
-                    <div className="text-xs text-zinc-400 mt-1">{label}</div>
-                  </div>
-                ))}
-              </div>
+
+              {/* Real paystub */}
               <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Employee Payroll Summary</h2>
-                <div className="overflow-x-auto">
-                <table className="w-full text-sm" style={{ minWidth: '500px' }}>
-                  <thead>
-                    <tr className="text-zinc-400 border-b border-white/10 text-left">
-                      <th className="py-2">Employee</th>
-                      <th className="py-2">Role</th>
-                      <th className="py-2">Hours</th>
-                      <th className="py-2">Rate</th>
-                      <th className="py-2">Gross Pay</th>
-                      <th className="py-2">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <h2 className="text-lg font-semibold mb-5" style={{ color: 'var(--accent-color)' }}>
+                  Paystub — {user.first_name} {user.last_name}
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <div className="text-xs uppercase tracking-widest text-zinc-500 mb-2">Earnings</div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-zinc-400">Regular ({Math.min(parseFloat(periodHours), 80).toFixed(1)} hrs @ ${clockHourlyRate}/hr)</span>
+                      <span className="font-mono">${(Math.min(parseFloat(periodHours), 80) * clockHourlyRate).toFixed(2)}</span>
+                    </div>
+                    {parseFloat(periodHours) > 80 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-zinc-400">Overtime ({(parseFloat(periodHours) - 80).toFixed(1)} hrs @ ${(clockHourlyRate * 1.5).toFixed(2)}/hr)</span>
+                        <span className="font-mono text-amber-400">${((parseFloat(periodHours) - 80) * clockHourlyRate * 1.5).toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm font-semibold border-t border-white/10 pt-2">
+                      <span>Gross Pay</span>
+                      <span className="font-mono" style={{ color: 'var(--accent-color)' }}>${periodEarnings.toFixed(2)}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="text-xs uppercase tracking-widest text-zinc-500 mb-2">Deductions</div>
                     {[
-                      ['Alex Rivera', 'Co-Founder', '80h', '$85/hr', '$6,800', 'Processed'],
-                      ['Jordan Lee', 'Engineering Lead', '76h', '$72/hr', '$5,472', 'Processed'],
-                      ['Dana Morales', 'HR Director', '78h', '$65/hr', '$5,070', 'Pending'],
-                      ['Casey Morgan', 'Sales Lead', '82h', '$60/hr', '$4,920', 'Pending'],
-                    ].map(([name, role, hrs, rate, gross, status]) => (
-                      <tr key={name} className="border-b border-white/5 hover:bg-white/5">
-                        <td className="py-2 font-medium">{name}</td>
-                        <td className="py-2 text-zinc-400">{role}</td>
-                        <td className="py-2">{hrs}</td>
-                        <td className="py-2">{rate}</td>
-                        <td className="py-2 font-semibold" style={{ color: 'var(--accent-color)' }}>{gross}</td>
-                        <td className="py-2">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status === 'Processed' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>{status}</span>
-                        </td>
-                      </tr>
+                      ['Federal Tax', federalTax],
+                      ['Social Security (6.2%)', socialSecurity],
+                      ['Medicare (1.45%)', medicare],
+                      ['401(k) (6%)', state401k],
+                    ].map(([label, amt]) => (
+                      <div key={label as string} className="flex justify-between text-sm">
+                        <span className="text-zinc-400">{label as string}</span>
+                        <span className="font-mono text-red-400">-${(amt as number).toFixed(2)}</span>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
+                    <div className="flex justify-between text-sm font-semibold border-t border-white/10 pt-2">
+                      <span>Net Pay</span>
+                      <span className="font-mono neon-green">${netPay.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tax withholding calculator */}
+              <div className="glass rounded-3xl p-6">
+                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Tax Withholding Calculator (2026 Brackets)</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                  {[
+                    ['Annualized Gross', `$${annualGross.toFixed(0)}`],
+                    ['Effective Rate', `${effectiveRate.toFixed(1)}%`],
+                    ['Per-paycheck Federal', `$${federalTax.toFixed(2)}`],
+                  ].map(([label, val]) => (
+                    <div key={label} className="bg-white/5 rounded-2xl p-4 text-center">
+                      <div className="text-xl font-bold" style={{ color: 'var(--accent-color)' }}>{val}</div>
+                      <div className="text-xs text-zinc-400 mt-1">{label}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-2 text-xs">
+                  <div className="text-zinc-500 mb-2">2026 Federal Brackets (single filer):</div>
+                  {[
+                    ['$0 – $11,925', '10%'],
+                    ['$11,926 – $48,475', '12%'],
+                    ['$48,476 – $103,350', '22%'],
+                    ['$103,351 – $197,300', '24%'],
+                    ['$197,301 – $250,525', '32%'],
+                    ['$250,526 – $626,350', '35%'],
+                    ['$626,351+', '37%'],
+                  ].map(([range, rate]) => {
+                    const lo = parseInt(range.replace(/[$,+–\s]/g, '').split('')[0]) || 0
+                    const active = annualGross > lo
+                    return (
+                      <div key={range} className={`flex justify-between px-3 py-1.5 rounded-lg ${active ? 'bg-white/10' : 'opacity-40'}`}>
+                        <span className="text-zinc-400">{range}</span>
+                        <span className={active ? 'font-medium' : 'text-zinc-600'} style={active ? { color: 'var(--accent-color)' } : {}}>{rate}</span>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             </div>
-          )}
+            )
+          })()}
           {activeView === 'reports' && (
             <div className="max-w-5xl mx-auto space-y-6">
               <div>
@@ -2814,47 +3158,146 @@ export default function App() {
               </div>
             </div>
           )}
-          {activeView === 'leaves' && (
+          {activeView === 'leaves' && (() => {
+            const pendingCount = ptoRequests.filter(r => r.status === 'pending').length
+            const approvedCount = ptoRequests.filter(r => r.status === 'approved').length
+            const ptoDollars = ptoBalance * clockHourlyRate
+            const payoutHrs = parseFloat(ptoPayoutHours) || 0
+            const payoutValue = payoutHrs * clockHourlyRate
+            return (
             <div className="max-w-5xl mx-auto space-y-6">
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-2xl font-semibold neon-green">Leave Management</h1>
-                  <p className="text-sm text-zinc-400">Manage PTO requests and absence tracking</p>
+                  <p className="text-sm text-zinc-400">PTO bank, payout calculator, and request tracking</p>
                 </div>
+                <button onClick={() => setShowPtoModal(true)} className="px-4 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
+                  + Request PTO
+                </button>
               </div>
+
+              {/* PTO bank stats */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {[['Pending Requests', '5'], ['Approved This Month', '12'], ['Denied This Month', '2'], ['Avg PTO Balance', '14.2 days']].map(([label, val]) => (
+                {[
+                  ['PTO Balance', `${ptoBalance.toFixed(2)} hrs`],
+                  ['Cash Value', `$${ptoDollars.toFixed(0)}`],
+                  ['Pending', `${pendingCount}`],
+                  ['Approved', `${approvedCount}`],
+                ].map(([label, val]) => (
                   <div key={label} className="glass rounded-2xl p-4 text-center">
                     <div className="text-2xl font-bold" style={{ color: 'var(--accent-color)' }}>{val}</div>
                     <div className="text-xs text-zinc-400 mt-1">{label}</div>
                   </div>
                 ))}
               </div>
+
+              {/* Payout calculator */}
               <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Pending Leave Requests</h2>
-                <div className="space-y-3">
-                  {[
-                    { name: 'Parker Kim', type: 'Vacation', dates: 'May 5–9, 2026', days: 5, status: 'Pending' },
-                    { name: 'Quinn Torres', type: 'Sick Leave', dates: 'Apr 24, 2026', days: 1, status: 'Pending' },
-                    { name: 'Skyler Reed', type: 'Personal', dates: 'May 12, 2026', days: 1, status: 'Pending' },
-                    { name: 'Avery Lane', type: 'Vacation', dates: 'May 19–23, 2026', days: 5, status: 'Pending' },
-                    { name: 'Dakota Lane', type: 'Bereavement', dates: 'Apr 25–27, 2026', days: 3, status: 'Pending' },
-                  ].map(({ name, type, dates, days }) => (
-                    <div key={name} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
-                      <div>
-                        <div className="font-medium">{name}</div>
-                        <div className="text-xs text-zinc-400">{type} · {dates} · {days} day{days > 1 ? 's' : ''}</div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button className="px-3 py-1 rounded-lg text-xs font-medium bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors">Approve</button>
-                        <button className="px-3 py-1 rounded-lg text-xs font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors">Deny</button>
-                      </div>
-                    </div>
-                  ))}
+                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Payout Calculator</h2>
+                <div className="flex flex-wrap gap-4 items-end">
+                  <div>
+                    <div className="text-xs text-zinc-400 mb-1">PTO hours to pay out</div>
+                    <input
+                      type="number" min="0" step="0.5"
+                      value={ptoPayoutHours}
+                      onChange={e => setPtoPayoutHours(e.target.value)}
+                      placeholder="0"
+                      className="w-36 px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white placeholder-zinc-600 focus:outline-none"
+                    />
+                  </div>
+                  <div className="text-sm">
+                    <span className="text-zinc-400">Rate: </span>
+                    <span className="font-mono neon-green">${clockHourlyRate}/hr</span>
+                    <span className="mx-3 text-zinc-600">→</span>
+                    <span className="font-semibold neon-green text-lg">${payoutValue.toFixed(2)}</span>
+                    {payoutHrs > ptoBalance && <span className="ml-2 text-xs text-red-400">(exceeds balance)</span>}
+                  </div>
                 </div>
               </div>
+
+              {/* Request history */}
+              <div className="glass rounded-3xl p-6">
+                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>My PTO Requests</h2>
+                {ptoRequests.length === 0 ? (
+                  <div className="text-zinc-500 text-sm py-6 text-center">No PTO requests yet. Use &quot;+ Request PTO&quot; to submit one.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {ptoRequests.map((req: any) => (
+                      <div key={req.id} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
+                        <div>
+                          <div className="font-medium">{req.hours} hrs</div>
+                          <div className="text-xs text-zinc-400">{req.reason || 'No reason'} · {req.created_at?.slice(0,10)}</div>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${req.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : req.status === 'denied' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                          {req.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* PTO request modal */}
+              {showPtoModal && (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70" onClick={() => setShowPtoModal(false)}>
+                  <div className="glass rounded-2xl p-6 w-96 border border-white/20" onClick={e => e.stopPropagation()}>
+                    <h3 className="text-lg font-semibold mb-4 neon-green">Request PTO</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="text-xs text-zinc-400 mb-1">Hours requested</div>
+                        <input
+                          type="number" min="1" step="0.5"
+                          value={ptoForm.hours}
+                          onChange={e => setPtoForm(f => ({ ...f, hours: e.target.value }))}
+                          className="w-full px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white focus:outline-none"
+                          placeholder="8"
+                        />
+                      </div>
+                      <div>
+                        <div className="text-xs text-zinc-400 mb-1">Reason</div>
+                        <input
+                          type="text"
+                          value={ptoForm.reason}
+                          onChange={e => setPtoForm(f => ({ ...f, reason: e.target.value }))}
+                          className="w-full px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white focus:outline-none"
+                          placeholder="Vacation, personal, etc."
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-3 mt-5">
+                      <button onClick={() => setShowPtoModal(false)} className="flex-1 py-2 rounded-xl bg-white/10 text-sm">Cancel</button>
+                      <button
+                        onClick={() => {
+                          const hrs = parseFloat(ptoForm.hours)
+                          if (!hrs || hrs <= 0) return
+                          fetch(`${API_BASE}/api/pto/requests`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ user_id: user.id, hours: hrs, reason: ptoForm.reason }),
+                          })
+                            .then(r => r.ok ? r.json() : null)
+                            .then(data => {
+                              if (data) {
+                                setPtoRequests(prev => [data, ...prev])
+                                toast.success('PTO request submitted!')
+                                setShowPtoModal(false)
+                                setPtoForm({ hours: '', reason: '' })
+                              }
+                            })
+                            .catch(() => toast.error('Failed to submit request'))
+                        }}
+                        className="flex-1 py-2 rounded-xl text-sm font-medium"
+                        style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
+                      >
+                        Submit Request
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+            )
+          })()}
           {activeView === 'compliance' && (
             <div className="max-w-5xl mx-auto space-y-6">
               <div>
@@ -3449,13 +3892,12 @@ export default function App() {
             </div>
           )}
           {activeView === 'profile' && (
-            <div className="max-w-5xl mx-auto">
+            <div className="max-w-5xl mx-auto space-y-6">
+              {/* Profile header */}
               <div className="glass rounded-3xl p-8">
-                <h1 className="text-2xl font-semibold mb-6 neon-green">Profile</h1>
-
-                <div className="flex items-center gap-6 mb-8">
-                  <div className="w-24 h-24 rounded-2xl bg-white/10 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <div className="flex items-center gap-6 mb-6">
+                  <div className="w-20 h-20 rounded-2xl bg-white/10 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
                     </svg>
                   </div>
@@ -3465,28 +3907,166 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="glass rounded-2xl p-4">
-                    <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-1">Email</div>
-                    <div className="text-base">{user.email || ''}</div>
-                  </div>
-                  <div className="glass rounded-2xl p-4">
-                    <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-1">Manager</div>
-                    <div className="text-base">{user.manager_name || ''}</div>
-                  </div>
-                  <div className="glass rounded-2xl p-4">
-                    <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-1">User ID</div>
-                    <div className="text-base font-mono">{user.id}</div>
-                  </div>
-                  <div className="glass rounded-2xl p-4">
-                    <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-1">Role</div>
-                    <div className="text-base">{user.job_role || ''}</div>
-                  </div>
+                {/* 4-tab navigation */}
+                <div className="flex gap-2 border-b border-white/10 mb-6">
+                  {(['info', 'schedule', 'deposit', 'availability'] as const).map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => setProfileTab(tab)}
+                      className={`px-4 py-2 text-sm font-medium rounded-t-xl transition-colors ${profileTab === tab ? 'text-black' : 'text-zinc-400 hover:text-white'}`}
+                      style={profileTab === tab ? { backgroundColor: 'var(--accent-color)' } : {}}
+                    >
+                      {tab === 'info' ? 'Info' : tab === 'schedule' ? 'Work Schedule' : tab === 'deposit' ? 'Direct Deposit' : 'Availability'}
+                    </button>
+                  ))}
                 </div>
 
-                <div className="mt-6 text-xs text-zinc-500">
-                  Profile information is pulled from your account. Contact HR to update.
-                </div>
+                {/* Info tab */}
+                {profileTab === 'info' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[['Email', user.email || ''], ['Manager', user.manager_name || ''], ['User ID', user.id], ['Role', user.job_role || '']].map(([label, val]) => (
+                      <div key={label} className="bg-white/5 rounded-2xl p-4">
+                        <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-1">{label}</div>
+                        <div className="text-base font-mono">{val}</div>
+                      </div>
+                    ))}
+                    <div className="md:col-span-2 text-xs text-zinc-500 mt-2">Contact HR to update personal info.</div>
+                  </div>
+                )}
+
+                {/* Work Schedule tab */}
+                {profileTab === 'schedule' && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <div className="text-xs text-zinc-400 mb-1">Work Start</div>
+                        <input type="time" value={workSchedule.work_start}
+                          onChange={e => setWorkSchedule(s => ({ ...s, work_start: e.target.value }))}
+                          className="w-full px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white focus:outline-none" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-zinc-400 mb-1">Work End</div>
+                        <input type="time" value={workSchedule.work_end}
+                          onChange={e => setWorkSchedule(s => ({ ...s, work_end: e.target.value }))}
+                          className="w-full px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white focus:outline-none" />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-zinc-400 mb-2">Work Days</div>
+                      <div className="flex gap-2">
+                        {[['M', 1], ['T', 2], ['W', 3], ['Th', 4], ['F', 5], ['Sa', 6], ['Su', 0]].map(([label, num]) => (
+                          <button key={num}
+                            onClick={() => setWorkSchedule(s => ({ ...s, work_days: s.work_days.includes(num as number) ? s.work_days.filter(d => d !== num) : [...s.work_days, num as number] }))}
+                            className={`w-9 h-9 rounded-xl text-xs font-semibold transition-colors ${workSchedule.work_days.includes(num as number) ? 'text-black' : 'bg-white/10 text-zinc-400'}`}
+                            style={workSchedule.work_days.includes(num as number) ? { backgroundColor: 'var(--accent-color)' } : {}}
+                          >{label}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <button
+                      disabled={profileSaving}
+                      onClick={() => {
+                        setProfileSaving(true)
+                        fetch(`${API_BASE}/api/work-schedule`, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ user_id: user.id, work_start: workSchedule.work_start, work_end: workSchedule.work_end, work_days: JSON.stringify(workSchedule.work_days) }),
+                        })
+                          .then(() => toast.success('Work schedule saved!'))
+                          .catch(() => toast.error('Failed to save'))
+                          .finally(() => setProfileSaving(false))
+                      }}
+                      className="px-5 py-2 rounded-xl text-sm font-medium disabled:opacity-50"
+                      style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
+                    >
+                      {profileSaving ? 'Saving…' : 'Save Schedule'}
+                    </button>
+                  </div>
+                )}
+
+                {/* Direct Deposit tab */}
+                {profileTab === 'deposit' && (
+                  <div className="space-y-4">
+                    {[
+                      { key: 'bank_name', label: 'Bank Name', placeholder: 'e.g. Chase, Wells Fargo' },
+                      { key: 'routing_number', label: 'Routing Number', placeholder: '9-digit ABA number' },
+                      { key: 'account_number', label: 'Account Number', placeholder: 'Account number' },
+                    ].map(({ key, label, placeholder }) => (
+                      <div key={key}>
+                        <div className="text-xs text-zinc-400 mb-1">{label}</div>
+                        <input type="text" value={(directDeposit as any)[key]} placeholder={placeholder}
+                          onChange={e => setDirectDeposit(d => ({ ...d, [key]: e.target.value }))}
+                          className="w-full px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white focus:outline-none placeholder-zinc-600" />
+                      </div>
+                    ))}
+                    <div>
+                      <div className="text-xs text-zinc-400 mb-1">Account Type</div>
+                      <select value={directDeposit.account_type}
+                        onChange={e => setDirectDeposit(d => ({ ...d, account_type: e.target.value }))}
+                        className="w-full px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white focus:outline-none">
+                        <option value="checking">Checking</option>
+                        <option value="savings">Savings</option>
+                      </select>
+                    </div>
+                    <button
+                      disabled={profileSaving}
+                      onClick={() => {
+                        setProfileSaving(true)
+                        fetch(`${API_BASE}/api/direct-deposit`, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ user_id: user.id, ...directDeposit }),
+                        })
+                          .then(() => toast.success('Direct deposit saved!'))
+                          .catch(() => toast.error('Failed to save'))
+                          .finally(() => setProfileSaving(false))
+                      }}
+                      className="px-5 py-2 rounded-xl text-sm font-medium disabled:opacity-50"
+                      style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
+                    >
+                      {profileSaving ? 'Saving…' : 'Save Direct Deposit'}
+                    </button>
+                  </div>
+                )}
+
+                {/* Availability tab */}
+                {profileTab === 'availability' && (
+                  <div className="space-y-4">
+                    <div className="text-sm text-zinc-400">Mark the days you are available to work.</div>
+                    <div className="grid grid-cols-7 gap-2">
+                      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => {
+                        const isAvail = availabilityGrid[day] !== false
+                        return (
+                          <button key={day}
+                            onClick={() => setAvailabilityGrid(g => ({ ...g, [day]: !isAvail }))}
+                            className={`py-4 rounded-2xl text-sm font-medium transition-colors ${isAvail ? 'text-black' : 'bg-white/5 text-zinc-500'}`}
+                            style={isAvail ? { backgroundColor: 'var(--accent-color)' } : {}}
+                          >
+                            {day}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <button
+                      disabled={profileSaving}
+                      onClick={() => {
+                        setProfileSaving(true)
+                        fetch(`${API_BASE}/api/availability`, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ user_id: user.id, availability_json: JSON.stringify(availabilityGrid) }),
+                        })
+                          .then(() => toast.success('Availability saved!'))
+                          .catch(() => toast.error('Failed to save'))
+                          .finally(() => setProfileSaving(false))
+                      }}
+                      className="px-5 py-2 rounded-xl text-sm font-medium disabled:opacity-50"
+                      style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
+                    >
+                      {profileSaving ? 'Saving…' : 'Save Availability'}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
