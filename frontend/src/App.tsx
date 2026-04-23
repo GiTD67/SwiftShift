@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import './App.css'
 import './index.css'
@@ -278,11 +278,16 @@ function TimesheetView({ user }: { user: any }) {
 
   const handleSaveDraft = () => {
     setDraftMessage('Draft saved')
+    toast.success('Draft saved! ✓', { description: 'Your hours are saved. Submit when ready.' })
   }
 
   const handleSubmit = () => {
     if (certified && !isSubmitted) {
       setSubmittedPeriods(prev => new Set(prev).add(periodId))
+      toast.success('Timesheet submitted! 🎉', { description: 'Your manager will review it shortly.' })
+      confetti({ particleCount: 150, spread: 90, origin: { y: 0.5 } })
+      setTimeout(() => confetti({ particleCount: 100, spread: 70, angle: 75, origin: { x: 0.2, y: 0.6 } }), 150)
+      setTimeout(() => confetti({ particleCount: 100, spread: 70, angle: 105, origin: { x: 0.8, y: 0.6 } }), 300)
     }
   }
 
@@ -360,12 +365,13 @@ function TimesheetView({ user }: { user: any }) {
 
       {/* Timecards table (14-day period) */}
       <div className="glass rounded-3xl overflow-hidden">
-        <div className="px-6 py-3 border-b border-white/10 flex justify-between text-xs uppercase tracking-[1px] text-zinc-400">
+        <div className="overflow-x-auto">
+        <div className="px-6 py-3 border-b border-white/10 flex justify-between text-xs uppercase tracking-[1px] text-zinc-400" style={{ minWidth: '700px' }}>
           {dayNames.map((n, i) => (
             <div key={i} className="text-center">{n}</div>
           ))}
         </div>
-        <div className="px-6 py-4 flex justify-between gap-3">
+        <div className="px-6 py-4 flex justify-between gap-3" style={{ minWidth: '700px' }}>
           {dayDates.map((d, i) => {
             const key = entryKey(periodId, i)
             const val = entries[key] || ''
@@ -389,6 +395,7 @@ function TimesheetView({ user }: { user: any }) {
               </div>
             )
           })}
+        </div>
         </div>
       </div>
 
@@ -1342,6 +1349,12 @@ export default function App() {
   const [taxFormData, setTaxFormData] = useState<any | null>(null)
   const [taxLoading, setTaxLoading] = useState(false)
   const [selectedDoc, setSelectedDoc] = useState<{ label: string; content: string } | null>(null)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  const navTo = (view: View) => {
+    setActiveView(view)
+    setMobileMenuOpen(false)
+  }
 
   const orgData = {
     id: 'ceo',
@@ -1436,7 +1449,7 @@ export default function App() {
 
   useTimesheet() // runs side effects (seeding)
 
-  // Clear tour-pending flag once tour is displayed
+  // Clear tour-pending flag and mark as seen once tour is displayed
   useEffect(() => {
     if (showTour) {
       localStorage.removeItem('swiftshift-tour-pending')
@@ -1500,6 +1513,12 @@ export default function App() {
   const [now, setNow] = useState(new Date())
   const [_shockwaveActive, setShockwaveActive] = useState(false)
   const [ripplePos, setRipplePos] = useState<{ x: number; y: number } | null>(null)
+
+  // Milestone tracking refs (persist across renders, reset on new clock session)
+  const hoursMilestoneFiredRef = useRef<Set<number>>(new Set())
+  const earningsMilestoneFiredRef = useRef<Set<number>>(new Set())
+  const progressMilestoneFiredRef = useRef<Set<number>>(new Set())
+  const loginWelcomeShownRef = useRef(false)
 
   // LootDrop modal state (shown after clock out)
   const [showLootDrop, setShowLootDrop] = useState(false)
@@ -1585,6 +1604,84 @@ export default function App() {
       ? 'On break'
       : `Clocked in since ${clockInAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
 
+  // One-time login welcome toast
+  useEffect(() => {
+    if (!loginWelcomeShownRef.current) {
+      loginWelcomeShownRef.current = true
+      const hour = new Date().getHours()
+      const g = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
+      setTimeout(() => {
+        toast.success(`Good ${g}, ${user.first_name}! 👋`, {
+          description: streak > 0 ? `${streak}-day streak — keep it going!` : 'Ready to clock in?',
+          duration: 8000,
+          style: {
+            background: '#111111',
+            border: `1px solid ${getThemeAccentHex(theme)}`,
+            color: '#ffffff',
+          },
+        })
+      }, 1000)
+    }
+  }, [])
+
+  // Hourly milestone toasts (fire each time a new whole hour is crossed)
+  useEffect(() => {
+    if (!isClockedIn) return
+    const hoursWorked = Math.floor(todayTotalMs / 3600000)
+    if (hoursWorked >= 1 && !hoursMilestoneFiredRef.current.has(hoursWorked)) {
+      hoursMilestoneFiredRef.current.add(hoursWorked)
+      const hourMsgs: Record<number, string> = {
+        1: '1 hour in — nice start!',
+        2: '2 hours down!',
+        3: '3 hours — you\'re in the zone!',
+        4: 'Halfway there — 4 hours! 💪',
+        5: '5 hours — almost done!',
+        6: '6 hours — strong work!',
+        7: '7 hours — one more to go!',
+        8: 'Full 8-hour day complete! 🎉',
+      }
+      toast.success(hourMsgs[hoursWorked] || `${hoursWorked} hours worked!`, {
+        description: `Keep it up, ${user.first_name}!`,
+      })
+    }
+  }, [Math.floor(todayTotalMs / 3600000)])
+
+  // 25% / 50% / 75% daily goal progress toasts
+  useEffect(() => {
+    if (!isClockedIn) return
+    const EIGHT_HOURS_MS = 8 * 3600000
+    const pct = Math.floor((todayTotalMs / EIGHT_HOURS_MS) * 100)
+    const milestones = [25, 50, 75]
+    for (const m of milestones) {
+      if (pct >= m && !progressMilestoneFiredRef.current.has(m)) {
+        progressMilestoneFiredRef.current.add(m)
+        const msgs: Record<number, string> = {
+          25: '25% of your day done! 🏁',
+          50: 'Halfway through your day! ⚡',
+          75: '75% complete — almost there! 🚀',
+        }
+        toast.success(msgs[m], { description: `${user.first_name}, you're crushing it!` })
+        confetti({ particleCount: 40, spread: 45, origin: { y: 0.75 }, colors: [themeAccentHex] })
+        break
+      }
+    }
+  }, [Math.floor((todayTotalMs / (8 * 3600000)) * 4)])
+
+  // Earnings milestone toasts ($50, $100, $200, $400)
+  useEffect(() => {
+    if (!isClockedIn) return
+    const earnings = (todayTotalMs / 3600000) * 65
+    const milestones = [50, 100, 200, 400]
+    for (const m of milestones) {
+      if (earnings >= m && !earningsMilestoneFiredRef.current.has(m)) {
+        earningsMilestoneFiredRef.current.add(m)
+        toast.success(`$${m} earned today! 💰`, { description: 'Your wallet is growing.' })
+        confetti({ particleCount: 60, spread: 50, origin: { y: 0.7 }, colors: [themeAccentHex, '#FFD700'] })
+        break
+      }
+    }
+  }, [Math.floor((todayTotalMs / 3600000) * 65 / 50)])
+
   // Pay period
   const period = useMemo(() => payPeriodFor(now), [now])
   const periodLabel = `${period.start.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })} – ${period.end.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })}`
@@ -1618,7 +1715,33 @@ export default function App() {
         setLastStreakDate(todayStr)
         localStorage.setItem('streak', String(newStreak))
         localStorage.setItem('lastStreakDate', todayStr)
+
+        // Streak milestone celebrations
+        if ([5, 10, 20, 30, 50].includes(newStreak)) {
+          setTimeout(() => {
+            confetti({ particleCount: 300, spread: 120, origin: { y: 0.5 }, colors: [themeAccentHex, '#FFD700', '#FF6B6B'] })
+            setTimeout(() => confetti({ particleCount: 200, spread: 80, origin: { y: 0.65 }, colors: [themeAccentHex, '#FFD700'] }), 200)
+          }, 400)
+          toast.success(`🔥 ${newStreak}-day streak milestone!`, {
+            description: newStreak >= 20 ? 'You\'re absolutely legendary!' : newStreak >= 10 ? 'You\'re on fire! Incredible consistency!' : 'High five! Keep that streak alive!',
+          })
+        } else {
+          // Regular clock-in toast
+          toast.success(`Clocked in! Let's go, ${user.first_name}!`, {
+            description: newStreak > 1 ? `${newStreak}-day streak 🔥` : 'Time to make it count!',
+          })
+        }
+      } else {
+        // Weekend clock-in toast (no streak tracking)
+        toast.success(`Clocked in! Working the weekend, ${user.first_name}?`, {
+          description: 'Dedication noted! 💪',
+        })
       }
+
+      // Reset milestone trackers for new session
+      hoursMilestoneFiredRef.current = new Set()
+      earningsMilestoneFiredRef.current = new Set()
+      progressMilestoneFiredRef.current = new Set()
 
       // Capture button center for ripple origin
       if (e?.currentTarget) {
@@ -1650,6 +1773,17 @@ export default function App() {
       const delta = Math.max(0, now.getTime() - breakStartedAt.getTime())
       setBreakMsAccum(v => v + delta)
       setBreakStartedAt(null)
+      const breakMins = Math.round(delta / 60000)
+      const msgs = [
+        "You're back — let's get it!",
+        "Refreshed and ready to crush it!",
+        "Break over — back to greatness!",
+        "Recharged! Time to earn! ⚡",
+        "Welcome back — you've got this!",
+      ]
+      toast.success(msgs[Math.floor(Math.random() * msgs.length)], {
+        description: `Break: ${breakMins} min`,
+      })
     }
   }
 
@@ -1786,23 +1920,35 @@ export default function App() {
   return (
     <div className="ta-app" data-theme={theme}>
       <nav className="ta-navbar">
-        <div className="ta-navbar-brand cursor-pointer" onClick={() => setActiveView('clock')}>
-          <LogoSVG className="h-10 w-auto" />
-          <span>SwiftShift</span>
+        <div className="flex items-center gap-2">
+          {/* Hamburger (mobile only) */}
+          <button
+            className="ta-hamburger"
+            onClick={() => setMobileMenuOpen(o => !o)}
+            aria-label="Toggle menu"
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+          <div className="ta-navbar-brand cursor-pointer" onClick={() => navTo('clock')}>
+            <LogoSVG className="h-10 w-auto" />
+            <span>SwiftShift</span>
+          </div>
         </div>
         <div className="ta-navbar-user">
           {/* Daily streak counter */}
           <div className="flex items-center gap-1.5 px-3 py-1 text-sm text-white/60 border border-white/10 rounded-full">
             <span style={{ color: 'var(--accent-color)' }}>{streak > 0 ? '🔥' : '○'}</span>
             <span className="font-semibold" style={{ color: 'var(--accent-color)' }}>{streak}</span>
-            <span className="text-white/40">day streak</span>
+            <span className="text-white/40 ta-streak-label">day streak</span>
           </div>
           {/* User menu dropdown */}
           <div className="relative group">
             <span className="text-sm text-zinc-400 cursor-pointer">Hi, {user.first_name} ▾</span>
             <div className="absolute right-0 top-full w-48 bg-zinc-900 border border-white/10 rounded-xl shadow-lg hidden group-hover:block z-50 pt-1">
               <button
-                onClick={() => setActiveView('profile')}
+                onClick={() => navTo('profile')}
                 className="w-full text-left px-4 py-2 text-sm hover:bg-white/5 rounded-t-xl"
               >
                 Profile
@@ -1840,11 +1986,17 @@ export default function App() {
         </div>
       </nav>
 
-      <aside className="ta-sidebar">
+      {/* Mobile sidebar backdrop */}
+      <div
+        className={`ta-sidebar-backdrop ${mobileMenuOpen ? 'mobile-open' : ''}`}
+        onClick={() => setMobileMenuOpen(false)}
+      />
+
+      <aside className={`ta-sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
         <nav className="ta-nav">
           <button
             className={`ta-nav-btn ${activeView === 'clock' ? 'active' : ''}`}
-            onClick={() => setActiveView('clock')}
+            onClick={() => navTo('clock')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
               <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
@@ -1853,7 +2005,7 @@ export default function App() {
           </button>
           <button
             className={`ta-nav-btn ${activeView === 'timesheet' ? 'active' : ''}`}
-            onClick={() => setActiveView('timesheet')}
+            onClick={() => navTo('timesheet')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
               <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
@@ -1862,7 +2014,7 @@ export default function App() {
           </button>
           <button
             className={`ta-nav-btn ${activeView === 'rewards' ? 'active' : ''}`}
-            onClick={() => setActiveView('rewards')}
+            onClick={() => navTo('rewards')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
               <circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
@@ -1871,7 +2023,7 @@ export default function App() {
           </button>
           <button
             className={`ta-nav-btn ${activeView === 'insurance' ? 'active' : ''}`}
-            onClick={() => setActiveView('insurance')}
+            onClick={() => navTo('insurance')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -1880,7 +2032,7 @@ export default function App() {
           </button>
           <button
             className={`ta-nav-btn ${activeView === 'orgchart' ? 'active' : ''}`}
-            onClick={() => setActiveView('orgchart')}
+            onClick={() => navTo('orgchart')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
               <rect x="8" y="2" width="8" height="4" rx="1"/><rect x="2" y="14" width="8" height="4" rx="1"/><rect x="14" y="14" width="8" height="4" rx="1"/><line x1="12" y1="6" x2="12" y2="11"/><line x1="6" y1="14" x2="6" y2="11"/><line x1="18" y1="14" x2="18" y2="11"/><line x1="6" y1="11" x2="18" y2="11"/>
@@ -1889,7 +2041,7 @@ export default function App() {
           </button>
           <button
             className={`ta-nav-btn ${activeView === 'taxes' ? 'active' : ''}`}
-            onClick={() => setActiveView('taxes')}
+            onClick={() => navTo('taxes')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
               <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
@@ -1898,7 +2050,7 @@ export default function App() {
           </button>
           <button
             className={`ta-nav-btn mb-2 ${activeView === 'groktax' ? 'active' : ''}`}
-            onClick={() => setActiveView('groktax')}
+            onClick={() => navTo('groktax')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
               <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
@@ -1908,7 +2060,7 @@ export default function App() {
           <div className="ta-nav-section">Job Applications</div>
           <button
             className={`ta-nav-btn mb-2 ${activeView === 'applications' ? 'active' : ''}`}
-            onClick={() => setActiveView('applications')}
+            onClick={() => navTo('applications')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
               <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
@@ -1918,7 +2070,7 @@ export default function App() {
           <div className="ta-nav-section">Admin</div>
           <button
             className={`ta-nav-btn ${activeView === 'admin' ? 'active' : ''}`}
-            onClick={() => setActiveView('admin')}
+            onClick={() => navTo('admin')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
               <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
@@ -1927,7 +2079,7 @@ export default function App() {
           </button>
           <button
             className={`ta-nav-btn ${activeView === 'schedules' ? 'active' : ''}`}
-            onClick={() => setActiveView('schedules')}
+            onClick={() => navTo('schedules')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
               <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
@@ -1936,7 +2088,7 @@ export default function App() {
           </button>
           <button
             className={`ta-nav-btn ${activeView === 'payroll' ? 'active' : ''}`}
-            onClick={() => setActiveView('payroll')}
+            onClick={() => navTo('payroll')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
               <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
@@ -1945,7 +2097,7 @@ export default function App() {
           </button>
           <button
             className={`ta-nav-btn ${activeView === 'reports' ? 'active' : ''}`}
-            onClick={() => setActiveView('reports')}
+            onClick={() => navTo('reports')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
               <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
@@ -1954,7 +2106,7 @@ export default function App() {
           </button>
           <button
             className={`ta-nav-btn ${activeView === 'leaves' ? 'active' : ''}`}
-            onClick={() => setActiveView('leaves')}
+            onClick={() => navTo('leaves')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
               <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
@@ -1963,7 +2115,7 @@ export default function App() {
           </button>
           <button
             className={`ta-nav-btn ${activeView === 'compliance' ? 'active' : ''}`}
-            onClick={() => setActiveView('compliance')}
+            onClick={() => navTo('compliance')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
               <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
@@ -1972,7 +2124,7 @@ export default function App() {
           </button>
           <button
             className={`ta-nav-btn ${activeView === 'hiring' ? 'active' : ''}`}
-            onClick={() => setActiveView('hiring')}
+            onClick={() => navTo('hiring')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
               <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
@@ -1983,7 +2135,7 @@ export default function App() {
         <div className="mt-auto pt-4">
           <button
             className={`ta-nav-btn ${activeView === 'grokky' ? 'active' : ''}`}
-            onClick={() => setActiveView('grokky')}
+            onClick={() => navTo('grokky')}
             style={{ color: 'var(--accent-color)', textShadow: '0 0 8px var(--accent-color)' }}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
@@ -1998,12 +2150,12 @@ export default function App() {
         <main className="ta-main">
           {activeView === 'clock' && (
             <>
-              <div className="flex gap-6 items-stretch max-w-[1200px] mx-auto">
+              <div className="flex flex-col xl:flex-row gap-6 items-stretch max-w-[1200px] mx-auto">
               {/* Left: Dashboard */}
               <div className="flex-1 space-y-6">
                 {/* Dashboard card */}
-                <div className="glass rounded-3xl p-8">
-                  <div className="flex items-start gap-10">
+                <div className="glass rounded-3xl p-5 sm:p-8">
+                  <div className="flex flex-col sm:flex-row items-start gap-6 sm:gap-10">
                     {/* Left: Greeting, Time, Status, Buttons */}
                     <div className="flex-1">
                       <div className="text-sm text-zinc-400 mb-1">{longDate(now)}</div>
@@ -2011,7 +2163,7 @@ export default function App() {
                         {greeting(now.getHours())}, {user.first_name}
                       </div>
 
-                      <div className="font-mono text-6xl tabular-nums tracking-[2px] mb-6">
+                      <div className="font-mono text-4xl sm:text-6xl tabular-nums tracking-[2px] mb-6">
                         {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </div>
 
@@ -2024,31 +2176,35 @@ export default function App() {
 
                   <div className="flex flex-wrap gap-3">
                     {!isClockedIn && (
-                      <button
+                      <motion.button
                         onClick={handleClockIn}
                         className="glass-btn-green px-5 py-2.5 rounded-xl font-semibold active:scale-[0.96] transition-all duration-75"
+                        whileHover={{ scale: 1.04 }}
+                        whileTap={{ scale: 0.95 }}
+                        animate={{ boxShadow: ['0 0 0px rgba(var(--accent-color-rgb),0)', '0 0 18px 4px rgba(var(--accent-color-rgb),0.35)', '0 0 0px rgba(var(--accent-color-rgb),0)'] }}
+                        transition={{ boxShadow: { repeat: Infinity, duration: 2, ease: 'easeInOut' } }}
                       >
                         Clock in
-                      </button>
+                      </motion.button>
                     )}
                     {isClockedIn && !isOnBreak && (
                       <>
-                        <button onClick={handleStartBreak} className="px-5 py-2.5 rounded-xl border border-white/20 hover:bg-white/5">
+                        <motion.button onClick={handleStartBreak} className="px-5 py-2.5 rounded-xl border border-white/20 hover:bg-white/5" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                           Start break
-                        </button>
-                        <button onClick={handleClockOut} className="px-5 py-2.5 rounded-xl bg-red-500/80 hover:bg-red-500 text-white">
+                        </motion.button>
+                        <motion.button onClick={handleClockOut} className="px-5 py-2.5 rounded-xl bg-red-500/80 hover:bg-red-500 text-white" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                           Clock out
-                        </button>
+                        </motion.button>
                       </>
                     )}
                     {isOnBreak && (
                       <>
-                        <button onClick={handleEndBreak} className="px-5 py-2.5 rounded-xl border border-white/20 hover:bg-white/5">
+                        <motion.button onClick={handleEndBreak} className="px-5 py-2.5 rounded-xl border border-white/20 hover:bg-white/5" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                           End break
-                        </button>
-                        <button onClick={handleClockOut} className="px-5 py-2.5 rounded-xl bg-red-500/80 hover:bg-red-500 text-white">
+                        </motion.button>
+                        <motion.button onClick={handleClockOut} className="px-5 py-2.5 rounded-xl bg-red-500/80 hover:bg-red-500 text-white" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                           Clock out
-                        </button>
+                        </motion.button>
                       </>
                     )}
                   </div>
@@ -2124,10 +2280,18 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="mt-6 grid grid-cols-3 gap-4 text-sm">
+                  <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                     <div className="glass rounded-2xl p-4">
                       <div className="text-zinc-400 mb-1">Session</div>
-                      <div className="font-mono text-xl neon-green">{formatMs(sessionWorkedMs)}</div>
+                      <motion.div
+                        key={Math.floor(sessionWorkedMs / 60000)}
+                        initial={isClockedIn && !isOnBreak ? { opacity: 0.6 } : false}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.3 }}
+                        className="font-mono text-xl neon-green"
+                      >
+                        {formatMs(sessionWorkedMs)}
+                      </motion.div>
                     </div>
                     <div className="glass rounded-2xl p-4">
                       <div className="text-zinc-400 mb-1">Breaks</div>
@@ -2138,18 +2302,34 @@ export default function App() {
                       <div className="font-mono text-xl neon-green">{formatMs(todayTotalMs)}</div>
                     </div>
                   </div>
+                  {/* Day progress bar */}
+                  {isClockedIn && (
+                    <div className="mt-4">
+                      <div className="flex justify-between text-xs text-zinc-500 mb-1">
+                        <span>Daily goal progress</span>
+                        <span>{Math.min(100, Math.round((todayTotalMs / (8 * 3600000)) * 100))}%</span>
+                      </div>
+                      <div className="crystal-progress">
+                        <motion.div
+                          className="crystal-progress-fill"
+                          animate={{ width: `${Math.min(100, (todayTotalMs / (8 * 3600000)) * 100)}%` }}
+                          transition={{ duration: 1, ease: 'easeOut' }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
               </div>
 
               {/* Right sidebar: This pay period + Real Time Rewards */}
-              <aside className="w-80 shrink-0 flex flex-col gap-4">
+              <aside className="xl:w-80 shrink-0 flex flex-col sm:flex-row xl:flex-col gap-4">
                 <div className="glass rounded-3xl p-8 flex-1">
                   <div className="text-sm uppercase tracking-[2px] text-white mb-3">This pay period</div>
                   <div className="text-lg font-medium mb-2 neon-green">{periodLabel}</div>
                   <div className="text-sm text-zinc-400 mb-4">Regular hours: <span className="font-mono neon-green">{periodHours}</span> hrs</div>
                   <button
-                    onClick={() => setActiveView('timesheet')}
+                    onClick={() => navTo('timesheet')}
                     className="text-sm underline decoration-white/30 hover:decoration-white"
                   >
                     See my time →
@@ -2159,20 +2339,35 @@ export default function App() {
                 {/* Real Time Rewards module */}
                 <div className="glass rounded-3xl p-8 flex-1">
                   <div className="text-sm uppercase tracking-[2px] text-white mb-3">Real Time Rewards</div>
-                  <div className="flex justify-between items-center mb-2">
-                    <div className="text-sm text-zinc-400">Today's Earnings:</div>
-                    <div className="h-6 rounded-b-lg flex items-center justify-center text-xs font-semibold px-3 bg-black neon-green">
+                  <div className="mb-3">
+                    <div className="text-xs text-zinc-400 mb-1">Today's Earnings</div>
+                    <motion.div
+                      key={Math.floor((todayTotalMs / 3600000) * 65 * 10)}
+                      initial={isClockedIn ? { scale: 1.08, color: 'var(--accent-color)' } : false}
+                      animate={{ scale: 1, color: 'var(--accent-color)' }}
+                      transition={{ duration: 0.25 }}
+                      className="font-mono text-2xl font-semibold tabular-nums neon-green"
+                    >
                       ${((todayTotalMs / 3600000) * 65).toFixed(2)}
-                    </div>
+                    </motion.div>
+                    {isClockedIn && (
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full animate-pulse inline-block"
+                          style={{ background: '#22ff7a', boxShadow: '0 0 8px #22ff7a, 0 0 16px #22ff7a60' }}
+                        />
+                        <span className="text-xs uppercase tracking-widest text-zinc-300 font-medium">live</span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex justify-between items-center mb-4">
-                    <div className="text-sm text-zinc-400">Today's PTO Accrued:</div>
-                    <div className="h-6 rounded-b-lg flex items-center justify-center text-xs font-semibold px-3 bg-black neon-green">
-                      {((todayTotalMs / 3600000) / 30).toFixed(2)} hrs
+                    <div className="text-sm text-zinc-400">PTO Accrued:</div>
+                    <div className="text-sm font-semibold neon-green">
+                      {((todayTotalMs / 3600000) / 30).toFixed(3)} hrs
                     </div>
                   </div>
                   <button
-                    onClick={() => setActiveView('rewards')}
+                    onClick={() => navTo('rewards')}
                     className="text-sm underline decoration-white/30 hover:decoration-white"
                   >
                     See rewards →
@@ -2198,7 +2393,7 @@ export default function App() {
           {activeView === 'admin' && (
             <div className="max-w-5xl mx-auto">
               <div className="glass rounded-3xl p-8">
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                   <h1 className="text-2xl font-semibold neon-green">Admin: Manage Users</h1>
                   <button
                     onClick={() => {
@@ -2215,7 +2410,8 @@ export default function App() {
                     Save Changes
                   </button>
                 </div>
-                <table className="w-full text-xs">
+                <div className="overflow-x-auto">
+                <table className="w-full text-xs" style={{ minWidth: '700px' }}>
                   <thead>
                     <tr className="text-zinc-400 border-b border-white/10">
                       <th className="text-left py-1">First Name</th>
@@ -2318,13 +2514,14 @@ export default function App() {
                     ))}
                   </tbody>
                 </table>
+                </div>
                 {users.length === 0 && <div className="text-zinc-400 mt-4">No users yet.</div>}
               </div>
             </div>
           )}
           {activeView === 'schedules' && (
             <div className="max-w-5xl mx-auto space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h1 className="text-2xl font-semibold neon-green">Schedule Management</h1>
                   <p className="text-sm text-zinc-400">Manage shifts and employee schedules</p>
@@ -2333,7 +2530,7 @@ export default function App() {
                   + Add Shift
                 </button>
               </div>
-              <div className="grid grid-cols-7 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
                 {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
                   <div key={day} className="glass rounded-2xl p-3">
                     <div className="text-xs font-semibold text-zinc-400 mb-2 uppercase">{day}</div>
@@ -2350,7 +2547,7 @@ export default function App() {
               </div>
               <div className="glass rounded-3xl p-6">
                 <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Shift Coverage Summary</h2>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {[['Total Shifts This Week', '14'], ['Filled Shifts', '11'], ['Open Shifts', '3']].map(([label, val]) => (
                     <div key={label} className="bg-white/5 rounded-2xl p-4 text-center">
                       <div className="text-2xl font-bold" style={{ color: 'var(--accent-color)' }}>{val}</div>
@@ -2363,7 +2560,7 @@ export default function App() {
           )}
           {activeView === 'payroll' && (
             <div className="max-w-5xl mx-auto space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h1 className="text-2xl font-semibold neon-green">Payroll</h1>
                   <p className="text-sm text-zinc-400">Current pay period: Apr 15 – Apr 30, 2026</p>
@@ -2372,7 +2569,7 @@ export default function App() {
                   Run Payroll
                 </button>
               </div>
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {[['Total Payroll', '$48,320'], ['Employees Paid', '24'], ['Avg Hours/Employee', '38.5h'], ['Overtime Hours', '42h']].map(([label, val]) => (
                   <div key={label} className="glass rounded-2xl p-4 text-center">
                     <div className="text-2xl font-bold" style={{ color: 'var(--accent-color)' }}>{val}</div>
@@ -2382,7 +2579,8 @@ export default function App() {
               </div>
               <div className="glass rounded-3xl p-6">
                 <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Employee Payroll Summary</h2>
-                <table className="w-full text-sm">
+                <div className="overflow-x-auto">
+                <table className="w-full text-sm" style={{ minWidth: '500px' }}>
                   <thead>
                     <tr className="text-zinc-400 border-b border-white/10 text-left">
                       <th className="py-2">Employee</th>
@@ -2413,6 +2611,7 @@ export default function App() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
           )}
@@ -2422,7 +2621,7 @@ export default function App() {
                 <h1 className="text-2xl font-semibold neon-green">Reports &amp; Analytics</h1>
                 <p className="text-sm text-zinc-400">Workforce performance and operational insights</p>
               </div>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {[
                   { title: 'Hours Worked (This Month)', value: '1,842h', change: '+4.2%', sub: 'vs last month' },
                   { title: 'Labor Cost (This Month)', value: '$94,600', change: '+1.8%', sub: 'vs last month' },
@@ -2446,7 +2645,7 @@ export default function App() {
                         <span className="text-zinc-400">{used}h / {total}h</span>
                       </div>
                       <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all" style={{ width: `${Math.round((used as number / total as number) * 100)}%`, backgroundColor: 'var(--accent-color)' }} />
+                        <div className="h-full rounded-full transition-all" style={{ width: `${Math.round(((used as number) / (total as number)) * 100)}%`, backgroundColor: 'var(--accent-color)' }} />
                       </div>
                     </div>
                   ))}
@@ -2462,7 +2661,7 @@ export default function App() {
                   <p className="text-sm text-zinc-400">Manage PTO requests and absence tracking</p>
                 </div>
               </div>
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {[['Pending Requests', '5'], ['Approved This Month', '12'], ['Denied This Month', '2'], ['Avg PTO Balance', '14.2 days']].map(([label, val]) => (
                   <div key={label} className="glass rounded-2xl p-4 text-center">
                     <div className="text-2xl font-bold" style={{ color: 'var(--accent-color)' }}>{val}</div>
@@ -2479,7 +2678,7 @@ export default function App() {
                     { name: 'Skyler Reed', type: 'Personal', dates: 'May 12, 2026', days: 1, status: 'Pending' },
                     { name: 'Avery Lane', type: 'Vacation', dates: 'May 19–23, 2026', days: 5, status: 'Pending' },
                     { name: 'Dakota Lane', type: 'Bereavement', dates: 'Apr 25–27, 2026', days: 3, status: 'Pending' },
-                  ].map(({ name, type, dates, days, status }) => (
+                  ].map(({ name, type, dates, days }) => (
                     <div key={name} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
                       <div>
                         <div className="font-medium">{name}</div>
@@ -2501,7 +2700,7 @@ export default function App() {
                 <h1 className="text-2xl font-semibold neon-green">Compliance &amp; Audit</h1>
                 <p className="text-sm text-zinc-400">Policy compliance, certifications, and audit logs</p>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {[['Compliance Score', '94%'], ['Open Incidents', '2'], ['Overdue Trainings', '7']].map(([label, val]) => (
                   <div key={label} className="glass rounded-2xl p-4 text-center">
                     <div className="text-3xl font-bold" style={{ color: 'var(--accent-color)' }}>{val}</div>
@@ -2552,7 +2751,7 @@ export default function App() {
           )}
           {activeView === 'hiring' && (
             <div className="max-w-5xl mx-auto space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h1 className="text-2xl font-semibold neon-green">Hiring &amp; Onboarding</h1>
                   <p className="text-sm text-zinc-400">Recruitment pipeline and new hire management</p>
@@ -2561,7 +2760,7 @@ export default function App() {
                   + Post Job
                 </button>
               </div>
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {[['Open Positions', '6'], ['Active Applicants', '38'], ['Interviews This Week', '9'], ['Offers Pending', '3']].map(([label, val]) => (
                   <div key={label} className="glass rounded-2xl p-4 text-center">
                     <div className="text-2xl font-bold" style={{ color: 'var(--accent-color)' }}>{val}</div>
@@ -2569,7 +2768,7 @@ export default function App() {
                   </div>
                 ))}
               </div>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="glass rounded-3xl p-6">
                   <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Hiring Pipeline</h2>
                   <div className="space-y-3">
@@ -2768,21 +2967,21 @@ export default function App() {
           {activeView === 'orgchart' && (
             <div className="flex-1 flex flex-col">
               {/* Header bar */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-white/10">
                 <div>
-                  <p className="text-xs text-zinc-400">Hover for details • Click ▶ to expand</p>
+                  <p className="text-xs text-zinc-400">Tap/hover for details • Tap ▶ to expand</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <input
                     type="text"
                     placeholder="Search..."
-                    className="bg-white/5 rounded-xl px-3 py-1.5 text-sm focus:bg-white/10 focus:outline-none w-56"
+                    className="bg-white/5 rounded-xl px-3 py-1.5 text-sm focus:bg-white/10 focus:outline-none flex-1 sm:w-56"
                     value={orgSearch}
                     onChange={(e) => setOrgSearch(e.target.value)}
                   />
                   <button
                     onClick={() => setOrgExpandedAll(!orgExpandedAll)}
-                    className="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+                    className="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors whitespace-nowrap"
                   >
                     {orgExpandedAll ? 'Collapse All' : 'Expand All'}
                   </button>
@@ -3139,7 +3338,7 @@ export default function App() {
               </div>
 
               {/* Resume Upload */}
-              <div className="glass rounded-3xl p-6 flex items-center justify-between">
+              <div className="glass rounded-3xl p-6 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="font-medium">Your Resume</div>
                   <div className="text-sm text-zinc-500">Upload once, apply everywhere</div>
