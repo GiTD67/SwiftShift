@@ -1,5 +1,5 @@
 [build]
-buildCommand = "./build.sh"
+buildCommand = "sh build.sh"
 
 [deploy]
 startCommand = "cd backend && gunicorn app:app --workers 4 --bind 0.0.0.0:$PORT"
