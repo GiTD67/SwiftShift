@@ -2,6 +2,6 @@
 buildCommand = "sh build.sh"
 
 [deploy]
-startCommand = "bash -c 'export PATH=/root/.local/share/mise/shims:$PATH && cd backend && python3 init_db.py && gunicorn app:app --workers 4 --bind 0.0.0.0:$PORT'"
+startCommand = "bash -c 'export PATH=$(ls -d /root/.local/share/mise/installs/python/*/bin | head -1):/root/.local/share/mise/shims:$PATH && cd backend && python3 init_db.py && gunicorn app:app --workers 4 --bind 0.0.0.0:$PORT'"
 healthcheckPath = "/api/health"
 restartPolicyType = "on_failure"
