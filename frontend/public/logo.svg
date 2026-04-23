@@ -1,29 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
-  <!-- Clock ring (time) -->
-  <circle cx="100" cy="100" r="90" fill="#000" stroke="#d7fe51" stroke-width="3.5"/>
-
-  <!-- Clock tick marks at 12, 3, 6, 9 -->
-  <rect x="97.5" y="18" width="5" height="14" rx="2.5" fill="#d7fe51" opacity="0.75"/>
-  <rect x="168" y="97.5" width="14" height="5" rx="2.5" fill="#d7fe51" opacity="0.75"/>
-  <rect x="97.5" y="168" width="5" height="14" rx="2.5" fill="#d7fe51" opacity="0.75"/>
-  <rect x="18" y="97.5" width="14" height="5" rx="2.5" fill="#d7fe51" opacity="0.75"/>
-
-  <!-- Clock hour hand pointing to ~10 o'clock (time) -->
-  <line x1="100" y1="100" x2="58" y2="60" stroke="#d7fe51" stroke-width="4" stroke-linecap="round" opacity="0.55"/>
-
-  <!-- Lightning bolt (speed) — the dominant shape -->
-  <path d="M 117 28 L 80 108 L 105 108 L 88 172 L 138 88 L 111 88 Z" fill="#d7fe51"/>
-  <!-- Inner depth shadow -->
-  <path d="M 117 44 L 88 108 L 107 108 L 93 153 L 130 94 L 109 94 Z" fill="#000" opacity="0.22"/>
-
-  <!-- Center hub -->
-  <circle cx="100" cy="100" r="6" fill="#d7fe51"/>
-  <circle cx="100" cy="100" r="3" fill="#000"/>
-
-  <!-- AI circuit nodes (artificial intelligence) -->
-  <circle cx="42" cy="65" r="5" fill="#d7fe51" opacity="0.8"/>
-  <line x1="46" y1="68" x2="68" y2="82" stroke="#d7fe51" stroke-width="1.8" opacity="0.45" stroke-linecap="round"/>
-
-  <circle cx="156" cy="148" r="5" fill="#d7fe51" opacity="0.8"/>
-  <line x1="152" y1="144" x2="132" y2="126" stroke="#d7fe51" stroke-width="1.8" opacity="0.45" stroke-linecap="round"/>
+  <circle cx="100" cy="100" r="100" fill="#0a0a0a"/>
+  <circle cx="100" cy="100" r="86" stroke="white" stroke-width="2"/>
+  <path d="M 116 28 L 70 108 L 102 108 L 80 172 L 146 90 L 112 90 Z" fill="white"/>
 </svg>

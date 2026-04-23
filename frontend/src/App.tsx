@@ -429,24 +429,12 @@ function TimesheetView({ user }: { user: any }) {
   )
 }
 
-// ===== Theme-aware Logo SVG =====
-function LogoSVG({ className, accentColor = 'var(--accent-color)' }: { className?: string; accentColor?: string }) {
+// ===== Logo SVG =====
+function LogoSVG({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none" className={className}>
-      <circle cx="100" cy="100" r="90" fill="#000" stroke={accentColor} strokeWidth="3.5"/>
-      <rect x="97.5" y="18" width="5" height="14" rx="2.5" fill={accentColor} opacity="0.75"/>
-      <rect x="168" y="97.5" width="14" height="5" rx="2.5" fill={accentColor} opacity="0.75"/>
-      <rect x="97.5" y="168" width="5" height="14" rx="2.5" fill={accentColor} opacity="0.75"/>
-      <rect x="18" y="97.5" width="14" height="5" rx="2.5" fill={accentColor} opacity="0.75"/>
-      <line x1="100" y1="100" x2="58" y2="60" stroke={accentColor} strokeWidth="4" strokeLinecap="round" opacity="0.55"/>
-      <path d="M 117 28 L 80 108 L 105 108 L 88 172 L 138 88 L 111 88 Z" fill={accentColor}/>
-      <path d="M 117 44 L 88 108 L 107 108 L 93 153 L 130 94 L 109 94 Z" fill="#000" opacity="0.22"/>
-      <circle cx="100" cy="100" r="6" fill={accentColor}/>
-      <circle cx="100" cy="100" r="3" fill="#000"/>
-      <circle cx="42" cy="65" r="5" fill={accentColor} opacity="0.8"/>
-      <line x1="46" y1="68" x2="68" y2="82" stroke={accentColor} strokeWidth="1.8" strokeLinecap="round" opacity="0.45"/>
-      <circle cx="156" cy="148" r="5" fill={accentColor} opacity="0.8"/>
-      <line x1="152" y1="144" x2="132" y2="126" stroke={accentColor} strokeWidth="1.8" strokeLinecap="round" opacity="0.45"/>
+      <circle cx="100" cy="100" r="86" stroke="white" strokeWidth="2"/>
+      <path d="M 116 28 L 70 108 L 102 108 L 80 172 L 146 90 L 112 90 Z" fill="white"/>
     </svg>
   )
 }
@@ -522,7 +510,7 @@ function LoginPage() {
       <div className="hidden lg:flex w-5/12 flex-col justify-between p-10 relative z-10">
         <div>
           <div className="flex items-center gap-3 mb-10">
-            <LogoSVG className="h-9 w-auto" accentColor={loginAccentHex} />
+            <LogoSVG className="h-9 w-auto" />
             <span className="font-semibold text-2xl tracking-[1px]">SWIFTSHIFT</span>
           </div>
           <div className="max-w-[380px]">
@@ -707,7 +695,7 @@ function SignupPage() {
       <div className="hidden lg:flex w-5/12 flex-col justify-between p-10 relative z-10">
         <div>
           <div className="flex items-center gap-3 mb-10">
-            <LogoSVG className="h-9 w-auto" accentColor={signupAccentHex} />
+            <LogoSVG className="h-9 w-auto" />
             <span className="font-semibold text-2xl tracking-[1px]">SWIFTSHIFT</span>
           </div>
           <div className="max-w-[380px]">
@@ -1031,8 +1019,7 @@ export default function App() {
 
   // Update favicon dynamically when theme changes
   useEffect(() => {
-    const accent = getThemeAccentHex(theme)
-    const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="14" fill="#000"/><circle cx="32" cy="32" r="26" stroke="${accent}" stroke-width="2.5" fill="none"/><rect x="30.5" y="9" width="3" height="6" rx="1.5" fill="${accent}" opacity="0.75"/><rect x="49" y="30.5" width="6" height="3" rx="1.5" fill="${accent}" opacity="0.75"/><rect x="30.5" y="49" width="3" height="6" rx="1.5" fill="${accent}" opacity="0.75"/><rect x="9" y="30.5" width="6" height="3" rx="1.5" fill="${accent}" opacity="0.75"/><path d="M 37 8 L 22 34 L 32 34 L 26 56 L 46 30 L 35 30 Z" fill="${accent}"/></svg>`
+    const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="14" fill="#0a0a0a"/><circle cx="32" cy="32" r="27" stroke="white" stroke-width="1.5"/><path d="M 37 9 L 22 35 L 33 35 L 26 55 L 47 29 L 35 29 Z" fill="white"/></svg>`
     const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgContent)}`
     let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']")
     if (!link) {
@@ -1041,7 +1028,7 @@ export default function App() {
       document.head.appendChild(link)
     }
     link.href = url
-  }, [theme])
+  }, [])
 
   const cycleTheme = () => {
     setTheme(t => t === 'green' ? 'white' : t === 'white' ? 'orange' : t === 'orange' ? 'cyan' : t === 'cyan' ? 'pink' : t === 'pink' ? 'purple' : 'green')

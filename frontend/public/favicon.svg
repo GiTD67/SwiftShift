@@ -1,12 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <rect width="64" height="64" rx="14" fill="#000"/>
-  <!-- Clock ring (time) -->
-  <circle cx="32" cy="32" r="26" stroke="#d7fe51" stroke-width="2.5" fill="none"/>
-  <!-- Clock tick marks -->
-  <rect x="30.5" y="9" width="3" height="6" rx="1.5" fill="#d7fe51" opacity="0.75"/>
-  <rect x="49" y="30.5" width="6" height="3" rx="1.5" fill="#d7fe51" opacity="0.75"/>
-  <rect x="30.5" y="49" width="3" height="6" rx="1.5" fill="#d7fe51" opacity="0.75"/>
-  <rect x="9" y="30.5" width="6" height="3" rx="1.5" fill="#d7fe51" opacity="0.75"/>
-  <!-- Lightning bolt (speed + AI) -->
-  <path d="M 37 8 L 22 34 L 32 34 L 26 56 L 46 30 L 35 30 Z" fill="#d7fe51"/>
+  <rect width="64" height="64" rx="14" fill="#0a0a0a"/>
+  <circle cx="32" cy="32" r="27" stroke="white" stroke-width="1.5"/>
+  <path d="M 37 9 L 22 35 L 33 35 L 26 55 L 47 29 L 35 29 Z" fill="white"/>
 </svg>
