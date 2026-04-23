@@ -15,26 +15,6 @@ app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB uploads
 _allowed_origins = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
 CORS(app, origins=_allowed_origins)
 
-# Subpath for preview deployment (must be defined before routes)
-SUBPATH = "/hackathon/preview/doesitworkday"
-
-
-class SubpathMiddleware:
-    """Strip SUBPATH prefix so blueprint routes match under preview subpath."""
-    def __init__(self, app, prefix):
-        self.app = app
-        self.prefix = prefix.rstrip("/")
-
-    def __call__(self, environ, start_response):
-        path = environ.get("PATH_INFO", "")
-        if path.startswith(self.prefix + "/"):
-            environ["SCRIPT_NAME"] = self.prefix
-            environ["PATH_INFO"] = path[len(self.prefix):]
-        return self.app(environ, start_response)
-
-
-app.wsgi_app = SubpathMiddleware(app.wsgi_app, SUBPATH)
-
 
 @app.route("/api/kalshi/markets")
 def kalshi_markets():
@@ -80,10 +60,6 @@ app.register_blueprint(jobs_bp)
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def serve_frontend(path):
-    # Strip subpath prefix if present (for preview proxy)
-    if path.startswith(SUBPATH.lstrip("/") + "/"):
-        path = path[len(SUBPATH):].lstrip("/")
-    # API paths go to blueprints (after subpath stripping)
     if path.startswith("api/"):
         return jsonify({"error": "Not found"}), 404
     file_path = os.path.join(frontend_dir, path)

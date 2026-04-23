@@ -13,10 +13,7 @@ import { FeaturePreview } from './components/FeaturePreview'
 import { BreakReminderModal } from './components/BreakReminderModal'
 import { STATE_BREAK_RULES, STATE_CODES } from './data/stateBreakRules'
 
-const API_BASE = (() => {
-  const m = window.location.pathname.match(/^(\/hackathon\/preview\/[^/]+)/)
-  return m ? m[1] : ''
-})()
+const API_BASE = ''
 
 type View = 'clock' | 'timesheet' | 'rewards' | 'admin' | 'profile' | 'insurance' | 'orgchart' | 'taxes' | 'groktax' | 'grokky' | 'applications' | 'jobs' | 'schedules' | 'payroll' | 'reports' | 'leaves' | 'compliance' | 'hiring'
 
