@@ -3274,7 +3274,7 @@ export default function App() {
           isSecondBreak={breakReminderIsSecond}
           onStartBreak={() => {
             setShowBreakReminder(false)
-            handleStartBreak()
+            handleStartBreak(STATE_BREAK_RULES[workState]?.isPaid ? 'paid' : 'unpaid')
           }}
           onDismiss={() => setShowBreakReminder(false)}
         />
