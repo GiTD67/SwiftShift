@@ -1,5 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import confetti from 'canvas-confetti'
+import { motion } from 'framer-motion'
+import { Odometer } from './Odometer'
 
 interface RewardsProps {
   totalHours: number
@@ -10,27 +12,24 @@ interface RewardsProps {
   onFocus?: () => void
 }
 
-// Compute hourly rate from user: if salary set (salaried), hourly = salary/2080, else use pay (default $65)
 function computeHourlyRate(user: any): number {
   const salary = Number(user?.salary) || 0
-  if (salary > 0) {
-    return salary / 2080
-  }
+  if (salary > 0) return salary / 2080
   const pay = Number(user?.pay)
   return pay > 0 ? pay : 65
 }
 
+const LEVEL_NAMES = ['Rookie', 'Associate', 'Pro', 'Senior', 'Expert', 'Elite', 'Master', 'Legend']
+
 export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'green', user, onFocus }: RewardsProps) {
   const [hourlyRate, setHourlyRate] = useState(() => computeHourlyRate(user))
-  const [ptoAccrualRate, setPtoAccrualRate] = useState(1 / 30) // 1 hour per 30 hours worked
+  const [ptoAccrualRate, setPtoAccrualRate] = useState(1 / 30)
   const [hasFiredConfetti, setHasFiredConfetti] = useState(false)
+  const [streak, setStreak] = useState(0)
   const prevCentsRef = useRef(0)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const liveTodayEarnings = isClockedIn
-    ? (elapsedSeconds / 3600) * hourlyRate
-    : 0
-
+  const liveTodayEarnings = isClockedIn ? (elapsedSeconds / 3600) * hourlyRate : 0
   const earnedToday = liveTodayEarnings
   const totalEarnings = totalHours * hourlyRate
   const accruedPTO = totalHours * ptoAccrualRate
@@ -44,9 +43,29 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
     pink: '#FE51D7',
     purple: '#9B51FE',
   }
-  const confettiColor = isOvertime ? '#FFAA00' : themeColors[theme]
+  const accentColor = themeColors[theme]
+  const confettiColor = isOvertime ? '#FFAA00' : accentColor
 
-  // Paycheck date helpers: 2nd Friday and last Friday of each month
+  // Gamification calculations
+  const dailyGoalDollars = hourlyRate * 8
+  const dailyGoalProgress = Math.min(100, earnedToday > 0 ? (earnedToday / dailyGoalDollars) * 100 : 0)
+
+  const totalXP = Math.floor(totalHours * 100)
+  const level = Math.floor(totalXP / 500) + 1
+  const levelName = LEVEL_NAMES[Math.min(level - 1, LEVEL_NAMES.length - 1)]
+  const xpForCurrentLevel = (level - 1) * 500
+  const xpProgress = Math.min(100, ((totalXP - xpForCurrentLevel) / 500) * 100)
+
+  const achievements = [
+    { id: 'first_shift', label: 'First Shift', icon: '⚡', desc: 'Clock in for the first time', unlocked: totalHours > 0 || isClockedIn },
+    { id: 'century', label: 'Century Club', icon: '💯', desc: 'Earn $100 in a day', unlocked: earnedToday >= 100 },
+    { id: 'overtime', label: 'Overtime Warrior', icon: '🔥', desc: 'Work over 9 hours', unlocked: totalHours > 9 },
+    { id: 'streak_3', label: 'On a Roll', icon: '🎯', desc: 'Work 3 days in a row', unlocked: streak >= 3 },
+    { id: 'high_earner', label: 'High Earner', icon: '💎', desc: 'Earn $500 in a week', unlocked: totalEarnings >= 500 },
+    { id: 'pto_master', label: 'PTO Hoarder', icon: '🏖️', desc: 'Accrue 1 hour of PTO', unlocked: accruedPTO >= 1 },
+  ]
+
+  // Paycheck helpers
   const getPaycheckDates = (year: number, month: number) => {
     let day = 1
     while (new Date(year, month, day).getDay() !== 5) day++
@@ -54,98 +73,98 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
     const lastDay = new Date(year, month + 1, 0).getDate()
     let lastFridayDate = lastDay
     while (new Date(year, month, lastFridayDate).getDay() !== 5) lastFridayDate--
-    const lastFriday = new Date(year, month, lastFridayDate)
-    return { secondFriday, lastFriday }
+    return { secondFriday, lastFriday: new Date(year, month, lastFridayDate) }
   }
 
   const getNextPaycheck = () => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    const year = today.getFullYear()
-    const month = today.getMonth()
-    const { secondFriday, lastFriday } = getPaycheckDates(year, month)
-
+    const { secondFriday, lastFriday } = getPaycheckDates(today.getFullYear(), today.getMonth())
     if (today <= secondFriday) return secondFriday
     if (today <= lastFriday) return lastFriday
-    const { secondFriday: nextSecond } = getPaycheckDates(year, month + 1)
-    return nextSecond
+    return getPaycheckDates(today.getFullYear(), today.getMonth() + 1).secondFriday
   }
 
   const daysUntilNextPaycheck = () => {
     const next = getNextPaycheck()
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    const diff = Math.ceil((next.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-    return Math.max(0, diff)
+    return Math.max(0, Math.ceil((next.getTime() - today.getTime()) / 86400000))
   }
 
-  const estimatedPaycheck = totalEarnings
+  const daysUntil = daysUntilNextPaycheck()
+  const paycheckProgress = Math.min(100, ((14 - daysUntil) / 14) * 100)
 
-  // Haptic ticker: fire vibration on each cent increment
+  // Streak tracking via localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('swiftshift-streak')
+      if (stored) {
+        const { count, lastDate } = JSON.parse(stored)
+        const today = new Date().toDateString()
+        const yesterday = new Date(Date.now() - 86400000).toDateString()
+        if (lastDate === today || lastDate === yesterday) setStreak(count)
+      }
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    if (!isClockedIn) return
+    try {
+      const today = new Date().toDateString()
+      const stored = localStorage.getItem('swiftshift-streak')
+      if (!stored) {
+        localStorage.setItem('swiftshift-streak', JSON.stringify({ count: 1, lastDate: today }))
+        setStreak(1)
+        return
+      }
+      const { count, lastDate } = JSON.parse(stored)
+      if (lastDate === today) return
+      const yesterday = new Date(Date.now() - 86400000).toDateString()
+      const newCount = lastDate === yesterday ? count + 1 : 1
+      localStorage.setItem('swiftshift-streak', JSON.stringify({ count: newCount, lastDate: today }))
+      setStreak(newCount)
+    } catch {}
+  }, [isClockedIn])
+
+  // Haptic on cent increment
   const triggerHaptic = useCallback((currentCents: number) => {
     if (currentCents !== prevCentsRef.current && 'vibrate' in navigator) {
-      try {
-        navigator.vibrate(10)
-      } catch {
-        // Ignore if not supported
-      }
+      try { navigator.vibrate(10) } catch {}
     }
     prevCentsRef.current = currentCents
   }, [])
 
   useEffect(() => {
     if (!isClockedIn) return
-    const cents = Math.floor(earnedToday * 100) % 100
-    triggerHaptic(cents)
+    triggerHaptic(Math.floor(earnedToday * 100) % 100)
   }, [earnedToday, isClockedIn, triggerHaptic])
 
-  // Neon green confetti from bottom when rewards tab focuses
+  // Confetti on tab focus
   useEffect(() => {
     if (onFocus && !hasFiredConfetti) {
       const timer = setTimeout(() => {
-        confetti({
-          particleCount: 180,
-          spread: 90,
-          origin: { x: 0.5, y: 0.95 },
-          colors: [confettiColor, '#39FF14', '#00CC00'],
-        })
-        setTimeout(() => {
-          confetti({
-            particleCount: 120,
-            spread: 70,
-            angle: 75,
-            origin: { x: 0.3, y: 0.9 },
-            colors: [confettiColor, '#39FF14'],
-          })
-        }, 120)
-        setTimeout(() => {
-          confetti({
-            particleCount: 120,
-            spread: 70,
-            angle: 105,
-            origin: { x: 0.7, y: 0.9 },
-            colors: [confettiColor, '#00CC00'],
-          })
-        }, 240)
+        confetti({ particleCount: 180, spread: 90, origin: { x: 0.5, y: 0.95 }, colors: [confettiColor, '#39FF14', '#00CC00'] })
+        setTimeout(() => confetti({ particleCount: 120, spread: 70, angle: 75, origin: { x: 0.3, y: 0.9 }, colors: [confettiColor, '#39FF14'] }), 120)
+        setTimeout(() => confetti({ particleCount: 120, spread: 70, angle: 105, origin: { x: 0.7, y: 0.9 }, colors: [confettiColor, '#00CC00'] }), 240)
         setHasFiredConfetti(true)
       }, 80)
       return () => clearTimeout(timer)
     }
-  }, [onFocus, hasFiredConfetti])
+  }, [onFocus, hasFiredConfetti, confettiColor])
 
-  useEffect(() => {
-    return () => setHasFiredConfetti(false)
-  }, [])
+  useEffect(() => { return () => setHasFiredConfetti(false) }, [])
 
   return (
-    <div ref={containerRef} className="max-w-[1200px] mx-auto">
+    <div ref={containerRef} className="max-w-[1200px] mx-auto space-y-4">
+
+      {/* ═══════════════════════════════════════════
+          TOP MODULE — Live Earnings Machine
+          ═══════════════════════════════════════════ */}
       <div className="glass rounded-3xl p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <div>
-            <div className="text-2xl font-semibold neon-green">Rewards</div>
-          </div>
-
+          <div className="text-2xl font-semibold neon-green">Rewards</div>
           <div className="flex items-center gap-4 text-sm">
             <div className="flex items-center gap-2">
               <span className="text-zinc-500">Rate:</span>
@@ -184,26 +203,298 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
 
         {/* Three modules side-by-side */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="glass rounded-3xl p-6 flex-1">
-            <div className="text-sm uppercase tracking-[2px] text-white mb-2">Today's Earnings</div>
-            <div className="text-4xl font-medium mb-1.5 neon-green">{isClockedIn ? `$${earnedToday.toFixed(2)}` : 'CLOCK IN'}</div>
-            <div className="text-sm text-zinc-400 mb-3">Real time earnings</div>
+
+          {/* ── SLOT MACHINE EARNINGS ── */}
+          <div className="glass rounded-3xl p-6 relative overflow-hidden">
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{ background: `radial-gradient(ellipse at 50% 0%, ${accentColor}1A 0%, transparent 65%)` }}
+            />
+            <div className="text-xs uppercase tracking-[3px] text-zinc-400 mb-3 relative">Today's Earnings</div>
+
+            {isClockedIn ? (
+              <div className="relative">
+                {/* Slot machine bezel */}
+                <div
+                  className="relative inline-block mb-2"
+                  style={{
+                    background: 'rgba(0,0,0,0.92)',
+                    borderRadius: '14px',
+                    padding: '10px 16px 10px 12px',
+                    border: `1px solid ${accentColor}35`,
+                    boxShadow: `0 0 28px ${accentColor}22, inset 0 2px 0 rgba(255,255,255,0.08), inset 0 -2px 0 rgba(0,0,0,0.6)`,
+                  }}
+                >
+                  {/* Scanning gloss line */}
+                  <motion.div
+                    className="absolute inset-x-0 h-px pointer-events-none"
+                    style={{
+                      background: `linear-gradient(90deg, transparent 0%, ${accentColor}55 50%, transparent 100%)`,
+                      top: '52%',
+                    }}
+                    animate={{ opacity: [0, 0.8, 0] }}
+                    transition={{ repeat: Infinity, duration: 2.8, ease: 'easeInOut' }}
+                  />
+                  <Odometer
+                    value={earnedToday}
+                    format="currency"
+                    className="text-4xl"
+                    speed={isOvertime ? 1.5 : 1}
+                    color={isOvertime ? '#FFAA00' : accentColor}
+                  />
+                </div>
+
+                {/* Live / Overtime badge */}
+                <div className="flex items-center gap-1.5">
+                  <motion.div
+                    className="w-1.5 h-1.5 rounded-full bg-green-400"
+                    animate={{ opacity: [1, 0.25, 1] }}
+                    transition={{ repeat: Infinity, duration: 1.2 }}
+                  />
+                  <span className="text-[10px] uppercase tracking-widest text-zinc-500">
+                    {isOvertime ? 'Overtime ×1.5' : 'Live'}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="text-3xl font-light text-zinc-700 tracking-widest mb-1 font-mono">— — —</div>
+                <div className="text-xs text-zinc-600">Clock in to start earning</div>
+              </div>
+            )}
+
+            <div className="text-xs text-zinc-500 mt-2">Real time earnings</div>
           </div>
-          <div className="glass rounded-3xl p-6 flex-1">
-            <div className="text-sm uppercase tracking-[2px] text-white mb-2">Today's Accrued PTO</div>
-            <div className="text-4xl font-medium mb-1.5 neon-green">{isClockedIn ? `${accruedPTO.toFixed(2)} hrs` : 'CLOCK IN'}</div>
-            <div className="text-sm text-zinc-400 mb-3">Real Time PTO Earned</div>
+
+          {/* ── PTO MODULE ── */}
+          <div className="glass rounded-3xl p-6 relative overflow-hidden">
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{ background: 'radial-gradient(ellipse at 50% 0%, rgba(81,254,254,0.07) 0%, transparent 65%)' }}
+            />
+            <div className="text-xs uppercase tracking-[3px] text-zinc-400 mb-3 relative">Today's Accrued PTO</div>
+
+            {isClockedIn ? (
+              <div className="relative">
+                <div
+                  className="relative inline-flex items-baseline mb-2"
+                  style={{
+                    background: 'rgba(0,0,0,0.92)',
+                    borderRadius: '14px',
+                    padding: '10px 16px 10px 12px',
+                    border: '1px solid rgba(81,254,254,0.2)',
+                    boxShadow: 'inset 0 2px 0 rgba(255,255,255,0.06)',
+                  }}
+                >
+                  <Odometer value={accruedPTO} format="decimal" className="text-4xl" color="#51FEFE" />
+                  <span className="text-sm text-zinc-400 ml-2 mb-0.5">hrs</span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-3xl font-light text-zinc-700 tracking-widest font-mono">— — —</div>
+            )}
+
+            <div className="text-xs text-zinc-500 mt-2">Real time PTO accrual</div>
           </div>
-          <div className="glass rounded-3xl p-6 flex-1">
-            <div className="text-sm uppercase tracking-[2px] text-white mb-2">Estimated Next Paycheck</div>
-            <div className="text-4xl font-medium mb-1.5 neon-green">${estimatedPaycheck.toFixed(0)}</div>
-            <div className="text-sm text-zinc-400 mb-3">{daysUntilNextPaycheck()} days until next paycheck</div>
+
+          {/* ── PAYCHECK MODULE ── */}
+          <div className="glass rounded-3xl p-6 relative overflow-hidden">
+            <div className="text-xs uppercase tracking-[3px] text-zinc-400 mb-3">Estimated Next Paycheck</div>
+            <div className="text-4xl font-medium mb-2 neon-green">${Math.round(totalEarnings).toLocaleString()}</div>
+            <div className="text-xs text-zinc-500 mb-3">{daysUntil} days away</div>
+            <div className="crystal-progress">
+              <div
+                className="h-full rounded-full transition-all duration-1000"
+                style={{
+                  width: `${paycheckProgress}%`,
+                  background: `linear-gradient(90deg, ${accentColor}70, ${accentColor})`,
+                }}
+              />
+            </div>
+            <div className="text-[10px] text-zinc-600 mt-1.5 text-right">{Math.round(paycheckProgress)}% of pay cycle</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════
+          DAILY MISSION
+          ═══════════════════════════════════════════ */}
+      <div className="glass rounded-3xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <div className="text-xs uppercase tracking-[2px] text-zinc-400">Daily Mission</div>
+            <div className="text-lg font-semibold neon-green mt-0.5">
+              Earn ${dailyGoalDollars.toFixed(0)} today
+            </div>
+          </div>
+          <div className="text-right">
+            <div
+              className="text-3xl font-bold tabular-nums"
+              style={{ color: dailyGoalProgress >= 100 ? accentColor : 'white' }}
+            >
+              {Math.round(dailyGoalProgress)}%
+            </div>
+            <div className="text-xs text-zinc-500">complete</div>
           </div>
         </div>
 
-        <div className="text-center text-xs text-zinc-500 pt-6">
-          SwiftShift - Instant gratification for your hard work.
+        <div className="crystal-progress" style={{ height: '10px' }}>
+          <motion.div
+            className="h-full rounded-full"
+            style={{ background: `linear-gradient(90deg, ${accentColor}70, ${accentColor})` }}
+            initial={{ width: 0 }}
+            animate={{ width: `${dailyGoalProgress}%` }}
+            transition={{ duration: 1.2, ease: 'easeOut' }}
+          />
         </div>
+
+        <div className="flex justify-between text-xs mt-2">
+          <span className="text-zinc-600">$0</span>
+          <span className="font-semibold" style={{ color: accentColor }}>${earnedToday.toFixed(2)}</span>
+          <span className="text-zinc-600">${dailyGoalDollars.toFixed(0)}</span>
+        </div>
+
+        {dailyGoalProgress >= 100 && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-3 text-center text-xs font-semibold tracking-[3px] uppercase"
+            style={{ color: accentColor }}
+          >
+            Daily goal complete — great work
+          </motion.div>
+        )}
+      </div>
+
+      {/* ═══════════════════════════════════════════
+          STATS ROW: Streak + Level/XP + Hours
+          ═══════════════════════════════════════════ */}
+      <div className="grid grid-cols-3 gap-4">
+
+        {/* Work Streak */}
+        <div className="glass rounded-3xl p-6 text-center flex flex-col items-center justify-center">
+          <div className="text-xs uppercase tracking-[2px] text-zinc-400 mb-2">Work Streak</div>
+          <div className="text-4xl mb-1 select-none">🔥</div>
+          <div className="text-4xl font-bold neon-green tabular-nums">{streak}</div>
+          <div className="text-xs text-zinc-500 mt-1.5">
+            {streak === 0
+              ? 'Clock in to start'
+              : streak === 1
+              ? 'Day one — keep going!'
+              : `${streak} days in a row`}
+          </div>
+        </div>
+
+        {/* Level & XP */}
+        <div className="glass rounded-3xl p-6 text-center">
+          <div className="text-xs uppercase tracking-[2px] text-zinc-400 mb-1">Level {level}</div>
+          <div className="text-2xl font-bold neon-green">{levelName}</div>
+          <div className="mt-4 crystal-progress">
+            <div
+              className="h-full rounded-full transition-all duration-700"
+              style={{
+                width: `${xpProgress}%`,
+                background: `linear-gradient(90deg, ${accentColor}70, ${accentColor})`,
+              }}
+            />
+          </div>
+          <div className="text-xs text-zinc-500 mt-2">{totalXP} / {level * 500} XP</div>
+          <div className="text-[10px] text-zinc-600 mt-0.5">100 XP per hour worked</div>
+        </div>
+
+        {/* Hours Today */}
+        <div className="glass rounded-3xl p-6 text-center">
+          <div className="text-xs uppercase tracking-[2px] text-zinc-400 mb-2">Hours Today</div>
+          <div className="text-4xl font-bold neon-green tabular-nums">{totalHours.toFixed(1)}</div>
+          <div className="text-xs text-zinc-500 mt-1">
+            {isOvertime ? 'Overtime active' : isClockedIn ? 'Currently clocked in' : 'Clocked out'}
+          </div>
+          <div className="mt-3 crystal-progress">
+            <div
+              className="h-full rounded-full transition-all duration-700"
+              style={{
+                width: `${Math.min(100, (totalHours / 8) * 100)}%`,
+                background: isOvertime
+                  ? 'linear-gradient(90deg, #FFAA0070, #FFAA00)'
+                  : `linear-gradient(90deg, ${accentColor}70, ${accentColor})`,
+              }}
+            />
+          </div>
+          <div className="text-xs text-zinc-500 mt-1.5">
+            {Math.round(Math.min(100, (totalHours / 8) * 100))}% of 8-hour day
+          </div>
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════
+          ACHIEVEMENTS
+          ═══════════════════════════════════════════ */}
+      <div className="glass rounded-3xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-xs uppercase tracking-[2px] text-zinc-400">Achievements</div>
+          <div className="text-xs text-zinc-500">
+            {achievements.filter(a => a.unlocked).length} / {achievements.length} unlocked
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          {achievements.map((ach, i) => (
+            <motion.div
+              key={ach.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: ach.unlocked ? 1 : 0.35, y: 0 }}
+              transition={{ delay: i * 0.07, duration: 0.4 }}
+              className={`glass rounded-2xl p-4 transition-all duration-500 ${!ach.unlocked ? 'grayscale' : ''}`}
+              style={
+                ach.unlocked
+                  ? {
+                      boxShadow: `0 0 18px ${accentColor}18, inset 0 1px 0 rgba(255,255,255,0.08)`,
+                      borderColor: `${accentColor}22`,
+                    }
+                  : {}
+              }
+            >
+              <div className="text-2xl mb-2 select-none">{ach.icon}</div>
+              <div className="text-sm font-semibold neon-green leading-tight">{ach.label}</div>
+              <div className="text-xs text-zinc-500 mt-1 leading-snug">{ach.desc}</div>
+              {ach.unlocked && (
+                <div
+                  className="text-[10px] mt-2 font-semibold tracking-[2px] uppercase"
+                  style={{ color: accentColor }}
+                >
+                  Unlocked
+                </div>
+              )}
+            </motion.div>
+          ))}
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════
+          PTO VAULT
+          ═══════════════════════════════════════════ */}
+      <div className="glass rounded-3xl p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-xs uppercase tracking-[2px] text-zinc-400 mb-1">PTO Vault</div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-bold neon-green tabular-nums">{accruedPTO.toFixed(3)}</span>
+              <span className="text-lg text-zinc-400">hrs</span>
+            </div>
+            <div className="text-xs text-zinc-500 mt-1">
+              Accruing 1 hr per {(1 / ptoAccrualRate).toFixed(0)} hrs worked
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-xs text-zinc-500 mb-1">Projected annual PTO</div>
+            <div className="text-2xl font-semibold neon-green">{(2080 * ptoAccrualRate).toFixed(1)} hrs</div>
+            <div className="text-xs text-zinc-600 mt-0.5">{(2080 * ptoAccrualRate / 8).toFixed(1)} days / year</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="text-center text-xs text-zinc-500 pt-2 pb-4">
+        SwiftShift — Instant gratification for your hard work.
       </div>
     </div>
   )
