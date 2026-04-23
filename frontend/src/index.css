@@ -168,20 +168,20 @@ button, [role="button"] {
 
 .crystal-progress {
   position: relative;
-  height: 8px;
-  background: rgba(20, 28, 50, 0.8);
-  border: 1px solid rgba(140, 180, 230, 0.25);
+  height: 10px;
+  background: #0a0a0a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 9999px;
   overflow: hidden;
-  box-shadow: inset 0 1px 0 rgba(200, 220, 255, 0.15);
 }
 
 .crystal-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #ffffff, #e5e5e5, #ffffff);
+  background: var(--accent-color);
   border-radius: 9999px;
   transition: width 0.5s cubic-bezier(0.23, 1, 0.32, 1);
   position: relative;
+  box-shadow: 0 0 8px rgba(var(--accent-color-rgb), 0.5);
 }
 
 .crystal-progress-fill::after {
@@ -191,7 +191,7 @@ button, [role="button"] {
   background: linear-gradient(
     90deg,
     transparent 30%,
-    rgba(255, 255, 255, 0.35) 50%,
+    rgba(255, 255, 255, 0.25) 50%,
     transparent 70%
   );
   animation: progress-shine 1.8s linear infinite;

@@ -1105,7 +1105,10 @@ export default function App() {
   // Clock state
   const [clockInAt, setClockInAt] = useState<Date | null>(null)
   const [breakStartedAt, setBreakStartedAt] = useState<Date | null>(null)
+  const [breakType, setBreakType] = useState<'paid' | 'unpaid' | null>(null)
   const [breakMsAccum, setBreakMsAccum] = useState(0)
+  const [paidBreakMsAccum, setPaidBreakMsAccum] = useState(0)
+  const [periodTotalMs, setPeriodTotalMs] = useState(0)
   const [todayWorkedMs, setTodayWorkedMs] = useState(0)
   const [now, setNow] = useState(new Date())
   const [_shockwaveActive, setShockwaveActive] = useState(false)
@@ -1148,15 +1151,23 @@ export default function App() {
       .then(([activeRows, allRows]) => {
         const active = Array.isArray(activeRows) && activeRows.length ? activeRows[0] : null
         const todayStr = new Date().toISOString().slice(0, 10)
+        const currentPeriod = payPeriodFor(new Date())
+        const periodStartStr = currentPeriod.start.toISOString().slice(0, 10)
+        const periodEndStr = currentPeriod.end.toISOString().slice(0, 10)
 
-        // Sum duration_minutes for today's completed sessions
+        // Sum duration_minutes for today's completed sessions, and for the full pay period
         let todayMs = 0
+        let periodMs = 0
         for (const row of allRows) {
           if (!row.clock_in) continue
           const d = row.clock_in.slice(0, 10)
           if (d === todayStr) {
             const mins = Number(row.duration_minutes) || 0
             todayMs += mins * 60 * 1000
+          }
+          if (d >= periodStartStr && d <= periodEndStr) {
+            const mins = Number(row.duration_minutes) || 0
+            periodMs += mins * 60 * 1000
           }
         }
 
@@ -1170,12 +1181,15 @@ export default function App() {
           }
           setClockInAt(clockInDate)
           setBreakStartedAt(null)
+          setBreakType(null)
           setBreakMsAccum(0)
+          setPaidBreakMsAccum(0)
         } else {
           setClockInAt(null)
         }
 
         setTodayWorkedMs(todayMs)
+        setPeriodTotalMs(periodMs)
       })
       .catch(() => {})
   }, [user?.id])
@@ -1190,15 +1204,17 @@ export default function App() {
   const isClockedIn = clockInAt !== null
   const isOnBreak = breakStartedAt !== null
   const activeBreakMs = isOnBreak ? Math.max(0, now.getTime() - breakStartedAt.getTime()) : 0
+  // Only unpaid breaks deduct from worked time; paid breaks count as work time
+  const unpaidActiveBreakMs = (isOnBreak && breakType === 'unpaid') ? activeBreakMs : 0
   const sessionWorkedMs = isClockedIn
-    ? Math.max(0, now.getTime() - clockInAt.getTime() - breakMsAccum - activeBreakMs)
+    ? Math.max(0, now.getTime() - clockInAt.getTime() - breakMsAccum - unpaidActiveBreakMs)
     : 0
   const todayTotalMs = todayWorkedMs + sessionWorkedMs
 
   const statusText = !isClockedIn
     ? 'Not clocked in'
     : isOnBreak
-      ? 'On break'
+      ? (breakType === 'paid' ? 'On paid break (15 min)' : 'On lunch break')
       : `Clocked in since ${clockInAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
 
   // One-time login welcome toast
@@ -1276,13 +1292,16 @@ export default function App() {
   // Pay period
   const period = useMemo(() => payPeriodFor(now), [now])
   const periodLabel = `${period.start.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })} – ${period.end.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })}`
-  const periodHours = (todayTotalMs / 3600000).toFixed(1)
+  const periodHours = ((periodTotalMs + sessionWorkedMs) / 3600000).toFixed(1)
 
   // Actions
   const handleClockIn = (e?: React.MouseEvent<HTMLButtonElement>) => {
     if (!isClockedIn) {
       setClockInAt(now)
       setBreakStartedAt(null)
+      setBreakType(null)
+      setBreakMsAccum(0)
+      setPaidBreakMsAccum(0)
 
       // Update daily streak (freeze over weekends)
       const todayStr = now.toISOString().slice(0, 10)
@@ -1353,17 +1372,23 @@ export default function App() {
     }
   }
 
-  const handleStartBreak = () => {
+  const handleStartBreak = (type: 'paid' | 'unpaid') => {
     if (isClockedIn && !isOnBreak) {
       setBreakStartedAt(now)
+      setBreakType(type)
     }
   }
 
   const handleEndBreak = () => {
     if (isOnBreak && breakStartedAt) {
       const delta = Math.max(0, now.getTime() - breakStartedAt.getTime())
-      setBreakMsAccum(v => v + delta)
+      if (breakType === 'paid') {
+        setPaidBreakMsAccum(v => v + delta)
+      } else {
+        setBreakMsAccum(v => v + delta)
+      }
       setBreakStartedAt(null)
+      setBreakType(null)
       const breakMins = Math.round(delta / 60000)
       const msgs = [
         "You're back — let's get it!",
@@ -1373,23 +1398,25 @@ export default function App() {
         "Welcome back — you've got this!",
       ]
       toast.success(msgs[Math.floor(Math.random() * msgs.length)], {
-        description: `Break: ${breakMins} min`,
+        description: `${breakType === 'paid' ? 'Paid break' : 'Lunch'}: ${breakMins} min`,
       })
     }
   }
 
   const handleClockOut = () => {
     if (isClockedIn) {
-      // If currently on break, close it first
-      let accum = breakMsAccum
-      if (isOnBreak && breakStartedAt) {
-        accum += Math.max(0, now.getTime() - breakStartedAt.getTime())
+      // If currently on an unpaid break, close it first (unpaid breaks deduct from pay)
+      let unpaidAccum = breakMsAccum
+      if (isOnBreak && breakStartedAt && breakType === 'unpaid') {
+        unpaidAccum += Math.max(0, now.getTime() - breakStartedAt.getTime())
       }
-      const session = Math.max(0, now.getTime() - clockInAt!.getTime() - accum)
+      const session = Math.max(0, now.getTime() - clockInAt!.getTime() - unpaidAccum)
       setTodayWorkedMs(v => v + session)
       setClockInAt(null)
       setBreakStartedAt(null)
+      setBreakType(null)
       setBreakMsAccum(0)
+      setPaidBreakMsAccum(0)
 
       // Show LootDrop modal with earnings and PTO
       const hourlyRate = 65
@@ -1780,8 +1807,13 @@ export default function App() {
                     )}
                     {isClockedIn && !isOnBreak && (
                       <>
-                        <motion.button onClick={handleStartBreak} className="px-5 py-2.5 rounded-xl border border-white/20 hover:bg-white/5" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-                          Start break
+                        <motion.button onClick={() => handleStartBreak('paid')} className="px-4 py-2.5 rounded-xl border border-white/20 hover:bg-white/5 text-sm" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                          15-min break
+                          <span className="block text-[10px] text-zinc-500 mt-0.5">paid</span>
+                        </motion.button>
+                        <motion.button onClick={() => handleStartBreak('unpaid')} className="px-4 py-2.5 rounded-xl border border-white/20 hover:bg-white/5 text-sm" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                          Lunch break
+                          <span className="block text-[10px] text-zinc-500 mt-0.5">unpaid</span>
                         </motion.button>
                         <motion.button onClick={handleClockOut} className="px-5 py-2.5 rounded-xl bg-red-500/80 hover:bg-red-500 text-white" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                           Clock out
@@ -1886,7 +1918,14 @@ export default function App() {
                     </div>
                     <div className="glass rounded-2xl p-4">
                       <div className="text-zinc-400 mb-1">Breaks</div>
-                      <div className="font-mono text-xl neon-green">{formatMs(breakMsAccum + activeBreakMs)}</div>
+                      <div className="font-mono text-xl neon-green">{formatMs(breakMsAccum + paidBreakMsAccum + activeBreakMs)}</div>
+                      {(breakMsAccum > 0 || paidBreakMsAccum > 0) && (
+                        <div className="text-[10px] text-zinc-600 mt-1">
+                          {paidBreakMsAccum > 0 && <span>{formatMs(paidBreakMsAccum)} paid</span>}
+                          {paidBreakMsAccum > 0 && breakMsAccum > 0 && <span> · </span>}
+                          {breakMsAccum > 0 && <span>{formatMs(breakMsAccum)} unpaid</span>}
+                        </div>
+                      )}
                     </div>
                     <div className="glass rounded-2xl p-4">
                       <div className="text-zinc-400 mb-1">Today</div>
@@ -1937,7 +1976,7 @@ export default function App() {
                       initial={isClockedIn ? { scale: 1.08, color: 'var(--accent-color)' } : false}
                       animate={{ scale: 1, color: 'var(--accent-color)' }}
                       transition={{ duration: 0.25 }}
-                      className="font-mono text-2xl font-semibold tabular-nums neon-green"
+                      className="font-mono text-5xl font-bold tabular-nums neon-green"
                     >
                       ${((todayTotalMs / 3600000) * 65).toFixed(2)}
                     </motion.div>
