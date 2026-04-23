@@ -1942,9 +1942,12 @@ export default function App() {
                       ${((todayTotalMs / 3600000) * 65).toFixed(2)}
                     </motion.div>
                     {isClockedIn && (
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        <span className="text-[10px] text-zinc-500">live</span>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full animate-pulse inline-block"
+                          style={{ background: '#22ff7a', boxShadow: '0 0 8px #22ff7a, 0 0 16px #22ff7a60' }}
+                        />
+                        <span className="text-xs uppercase tracking-widest text-zinc-300 font-medium">live</span>
                       </div>
                     )}
                   </div>
