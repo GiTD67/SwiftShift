@@ -165,3 +165,98 @@
   color: rgba(255, 255, 255, 0.4);
   text-align: center;
 }
+
+/* ============================================
+   MOBILE HAMBURGER BUTTON
+   ============================================ */
+
+.ta-hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 36px;
+  height: 36px;
+  padding: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ta-hamburger span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 2px;
+  transition: all 0.2s ease;
+}
+
+/* ============================================
+   MOBILE SIDEBAR OVERLAY
+   ============================================ */
+
+.ta-sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 99;
+  backdrop-filter: blur(2px);
+}
+
+/* ============================================
+   MOBILE RESPONSIVE
+   ============================================ */
+
+@media (max-width: 767px) {
+  /* Show hamburger on mobile */
+  .ta-hamburger {
+    display: flex;
+  }
+
+  /* Sidebar slides in from left on mobile */
+  .ta-sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.23, 1, 0.32, 1);
+    z-index: 150;
+    width: 260px;
+    top: 0;
+    padding-top: 80px;
+  }
+
+  .ta-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  /* Show backdrop when sidebar is open */
+  .ta-sidebar-backdrop.mobile-open {
+    display: block;
+  }
+
+  /* Content takes full width */
+  .ta-content {
+    margin-left: 0;
+  }
+
+  /* Reduce main padding on mobile */
+  .ta-main {
+    padding: 16px;
+  }
+
+  /* Compact navbar on mobile */
+  .ta-navbar {
+    padding: 10px 16px;
+  }
+
+  /* Hide streak badge label on small screens */
+  .ta-streak-label {
+    display: none;
+  }
+
+  /* Compact navbar user section */
+  .ta-navbar-user {
+    gap: 8px;
+  }
+}
