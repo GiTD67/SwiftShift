@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import './App.css'
 import './index.css'
@@ -276,11 +276,16 @@ function TimesheetView({ user }: { user: any }) {
 
   const handleSaveDraft = () => {
     setDraftMessage('Draft saved')
+    toast.success('Draft saved! ✓', { description: 'Your hours are saved. Submit when ready.' })
   }
 
   const handleSubmit = () => {
     if (certified && !isSubmitted) {
       setSubmittedPeriods(prev => new Set(prev).add(periodId))
+      toast.success('Timesheet submitted! 🎉', { description: 'Your manager will review it shortly.' })
+      confetti({ particleCount: 150, spread: 90, origin: { y: 0.5 } })
+      setTimeout(() => confetti({ particleCount: 100, spread: 70, angle: 75, origin: { x: 0.2, y: 0.6 } }), 150)
+      setTimeout(() => confetti({ particleCount: 100, spread: 70, angle: 105, origin: { x: 0.8, y: 0.6 } }), 300)
     }
   }
 
@@ -1062,6 +1067,12 @@ export default function App() {
   const [_shockwaveActive, setShockwaveActive] = useState(false)
   const [ripplePos, setRipplePos] = useState<{ x: number; y: number } | null>(null)
 
+  // Milestone tracking refs (persist across renders, reset on new clock session)
+  const hoursMilestoneFiredRef = useRef<Set<number>>(new Set())
+  const earningsMilestoneFiredRef = useRef<Set<number>>(new Set())
+  const progressMilestoneFiredRef = useRef<Set<number>>(new Set())
+  const loginWelcomeShownRef = useRef(false)
+
   // LootDrop modal state (shown after clock out)
   const [showLootDrop, setShowLootDrop] = useState(false)
   const [lootEarnings, setLootEarnings] = useState(0)
@@ -1146,6 +1157,78 @@ export default function App() {
       ? 'On break'
       : `Clocked in since ${clockInAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
 
+  // One-time login welcome toast
+  useEffect(() => {
+    if (!loginWelcomeShownRef.current) {
+      loginWelcomeShownRef.current = true
+      const hour = new Date().getHours()
+      const g = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
+      setTimeout(() => {
+        toast.success(`Good ${g}, ${user.first_name}! 👋`, {
+          description: streak > 0 ? `${streak}-day streak — keep it going!` : 'Ready to clock in?',
+        })
+      }, 1000)
+    }
+  }, [])
+
+  // Hourly milestone toasts (fire each time a new whole hour is crossed)
+  useEffect(() => {
+    if (!isClockedIn) return
+    const hoursWorked = Math.floor(todayTotalMs / 3600000)
+    if (hoursWorked >= 1 && !hoursMilestoneFiredRef.current.has(hoursWorked)) {
+      hoursMilestoneFiredRef.current.add(hoursWorked)
+      const hourMsgs: Record<number, string> = {
+        1: '1 hour in — nice start!',
+        2: '2 hours down!',
+        3: '3 hours — you\'re in the zone!',
+        4: 'Halfway there — 4 hours! 💪',
+        5: '5 hours — almost done!',
+        6: '6 hours — strong work!',
+        7: '7 hours — one more to go!',
+        8: 'Full 8-hour day complete! 🎉',
+      }
+      toast.success(hourMsgs[hoursWorked] || `${hoursWorked} hours worked!`, {
+        description: `Keep it up, ${user.first_name}!`,
+      })
+    }
+  }, [Math.floor(todayTotalMs / 3600000)])
+
+  // 25% / 50% / 75% daily goal progress toasts
+  useEffect(() => {
+    if (!isClockedIn) return
+    const EIGHT_HOURS_MS = 8 * 3600000
+    const pct = Math.floor((todayTotalMs / EIGHT_HOURS_MS) * 100)
+    const milestones = [25, 50, 75]
+    for (const m of milestones) {
+      if (pct >= m && !progressMilestoneFiredRef.current.has(m)) {
+        progressMilestoneFiredRef.current.add(m)
+        const msgs: Record<number, string> = {
+          25: '25% of your day done! 🏁',
+          50: 'Halfway through your day! ⚡',
+          75: '75% complete — almost there! 🚀',
+        }
+        toast.success(msgs[m], { description: `${user.first_name}, you're crushing it!` })
+        confetti({ particleCount: 40, spread: 45, origin: { y: 0.75 }, colors: [themeAccentHex] })
+        break
+      }
+    }
+  }, [Math.floor((todayTotalMs / (8 * 3600000)) * 4)])
+
+  // Earnings milestone toasts ($50, $100, $200, $400)
+  useEffect(() => {
+    if (!isClockedIn) return
+    const earnings = (todayTotalMs / 3600000) * 65
+    const milestones = [50, 100, 200, 400]
+    for (const m of milestones) {
+      if (earnings >= m && !earningsMilestoneFiredRef.current.has(m)) {
+        earningsMilestoneFiredRef.current.add(m)
+        toast.success(`$${m} earned today! 💰`, { description: 'Your wallet is growing.' })
+        confetti({ particleCount: 60, spread: 50, origin: { y: 0.7 }, colors: [themeAccentHex, '#FFD700'] })
+        break
+      }
+    }
+  }, [Math.floor((todayTotalMs / 3600000) * 65 / 50)])
+
   // Pay period
   const period = useMemo(() => payPeriodFor(now), [now])
   const periodLabel = `${period.start.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })} – ${period.end.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })}`
@@ -1179,7 +1262,33 @@ export default function App() {
         setLastStreakDate(todayStr)
         localStorage.setItem('streak', String(newStreak))
         localStorage.setItem('lastStreakDate', todayStr)
+
+        // Streak milestone celebrations
+        if ([5, 10, 20, 30, 50].includes(newStreak)) {
+          setTimeout(() => {
+            confetti({ particleCount: 300, spread: 120, origin: { y: 0.5 }, colors: [themeAccentHex, '#FFD700', '#FF6B6B'] })
+            setTimeout(() => confetti({ particleCount: 200, spread: 80, origin: { y: 0.65 }, colors: [themeAccentHex, '#FFD700'] }), 200)
+          }, 400)
+          toast.success(`🔥 ${newStreak}-day streak milestone!`, {
+            description: newStreak >= 20 ? 'You\'re absolutely legendary!' : newStreak >= 10 ? 'You\'re on fire! Incredible consistency!' : 'High five! Keep that streak alive!',
+          })
+        } else {
+          // Regular clock-in toast
+          toast.success(`Clocked in! Let's go, ${user.first_name}!`, {
+            description: newStreak > 1 ? `${newStreak}-day streak 🔥` : 'Time to make it count!',
+          })
+        }
+      } else {
+        // Weekend clock-in toast (no streak tracking)
+        toast.success(`Clocked in! Working the weekend, ${user.first_name}?`, {
+          description: 'Dedication noted! 💪',
+        })
       }
+
+      // Reset milestone trackers for new session
+      hoursMilestoneFiredRef.current = new Set()
+      earningsMilestoneFiredRef.current = new Set()
+      progressMilestoneFiredRef.current = new Set()
 
       // Capture button center for ripple origin
       if (e?.currentTarget) {
@@ -1211,6 +1320,17 @@ export default function App() {
       const delta = Math.max(0, now.getTime() - breakStartedAt.getTime())
       setBreakMsAccum(v => v + delta)
       setBreakStartedAt(null)
+      const breakMins = Math.round(delta / 60000)
+      const msgs = [
+        "You're back — let's get it!",
+        "Refreshed and ready to crush it!",
+        "Break over — back to greatness!",
+        "Recharged! Time to earn! ⚡",
+        "Welcome back — you've got this!",
+      ]
+      toast.success(msgs[Math.floor(Math.random() * msgs.length)], {
+        description: `Break: ${breakMins} min`,
+      })
     }
   }
 
@@ -1579,31 +1699,35 @@ export default function App() {
 
                   <div className="flex flex-wrap gap-3">
                     {!isClockedIn && (
-                      <button
+                      <motion.button
                         onClick={handleClockIn}
                         className="glass-btn-green px-5 py-2.5 rounded-xl font-semibold active:scale-[0.96] transition-all duration-75"
+                        whileHover={{ scale: 1.04 }}
+                        whileTap={{ scale: 0.95 }}
+                        animate={{ boxShadow: ['0 0 0px rgba(var(--accent-color-rgb),0)', '0 0 18px 4px rgba(var(--accent-color-rgb),0.35)', '0 0 0px rgba(var(--accent-color-rgb),0)'] }}
+                        transition={{ boxShadow: { repeat: Infinity, duration: 2, ease: 'easeInOut' } }}
                       >
                         Clock in
-                      </button>
+                      </motion.button>
                     )}
                     {isClockedIn && !isOnBreak && (
                       <>
-                        <button onClick={handleStartBreak} className="px-5 py-2.5 rounded-xl border border-white/20 hover:bg-white/5">
+                        <motion.button onClick={handleStartBreak} className="px-5 py-2.5 rounded-xl border border-white/20 hover:bg-white/5" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                           Start break
-                        </button>
-                        <button onClick={handleClockOut} className="px-5 py-2.5 rounded-xl bg-red-500/80 hover:bg-red-500 text-white">
+                        </motion.button>
+                        <motion.button onClick={handleClockOut} className="px-5 py-2.5 rounded-xl bg-red-500/80 hover:bg-red-500 text-white" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                           Clock out
-                        </button>
+                        </motion.button>
                       </>
                     )}
                     {isOnBreak && (
                       <>
-                        <button onClick={handleEndBreak} className="px-5 py-2.5 rounded-xl border border-white/20 hover:bg-white/5">
+                        <motion.button onClick={handleEndBreak} className="px-5 py-2.5 rounded-xl border border-white/20 hover:bg-white/5" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                           End break
-                        </button>
-                        <button onClick={handleClockOut} className="px-5 py-2.5 rounded-xl bg-red-500/80 hover:bg-red-500 text-white">
+                        </motion.button>
+                        <motion.button onClick={handleClockOut} className="px-5 py-2.5 rounded-xl bg-red-500/80 hover:bg-red-500 text-white" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                           Clock out
-                        </button>
+                        </motion.button>
                       </>
                     )}
                   </div>
@@ -1682,7 +1806,15 @@ export default function App() {
                   <div className="mt-6 grid grid-cols-3 gap-4 text-sm">
                     <div className="glass rounded-2xl p-4">
                       <div className="text-zinc-400 mb-1">Session</div>
-                      <div className="font-mono text-xl neon-green">{formatMs(sessionWorkedMs)}</div>
+                      <motion.div
+                        key={Math.floor(sessionWorkedMs / 60000)}
+                        initial={isClockedIn && !isOnBreak ? { opacity: 0.6 } : false}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.3 }}
+                        className="font-mono text-xl neon-green"
+                      >
+                        {formatMs(sessionWorkedMs)}
+                      </motion.div>
                     </div>
                     <div className="glass rounded-2xl p-4">
                       <div className="text-zinc-400 mb-1">Breaks</div>
@@ -1693,6 +1825,22 @@ export default function App() {
                       <div className="font-mono text-xl neon-green">{formatMs(todayTotalMs)}</div>
                     </div>
                   </div>
+                  {/* Day progress bar */}
+                  {isClockedIn && (
+                    <div className="mt-4">
+                      <div className="flex justify-between text-xs text-zinc-500 mb-1">
+                        <span>Daily goal progress</span>
+                        <span>{Math.min(100, Math.round((todayTotalMs / (8 * 3600000)) * 100))}%</span>
+                      </div>
+                      <div className="crystal-progress">
+                        <motion.div
+                          className="crystal-progress-fill"
+                          animate={{ width: `${Math.min(100, (todayTotalMs / (8 * 3600000)) * 100)}%` }}
+                          transition={{ duration: 1, ease: 'easeOut' }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
               </div>
@@ -1714,16 +1862,28 @@ export default function App() {
                 {/* Real Time Rewards module */}
                 <div className="glass rounded-3xl p-8 flex-1">
                   <div className="text-sm uppercase tracking-[2px] text-white mb-3">Real Time Rewards</div>
-                  <div className="flex justify-between items-center mb-2">
-                    <div className="text-sm text-zinc-400">Today's Earnings:</div>
-                    <div className="h-6 rounded-b-lg flex items-center justify-center text-xs font-semibold px-3 bg-black neon-green">
+                  <div className="mb-3">
+                    <div className="text-xs text-zinc-400 mb-1">Today's Earnings</div>
+                    <motion.div
+                      key={Math.floor((todayTotalMs / 3600000) * 65 * 10)}
+                      initial={isClockedIn ? { scale: 1.08, color: 'var(--accent-color)' } : false}
+                      animate={{ scale: 1, color: 'var(--accent-color)' }}
+                      transition={{ duration: 0.25 }}
+                      className="font-mono text-2xl font-semibold tabular-nums neon-green"
+                    >
                       ${((todayTotalMs / 3600000) * 65).toFixed(2)}
-                    </div>
+                    </motion.div>
+                    {isClockedIn && (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-[10px] text-zinc-500">live</span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex justify-between items-center mb-4">
-                    <div className="text-sm text-zinc-400">Today's PTO Accrued:</div>
-                    <div className="h-6 rounded-b-lg flex items-center justify-center text-xs font-semibold px-3 bg-black neon-green">
-                      {((todayTotalMs / 3600000) / 30).toFixed(2)} hrs
+                    <div className="text-sm text-zinc-400">PTO Accrued:</div>
+                    <div className="text-sm font-semibold neon-green">
+                      {((todayTotalMs / 3600000) / 30).toFixed(3)} hrs
                     </div>
                   </div>
                   <button

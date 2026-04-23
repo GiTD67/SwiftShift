@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
+import confetti from 'canvas-confetti'
 import { TimeEntry } from '../types'
 import { format } from 'date-fns'
 
@@ -69,9 +70,10 @@ export function QuickAdd({ onAdd, disabled }: QuickAddProps) {
     }
 
     onAdd(form)
-    toast.success('Time entry added', { 
-      description: `${form.project} • ${form.task}` 
+    toast.success('Time entry added! ✅', {
+      description: `${form.project} • ${form.task}`
     })
+    confetti({ particleCount: 60, spread: 55, origin: { y: 0.65 }, ticks: 50 })
 
     // Reset form but keep date/project/task
     setForm(prev => ({
