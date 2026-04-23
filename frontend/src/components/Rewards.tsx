@@ -204,55 +204,43 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
         {/* Three modules side-by-side */}
         <div className="grid grid-cols-3 gap-4">
 
-          {/* ── SLOT MACHINE EARNINGS ── */}
+          {/* ── REAL TIME REWARDS ── */}
           <div className="glass rounded-3xl p-6 relative overflow-hidden">
             <div
               className="absolute inset-0 pointer-events-none"
               style={{ background: `radial-gradient(ellipse at 50% 0%, ${accentColor}1A 0%, transparent 65%)` }}
             />
-            <div className="text-xs uppercase tracking-[3px] text-zinc-400 mb-3 relative">Today's Earnings</div>
+            <div className="text-sm uppercase tracking-[2px] text-white mb-1 relative">Real Time Rewards</div>
+            <div className="text-xs uppercase tracking-[2px] text-zinc-400 mb-3 relative">Today's Earnings</div>
 
             {isClockedIn ? (
               <div className="relative">
-                {/* Slot machine bezel */}
-                <div
-                  className="relative inline-block mb-2"
-                  style={{
-                    background: 'rgba(0,0,0,0.92)',
-                    borderRadius: '14px',
-                    padding: '10px 16px 10px 12px',
-                    border: `1px solid ${accentColor}35`,
-                    boxShadow: `0 0 28px ${accentColor}22, inset 0 2px 0 rgba(255,255,255,0.08), inset 0 -2px 0 rgba(0,0,0,0.6)`,
-                  }}
+                <motion.div
+                  key={Math.floor(earnedToday * 10)}
+                  initial={{ scale: 1.06 }}
+                  animate={{ scale: 1 }}
+                  transition={{ duration: 0.25 }}
+                  className="font-mono text-4xl font-semibold tabular-nums mb-2"
+                  style={{ color: isOvertime ? '#FFAA00' : accentColor }}
                 >
-                  {/* Scanning gloss line */}
-                  <motion.div
-                    className="absolute inset-x-0 h-px pointer-events-none"
-                    style={{
-                      background: `linear-gradient(90deg, transparent 0%, ${accentColor}55 50%, transparent 100%)`,
-                      top: '52%',
-                    }}
-                    animate={{ opacity: [0, 0.8, 0] }}
-                    transition={{ repeat: Infinity, duration: 2.8, ease: 'easeInOut' }}
-                  />
-                  <Odometer
-                    value={earnedToday}
-                    format="currency"
-                    className="text-4xl"
-                    speed={isOvertime ? 1.5 : 1}
-                    color={isOvertime ? '#FFAA00' : accentColor}
-                  />
-                </div>
+                  ${earnedToday.toFixed(2)}
+                </motion.div>
 
                 {/* Live / Overtime badge */}
                 <div className="flex items-center gap-1.5">
                   <motion.div
-                    className="w-1.5 h-1.5 rounded-full bg-green-400"
-                    animate={{ opacity: [1, 0.25, 1] }}
-                    transition={{ repeat: Infinity, duration: 1.2 }}
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{
+                      background: isOvertime ? '#FFAA00' : '#22ff7a',
+                      boxShadow: isOvertime
+                        ? '0 0 8px #FFAA00, 0 0 16px #FFAA0060'
+                        : '0 0 8px #22ff7a, 0 0 16px #22ff7a60',
+                    }}
+                    animate={{ opacity: [1, 0.3, 1], scale: [1, 0.8, 1] }}
+                    transition={{ repeat: Infinity, duration: 1.0 }}
                   />
-                  <span className="text-[10px] uppercase tracking-widest text-zinc-500">
-                    {isOvertime ? 'Overtime ×1.5' : 'Live'}
+                  <span className="text-xs uppercase tracking-widest text-zinc-300 font-medium">
+                    {isOvertime ? 'Overtime ×1.5' : 'live'}
                   </span>
                 </div>
               </div>
