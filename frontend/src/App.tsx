@@ -1,13 +1,15 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import './App.css'
 import './index.css'
 import confetti from 'canvas-confetti'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { useTimesheet } from './hooks/useTimesheet'
 import { Rewards } from './components/Rewards'
 import { LootDrop } from './components/LootDrop'
+import { useGamification } from './hooks/useGamification'
+import type { Achievement } from './hooks/useGamification'
 
 const API_BASE = (() => {
   const m = window.location.pathname.match(/^(\/hackathon\/preview\/[^/]+)/)
@@ -182,7 +184,6 @@ function entryKey(weekId: string, dayIndex: number): string {
 
 function parseHours(s: string): number {
   if (!s || !s.trim()) return 0
-  // support comma as decimal separator
   const normalized = s.trim().replace(',', '.')
   const v = parseFloat(normalized)
   if (isNaN(v)) return 0
@@ -196,16 +197,110 @@ function fmtRange(start: Date, end: Date): string {
 
 function usePayPeriodRange(periodOffset: number) {
   return useMemo(() => {
-    // Same anchor as payPeriodFor: Mar 22, 2026
     const anchor = new Date(2026, 2, 22)
     const msPerDay = 86400000
     const periodStart = new Date(anchor.getTime() + periodOffset * 14 * msPerDay)
     periodStart.setHours(0, 0, 0, 0)
     const periodEnd = new Date(periodStart.getTime() + 13 * msPerDay)
     const dayDates = Array.from({ length: 14 }, (_, i) => new Date(periodStart.getTime() + i * msPerDay))
-    const periodId = periodStart.toISOString().slice(0, 10) // YYYY-MM-DD of period start
+    const periodId = periodStart.toISOString().slice(0, 10)
     return { start: periodStart, end: periodEnd, dayDates, periodId }
   }, [periodOffset])
+}
+
+// NLP parser: "set monday to 8", "I worked 7.5 hours tuesday", "today 6", "from 9 to 5 friday"
+function parseNLTimeEntry(input: string, dayDates: Date[]): { dayIndex: number; hours: number } | null {
+  const text = input.toLowerCase().trim()
+
+  const dayPatterns: Array<[RegExp, number[]]> = [
+    [/\bmon(day)?\b/, [0, 7]],
+    [/\btue(s(day)?)?\b/, [1, 8]],
+    [/\bwed(nesday)?\b/, [2, 9]],
+    [/\bthu(r(s(day)?)?)?\b/, [3, 10]],
+    [/\bfri(day)?\b/, [4, 11]],
+    [/\bsat(urday)?\b/, [5, 12]],
+    [/\bsun(day)?\b/, [6, 13]],
+  ]
+
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayIndex = dayDates.findIndex(d => d.toISOString().slice(0, 10) === todayStr)
+  const yesterdayIndex = todayIndex > 0 ? todayIndex - 1 : -1
+
+  let hours: number | null = null
+
+  // "from 9 to 5" or "from 9am to 5pm"
+  const fromToMatch = text.match(/from\s+(\d+)(?::(\d+))?\s*(am|pm)?\s+to\s+(\d+)(?::(\d+))?\s*(am|pm)?/)
+  if (fromToMatch) {
+    let sh = parseInt(fromToMatch[1]), sm = parseInt(fromToMatch[2] || '0')
+    let eh = parseInt(fromToMatch[4]), em = parseInt(fromToMatch[5] || '0')
+    const sPeriod = fromToMatch[3], ePeriod = fromToMatch[6]
+    if (ePeriod === 'pm' && eh < 12) eh += 12
+    if (ePeriod === 'am' && eh === 12) eh = 0
+    if (sPeriod === 'pm' && sh < 12) sh += 12
+    if (sPeriod === 'am' && sh === 12) sh = 0
+    // If no AM/PM and end < start, assume PM for end
+    if (!ePeriod && !sPeriod && eh < sh) eh += 12
+    hours = (eh * 60 + em - sh * 60 - sm) / 60
+    if (hours < 0) hours += 24
+  }
+
+  // "8 hours", "8.5h", "7", bare number near a day
+  if (hours === null) {
+    const numMatch = text.match(/(\d+(?:[.,]\d+)?)\s*(?:hours?|hrs?|h\b)?/)
+    if (numMatch) hours = parseFloat(numMatch[1].replace(',', '.'))
+  }
+
+  if (hours === null || isNaN(hours)) return null
+  hours = Math.max(0, Math.min(24, hours))
+
+  // Find day
+  let dayIndex: number | null = null
+  const isWeek2 = /\b(second week|week\s*2|next week)\b/.test(text)
+
+  if (/\btoday\b/.test(text) && todayIndex >= 0) {
+    dayIndex = todayIndex
+  } else if (/\byesterday\b/.test(text) && yesterdayIndex >= 0) {
+    dayIndex = yesterdayIndex
+  } else {
+    for (const [pattern, indices] of dayPatterns) {
+      if (pattern.test(text)) {
+        dayIndex = isWeek2 ? indices[1] : indices[0]
+        break
+      }
+    }
+  }
+
+  if (dayIndex === null) return null
+  return { dayIndex, hours }
+}
+
+// XP float animation component
+function XPFloat({ amount, onDone }: { amount: number; onDone: () => void }) {
+  return (
+    <motion.div
+      className="fixed pointer-events-none z-[200] font-bold text-lg select-none"
+      style={{ right: '2rem', bottom: '6rem', color: 'var(--accent-color)' }}
+      initial={{ opacity: 1, y: 0 }}
+      animate={{ opacity: 0, y: -80 }}
+      transition={{ duration: 1.4, ease: 'easeOut' }}
+      onAnimationComplete={onDone}
+    >
+      +{amount} XP ✨
+    </motion.div>
+  )
+}
+
+// Achievement toast
+function AchievementToast({ achievement }: { achievement: Achievement }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-2xl">{achievement.icon}</span>
+      <div>
+        <div className="font-semibold text-sm">Achievement Unlocked!</div>
+        <div className="text-xs text-zinc-400">{achievement.name} — {achievement.description}</div>
+      </div>
+    </div>
+  )
 }
 
 // ===== TimesheetView component =====
@@ -213,115 +308,309 @@ function TimesheetView({ user }: { user: any }) {
   const [periodOffset, setPeriodOffset] = useState(0)
   const [entries, setEntries] = useState<Record<string, string>>({})
   const [certified, setCertified] = useState(false)
-  const [submittedPeriods, setSubmittedPeriods] = useState<Set<string>>(new Set())
-  const [draftMessage, setDraftMessage] = useState<string | null>(null)
+  const [submittedPeriods, setSubmittedPeriods] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('ts-submitted-periods') || '[]')) } catch { return new Set() }
+  })
+  const [nlInput, setNlInput] = useState('')
+  const [nlError, setNlError] = useState<string | null>(null)
+  const [xpFloats, setXpFloats] = useState<Array<{ id: number; amount: number }>>([])
+  const [highlightedDay, setHighlightedDay] = useState<number | null>(null)
+  const xpFloatId = useRef(0)
+  const prevDayHoursRef = useRef<number[]>([])
 
   const { start, end, dayDates, periodId } = usePayPeriodRange(periodOffset)
+  const gamification = useGamification()
 
-  // Reset certified when periodId changes
+  // Persist submitted periods
+  useEffect(() => {
+    localStorage.setItem('ts-submitted-periods', JSON.stringify([...submittedPeriods]))
+  }, [submittedPeriods])
+
   useEffect(() => {
     setCertified(false)
   }, [periodId])
 
-  // Auto-clear draft flash
-  useEffect(() => {
-    if (draftMessage) {
-      const t = setTimeout(() => setDraftMessage(null), 3200)
-      return () => clearTimeout(t)
-    }
-  }, [draftMessage])
-
-  // Fetch clock sessions for this user and populate entries from DB
+  // Fetch clock sessions and populate entries
   useEffect(() => {
     const uid = user?.id
     if (!uid) return
     fetch(`${API_BASE}/api/clock-sessions?employee_id=${uid}`)
       .then(r => (r.ok ? r.json() : []))
       .then((rows: any[]) => {
-        // Build map: YYYY-MM-DD -> total minutes
         const byDate: Record<string, number> = {}
         for (const row of rows) {
           if (!row.clock_in) continue
-          const d = row.clock_in.slice(0, 10) // YYYY-MM-DD
+          const d = row.clock_in.slice(0, 10)
           const mins = Number(row.duration_minutes) || 0
           byDate[d] = (byDate[d] || 0) + mins
         }
-        // Map to entries keyed by entryKey(periodId, dayIndex)
+        // Also fetch manual time entries
+        return fetch(`${API_BASE}/api/time-entries?employee_id=${uid}`)
+          .then(r => (r.ok ? r.json() : []))
+          .then((entries: any[]) => {
+            for (const e of entries) {
+              if (!e.date) continue
+              const mins = Number(e.duration_minutes) || 0
+              byDate[e.date] = (byDate[e.date] || 0) + mins
+            }
+            return byDate
+          })
+          .catch(() => byDate)
+      })
+      .then((byDate: Record<string, number>) => {
         const next: Record<string, string> = {}
         dayDates.forEach((d, i) => {
           const key = entryKey(periodId, i)
           const dateStr = d.toISOString().slice(0, 10)
           const mins = byDate[dateStr] || 0
-          if (mins > 0) {
-            next[key] = (mins / 60).toFixed(1)
-          }
+          if (mins > 0) next[key] = (mins / 60).toFixed(1)
         })
         setEntries(next)
       })
       .catch(() => {})
   }, [user?.id, periodId, dayDates])
 
-  // Derived totals
   const dayHours = dayDates.map((_, i) => parseHours(entries[entryKey(periodId, i)] || ''))
   const totalHours = dayHours.reduce((a, b) => a + b, 0)
   const regularHours = dayHours.reduce((sum, h) => sum + Math.min(h, 8), 0)
   const overtimeHours = dayHours.reduce((sum, h) => sum + Math.max(0, h - 8) * 1.5, 0)
-
   const isSubmitted = submittedPeriods.has(periodId)
 
-  // Handlers
-  const setDayHours = (i: number, val: string) => {
-    setEntries(prev => ({ ...prev, [entryKey(periodId, i)]: val }))
-  }
+  const showXPFloat = useCallback((amount: number) => {
+    const id = ++xpFloatId.current
+    setXpFloats(prev => [...prev, { id, amount }])
+  }, [])
 
-  const handleSaveDraft = () => {
-    setDraftMessage('Draft saved')
-  }
+  const setDayHours = useCallback((i: number, val: string) => {
+    const prev = prevDayHoursRef.current[i] || 0
+    const next = parseHours(val)
+    setEntries(e => ({ ...e, [entryKey(periodId, i)]: val }))
 
-  const handleSubmit = () => {
-    if (certified && !isSubmitted) {
-      setSubmittedPeriods(prev => new Set(prev).add(periodId))
+    // Award XP for newly added hours
+    if (next > prev) {
+      const delta = next - prev
+      const xpGain = Math.round(delta * 5)
+      const result = gamification.addXP(xpGain, {
+        hoursAdded: delta,
+        isOT: next > 8,
+        dayHours,
+      })
+      if (xpGain > 0) showXPFloat(result.gained)
+      result.newAchievements.forEach(a => {
+        toast(<AchievementToast achievement={a} />, { duration: 4000 })
+        confetti({ particleCount: 60, spread: 50, origin: { y: 0.7 }, colors: ['#D7FE51'] })
+      })
+      if (result.leveledUp) {
+        toast(`🎉 Level Up! You're now Level ${gamification.level + 1}!`, { duration: 4000 })
+        confetti({ particleCount: 120, spread: 80, origin: { y: 0.5 }, colors: ['#D7FE51', '#fff'] })
+      }
+      if (next >= 8 && prev < 8) {
+        toast('✅ Full day logged!', { duration: 2000 })
+      }
     }
-  }
+    prevDayHoursRef.current[i] = next
+  }, [periodId, dayHours, gamification, showXPFloat])
+
+  // Save draft — POST entries to backend
+  const handleSaveDraft = useCallback(async () => {
+    const uid = user?.id
+    const promises: Promise<void>[] = []
+    dayDates.forEach((d, i) => {
+      const h = dayHours[i]
+      if (h <= 0 || !uid) return
+      const dateStr = d.toISOString().slice(0, 10)
+      const endHour = Math.min(Math.floor(9 + h), 23)
+      promises.push(
+        fetch(`${API_BASE}/api/time-entries`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            employee_id: uid,
+            date: dateStr,
+            start_time: '09:00',
+            end_time: `${String(endHour).padStart(2, '0')}:00`,
+            duration_minutes: Math.round(h * 60),
+            project: 'General',
+            description: 'Timesheet entry',
+          }),
+        }).then(() => {}).catch(() => {})
+      )
+    })
+    await Promise.allSettled(promises)
+    const result = gamification.addXP(15, { isDraft: true })
+    showXPFloat(result.gained)
+    toast('💾 Draft saved!', { duration: 2500 })
+  }, [user?.id, dayDates, dayHours, gamification, showXPFloat])
+
+  // Submit timesheet
+  const handleSubmit = useCallback(async () => {
+    if (!certified || isSubmitted) return
+    await handleSaveDraft()
+    setSubmittedPeriods(prev => new Set(prev).add(periodId))
+    const hasOT = overtimeHours > 0
+    const result = gamification.addXP(50, {
+      isSubmit: true,
+      periodId,
+      totalPeriodHours: totalHours,
+      isOT: hasOT,
+      dayHours,
+    })
+    showXPFloat(result.gained)
+    result.newAchievements.forEach(a => {
+      toast(<AchievementToast achievement={a} />, { duration: 4000 })
+    })
+    if (result.leveledUp) {
+      toast(`🎉 Level Up! You're now Level ${gamification.level + 1}!`, { duration: 4000 })
+    }
+    confetti({ particleCount: 160, spread: 90, origin: { y: 0.5 }, colors: ['#D7FE51', '#fff', '#51FEFE'] })
+    toast('🚀 Timesheet submitted!', { duration: 3000 })
+  }, [certified, isSubmitted, periodId, overtimeHours, totalHours, dayHours, gamification, handleSaveDraft, showXPFloat])
+
+  // NLP handler
+  const handleNL = useCallback(() => {
+    setNlError(null)
+    const result = parseNLTimeEntry(nlInput, dayDates)
+    if (!result) {
+      setNlError('Could not understand that. Try: "set monday to 8" or "I worked 7.5 hours today"')
+      return
+    }
+    const { dayIndex, hours } = result
+    if (dayIndex < 0 || dayIndex >= 14) {
+      setNlError('Day not in this pay period.')
+      return
+    }
+    setDayHours(dayIndex, hours.toFixed(1))
+    setHighlightedDay(dayIndex)
+    setTimeout(() => setHighlightedDay(null), 2000)
+    const xpResult = gamification.addXP(5, { isNLP: true })
+    showXPFloat(xpResult.gained)
+    xpResult.newAchievements.forEach(a => toast(<AchievementToast achievement={a} />, { duration: 4000 }))
+    const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][dayIndex]
+    toast(`✏️ Set ${dayName} to ${hours.toFixed(1)}h`, { duration: 2000 })
+    setNlInput('')
+  }, [nlInput, dayDates, setDayHours, gamification, showXPFloat])
 
   const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+  const levelTitle = ['', 'Rookie', 'Tracker', 'Logger', 'Hustler', 'Pro', 'Expert', 'Veteran', 'Elite', 'Master', 'Legend'][Math.min(gamification.level, 10)] || 'Legend'
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
+      {/* XP Floats */}
+      <AnimatePresence>
+        {xpFloats.map(f => (
+          <XPFloat key={f.id} amount={f.amount} onDone={() => setXpFloats(prev => prev.filter(x => x.id !== f.id))} />
+        ))}
+      </AnimatePresence>
+
       <div>
-        <h1 className="text-2xl font-semibold mb-2 neon-green">Timesheet</h1>
-        <p className="text-zinc-400 mb-6">Log your hours for the 2-week pay period. Hours accept decimals (e.g., 8 or 7.5).</p>
+        <h1 className="text-2xl font-semibold mb-1 neon-green">Timesheet</h1>
+        <p className="text-zinc-400">Log your hours for the 2-week pay period.</p>
+      </div>
+
+      {/* Gamification bar */}
+      <div className="glass rounded-3xl p-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center text-black font-bold text-sm" style={{ background: 'var(--accent-color)' }}>
+              {gamification.level}
+            </div>
+            <div>
+              <div className="font-semibold text-sm">{levelTitle}</div>
+              <div className="text-xs text-zinc-500">{gamification.xpIntoLevel} / {gamification.xpForNextLevel} XP to next level</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 text-sm">
+            {gamification.streak > 0 && (
+              <div className="flex items-center gap-1">
+                <span className="text-lg">🔥</span>
+                <span className="font-mono font-semibold">{gamification.streak}</span>
+                <span className="text-zinc-500 text-xs">streak</span>
+              </div>
+            )}
+            <div className="flex items-center gap-1">
+              <span className="text-zinc-500 text-xs">Total XP:</span>
+              <span className="font-mono font-semibold" style={{ color: 'var(--accent-color)' }}>{gamification.xp}</span>
+            </div>
+          </div>
+        </div>
+        {/* XP progress bar */}
+        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+          <motion.div
+            className="h-full rounded-full"
+            style={{ background: 'var(--accent-color)' }}
+            initial={{ width: 0 }}
+            animate={{ width: `${gamification.progressPct}%` }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
+          />
+        </div>
+        {/* Achievements row */}
+        {gamification.achievements.length > 0 && (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {gamification.achievements.map(a => (
+              <motion.div
+                key={a.id}
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                title={`${a.name}: ${a.description}`}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border border-white/10 bg-white/5 cursor-default"
+              >
+                <span>{a.icon}</span>
+                <span className="text-zinc-300">{a.name}</span>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Natural language input */}
+      <div className="glass rounded-3xl p-4">
+        <div className="text-xs uppercase tracking-widest text-zinc-500 mb-2">💬 Log hours in plain English</div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={nlInput}
+            onChange={e => setNlInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleNL()}
+            placeholder='Try: "set monday to 8" · "I worked 7.5 hours today" · "from 9 to 5 friday"'
+            className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white/30 placeholder:text-zinc-600"
+            disabled={isSubmitted}
+          />
+          <button
+            onClick={handleNL}
+            disabled={!nlInput.trim() || isSubmitted}
+            className="px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ background: 'var(--accent-color)', color: '#000' }}
+          >
+            Log it
+          </button>
+        </div>
+        {nlError && <div className="text-red-400 text-xs mt-2">{nlError}</div>}
+        <div className="text-[11px] text-zinc-600 mt-2">
+          Tip: "set tuesday to 9" · "yesterday 6.5" · "from 8am to 6pm wednesday" · "+5 xp per parse!"
+        </div>
       </div>
 
       {/* Submitted banner */}
-      {isSubmitted && (
-        <div className="glass rounded-2xl px-4 py-3 text-white flex items-center gap-2">
-          ✓ Submitted for approval
-        </div>
-      )}
+      <AnimatePresence>
+        {isSubmitted && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+            className="glass rounded-2xl px-4 py-3 text-white flex items-center gap-2 border border-white/20"
+          >
+            ✓ Timesheet submitted for approval
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Draft flash */}
-      {draftMessage && (
-        <div className="glass rounded-2xl px-4 py-3 text-amber-400 flex items-center gap-2">
-          {draftMessage}
-        </div>
-      )}
-
-      {/* Period picker (2-week) */}
+      {/* Period picker */}
       <div className="glass rounded-3xl p-4 flex items-center justify-between">
-        <button
-          onClick={() => setPeriodOffset(o => o - 1)}
-          className="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5"
-        >
+        <button onClick={() => setPeriodOffset(o => o - 1)} className="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5">
           ← Prev
         </button>
         <div className="text-lg font-medium">
           {fmtRange(start, end)} <span className="text-zinc-500 text-sm">({periodId})</span>
         </div>
-        <button
-          onClick={() => setPeriodOffset(o => o + 1)}
-          className="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5"
-        >
+        <button onClick={() => setPeriodOffset(o => o + 1)} className="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5">
           Next →
         </button>
       </div>
@@ -339,51 +628,105 @@ function TimesheetView({ user }: { user: any }) {
           <div className="text-sm text-zinc-500">Engineering Manager</div>
         </div>
         <div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2">
             <div className="px-3 py-1 rounded-full text-sm border border-white/10">
               Total: <span className="font-mono">{totalHours.toFixed(1)}</span> h
             </div>
             <div className="px-3 py-1 rounded-full text-sm border border-white/10">
-              Regular: <span className="font-mono">{regularHours.toFixed(1)}</span> h
+              Reg: <span className="font-mono">{regularHours.toFixed(1)}</span> h
             </div>
-            <div className="px-3 py-1 rounded-full text-sm border border-white/10">
-              OT×1.5: <span className="font-mono">{overtimeHours.toFixed(1)}</span> h
-            </div>
-            <div className="px-3 py-1 rounded-full text-sm border border-white/10 text-zinc-400">
-              PTO: 0.0 h
+            {overtimeHours > 0 && (
+              <div className="px-3 py-1 rounded-full text-sm border border-amber-400/30 text-amber-400">
+                OT×1.5: <span className="font-mono">{overtimeHours.toFixed(1)}</span> h
+              </div>
+            )}
+            {/* Progress toward 80h goal */}
+            <div className="w-full mt-2">
+              <div className="flex justify-between text-[10px] text-zinc-500 mb-1">
+                <span>Period progress</span>
+                <span>{Math.min(100, Math.round((totalHours / 80) * 100))}%</span>
+              </div>
+              <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ background: totalHours >= 80 ? '#D7FE51' : 'rgba(215,254,81,0.5)' }}
+                  animate={{ width: `${Math.min(100, (totalHours / 80) * 100)}%` }}
+                  transition={{ duration: 0.5 }}
+                />
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Timecards table (14-day period) */}
+      {/* Timecards grid */}
       <div className="glass rounded-3xl overflow-hidden">
-        <div className="px-6 py-3 border-b border-white/10 flex justify-between text-xs uppercase tracking-[1px] text-zinc-400">
-          {dayNames.map((n, i) => (
-            <div key={i} className="text-center">{n}</div>
-          ))}
+        <div className="px-6 py-3 border-b border-white/10 grid text-xs uppercase tracking-[1px] text-zinc-400" style={{ gridTemplateColumns: 'repeat(14, 1fr)' }}>
+          {dayNames.map((n, i) => <div key={i} className="text-center">{n}</div>)}
         </div>
-        <div className="px-6 py-4 flex justify-between gap-3">
+        <div className="px-3 py-4 grid gap-1.5" style={{ gridTemplateColumns: 'repeat(14, 1fr)' }}>
           {dayDates.map((d, i) => {
             const key = entryKey(periodId, i)
             const val = entries[key] || ''
             const h = parseHours(val)
             const isOT = h > 8
+            const isHighlighted = highlightedDay === i
+            const isToday = d.toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10)
             return (
-              <div key={i} className="text-center">
-                <div className="text-xs text-zinc-500 mb-1">
+              <motion.div
+                key={i}
+                className="text-center"
+                animate={isHighlighted ? { scale: [1, 1.08, 1] } : {}}
+                transition={{ duration: 0.4 }}
+              >
+                <div className={`text-[9px] mb-1 ${isToday ? 'font-bold' : 'text-zinc-500'}`} style={isToday ? { color: 'var(--accent-color)' } : undefined}>
                   {d.toLocaleDateString([], { month: 'short', day: 'numeric' })}
                 </div>
                 <input
                   type="text"
                   inputMode="decimal"
                   value={val}
-                  onChange={(e) => setDayHours(i, e.target.value)}
-                  className={`w-full text-center font-mono rounded-xl bg-black/40 border ${isOT ? 'border-amber-400/60' : 'border-white/10'} px-2 py-2 focus:outline-none focus:border-white/30`}
+                  onChange={e => setDayHours(i, e.target.value)}
+                  className={`w-full text-center font-mono rounded-lg bg-black/40 text-sm border transition-all px-1 py-1.5 focus:outline-none ${
+                    isHighlighted ? 'border-[color:var(--accent-color)]' :
+                    isOT ? 'border-amber-400/60' :
+                    h > 0 ? 'border-white/20' : 'border-white/10'
+                  } focus:border-white/40`}
                   placeholder="0"
                   disabled={isSubmitted}
                 />
-                <div className="text-[10px] text-zinc-500 mt-1">{h.toFixed(1)} h</div>
+                {h > 0 && (
+                  <motion.div
+                    className="text-[9px] mt-0.5 font-mono"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    style={{ color: isOT ? '#F97316' : 'rgba(255,255,255,0.4)' }}
+                  >
+                    {h.toFixed(1)}h{isOT ? ' OT' : ''}
+                  </motion.div>
+                )}
+              </motion.div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Achievement progress (locked ones) */}
+      <div className="glass rounded-3xl p-4">
+        <div className="text-xs uppercase tracking-widest text-zinc-500 mb-3">Achievements</div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+          {gamification.allAchievements.map(a => {
+            const unlocked = gamification.achievements.some(u => u.id === a.id)
+            return (
+              <div
+                key={a.id}
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl border text-center transition-all ${
+                  unlocked ? 'border-white/20 bg-white/5' : 'border-white/5 opacity-40 grayscale'
+                }`}
+                title={a.description}
+              >
+                <span className="text-xl">{a.icon}</span>
+                <span className="text-[10px] text-zinc-400">{a.name}</span>
               </div>
             )
           })}
@@ -396,7 +739,7 @@ function TimesheetView({ user }: { user: any }) {
           <input
             type="checkbox"
             checked={certified}
-            onChange={(e) => setCertified(e.target.checked)}
+            onChange={e => setCertified(e.target.checked)}
             disabled={isSubmitted}
             className="w-4 h-4 accent-white"
           />
@@ -406,21 +749,22 @@ function TimesheetView({ user }: { user: any }) {
         <div className="flex flex-wrap gap-3">
           <button
             onClick={handleSaveDraft}
-            className="px-5 py-2.5 rounded-xl border border-white/20 hover:bg-white/5"
+            disabled={isSubmitted}
+            className="px-5 py-2.5 rounded-xl border border-white/20 hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Save draft
+            Save draft (+15 XP)
           </button>
           <button
             onClick={handleSubmit}
             disabled={!certified || isSubmitted}
             className="glass-btn-green px-5 py-2.5 rounded-xl font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Submit timesheet
+            Submit timesheet (+50 XP) 🚀
           </button>
         </div>
 
         <p className="text-[11px] text-zinc-500 mt-4">
-          Once submitted, this week is locked for editing until approval or rejection.
+          Once submitted, this period is locked for editing until approved or rejected. Earn XP by logging hours (+5 XP/h), saving drafts (+15 XP), and submitting (+50 XP).
         </p>
       </div>
     </div>
