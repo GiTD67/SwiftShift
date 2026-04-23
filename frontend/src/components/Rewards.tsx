@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import confetti from 'canvas-confetti'
 import { motion } from 'framer-motion'
-import { Odometer } from './Odometer'
 
 interface RewardsProps {
   totalHours: number
@@ -258,28 +257,43 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
           <div className="glass rounded-3xl p-6 relative overflow-hidden">
             <div
               className="absolute inset-0 pointer-events-none"
-              style={{ background: 'radial-gradient(ellipse at 50% 0%, rgba(81,254,254,0.07) 0%, transparent 65%)' }}
+              style={{ background: 'radial-gradient(ellipse at 50% 0%, rgba(81,254,254,0.1) 0%, transparent 65%)' }}
             />
-            <div className="text-xs uppercase tracking-[3px] text-zinc-400 mb-3 relative">Today's Accrued PTO</div>
+            <div className="text-sm uppercase tracking-[2px] text-white mb-1 relative">Today's Accrued PTO</div>
+            <div className="text-xs uppercase tracking-[2px] text-zinc-400 mb-3 relative">Real time PTO accrual</div>
 
             {isClockedIn ? (
               <div className="relative">
-                <div
-                  className="relative inline-flex items-baseline mb-2"
-                  style={{
-                    background: 'rgba(0,0,0,0.92)',
-                    borderRadius: '14px',
-                    padding: '10px 16px 10px 12px',
-                    border: '1px solid rgba(81,254,254,0.2)',
-                    boxShadow: 'inset 0 2px 0 rgba(255,255,255,0.06)',
-                  }}
+                <motion.div
+                  key={Math.floor(accruedPTO * 1000)}
+                  initial={{ scale: 1.06 }}
+                  animate={{ scale: 1 }}
+                  transition={{ duration: 0.25 }}
+                  className="font-mono text-4xl font-semibold tabular-nums mb-2"
+                  style={{ color: '#51FEFE' }}
                 >
-                  <Odometer value={accruedPTO} format="decimal" className="text-4xl" color="#51FEFE" />
-                  <span className="text-sm text-zinc-400 ml-2 mb-0.5">hrs</span>
+                  {accruedPTO.toFixed(3)} hrs
+                </motion.div>
+
+                {/* Live badge */}
+                <div className="flex items-center gap-1.5">
+                  <motion.div
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{
+                      background: '#51FEFE',
+                      boxShadow: '0 0 8px #51FEFE, 0 0 16px #51FEFE60',
+                    }}
+                    animate={{ opacity: [1, 0.3, 1], scale: [1, 0.8, 1] }}
+                    transition={{ repeat: Infinity, duration: 1.0 }}
+                  />
+                  <span className="text-xs uppercase tracking-widest text-zinc-300 font-medium">live</span>
                 </div>
               </div>
             ) : (
-              <div className="text-3xl font-light text-zinc-700 tracking-widest font-mono">— — —</div>
+              <div>
+                <div className="text-3xl font-light text-zinc-700 tracking-widest mb-1 font-mono">— — —</div>
+                <div className="text-xs text-zinc-600">Clock in to start accruing</div>
+              </div>
             )}
 
             <div className="text-xs text-zinc-500 mt-2">Real time PTO accrual</div>
