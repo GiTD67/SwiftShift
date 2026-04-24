@@ -1330,6 +1330,8 @@ export default function App() {
   // Main app
   const [activeView, setActiveView] = useState<View>('clock')
   const [clockHourlyRate, setClockHourlyRate] = useState<number>(() => {
+    // Prefer DB value, fall back to localStorage, then derive from salary/pay
+    if (user?.hourly_rate != null) return Number(user.hourly_rate)
     const saved = localStorage.getItem('swiftshift-hourly-rate')
     if (saved) return parseFloat(saved)
     const salary = Number(user?.salary) || 0
@@ -1609,12 +1611,14 @@ export default function App() {
   // Tracks which reminder thresholds have already fired this clock session (reset on clock-in)
   const breakReminderFiredRef = useRef<Set<string>>(new Set())
 
-  // Daily streak counter (gamified punctuality)
+  // Daily streak counter (gamified punctuality) — prefer DB values, fall back to localStorage
   const [streak, setStreak] = useState<number>(() => {
+    if (user?.streak_count != null) return Number(user.streak_count)
     const saved = localStorage.getItem('streak')
     return saved ? parseInt(saved, 10) : 0
   })
   const [lastStreakDate, setLastStreakDate] = useState<string>(() => {
+    if (user?.streak_last_date) return user.streak_last_date
     return localStorage.getItem('lastStreakDate') || ''
   })
 
@@ -1898,6 +1902,14 @@ export default function App() {
         setLastStreakDate(todayStr)
         localStorage.setItem('streak', String(newStreak))
         localStorage.setItem('lastStreakDate', todayStr)
+        // Persist streak to DB
+        if (user?.id) {
+          fetch(`${API_BASE}/api/users/${user.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ streak_count: newStreak, streak_last_date: todayStr }),
+          }).catch(() => {})
+        }
 
         // Streak milestone celebrations
         if ([5, 10, 20, 30, 50].includes(newStreak)) {
@@ -2039,11 +2051,16 @@ export default function App() {
       setLootDurationMin(Math.round(session / 60000))
       setShowLootDrop(true)
 
-      // Persist clock-out to DB
+      // Persist clock-out to DB (send unpaid break minutes so backend deducts them)
       const sid = activeSessionId
       setActiveSessionId(null)
+      const unpaidBreakMin = Math.round(unpaidAccum / 60000)
       if (sid && user?.id) {
-        fetch(`${API_BASE}/api/clock-sessions/${sid}`, { method: 'PUT' }).catch(() => {})
+        fetch(`${API_BASE}/api/clock-sessions/${sid}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ break_minutes: unpaidBreakMin }),
+        }).catch(() => {})
         // Accrue PTO to DB
         fetch(`${API_BASE}/api/pto/balance/accrue`, {
           method: 'POST',
@@ -2714,7 +2731,16 @@ export default function App() {
               theme={theme}
               user={user}
               highlightRate={highlightRate}
-              onRateChange={(rate) => setClockHourlyRate(rate)}
+              onRateChange={(rate) => {
+                setClockHourlyRate(rate)
+                if (user?.id) {
+                  fetch(`${API_BASE}/api/users/${user.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ hourly_rate: rate }),
+                  }).catch(() => {})
+                }
+              }}
             />
           )}
           {activeView === 'admin' && (
