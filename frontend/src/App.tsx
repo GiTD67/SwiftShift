@@ -1529,6 +1529,7 @@ export default function App() {
 
   // Clock state
   const [clockInAt, setClockInAt] = useState<Date | null>(null)
+  const [activeSessionId, setActiveSessionId] = useState<number | null>(null)
   const [breakStartedAt, setBreakStartedAt] = useState<Date | null>(null)
   const [breakType, setBreakType] = useState<'paid' | 'unpaid' | null>(null)
   const [breakMsAccum, setBreakMsAccum] = useState(0)
@@ -1612,12 +1613,14 @@ export default function App() {
             todayMs += activeElapsedMs
           }
           setClockInAt(clockInDate)
+          setActiveSessionId(active.id)
           setBreakStartedAt(null)
           setBreakType(null)
           setBreakMsAccum(0)
           setPaidBreakMsAccum(0)
         } else {
           setClockInAt(null)
+          setActiveSessionId(null)
         }
 
         setTodayWorkedMs(todayMs)
@@ -1742,6 +1745,18 @@ export default function App() {
       setBreakType(null)
       setBreakMsAccum(0)
       setPaidBreakMsAccum(0)
+
+      // Persist clock-in to backend
+      if (user?.id) {
+        fetch(`${API_BASE}/api/clock-sessions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ employee_id: user.id }),
+        })
+          .then(r => (r.ok ? r.json() : null))
+          .then(row => { if (row?.id) setActiveSessionId(row.id) })
+          .catch(() => {})
+      }
 
       // Update daily streak (freeze over weekends)
       const todayStr = now.toISOString().slice(0, 10)
@@ -1897,6 +1912,12 @@ export default function App() {
       setBreakType(null)
       setBreakMsAccum(0)
       setPaidBreakMsAccum(0)
+
+      // Persist clock-out to backend
+      if (activeSessionId) {
+        fetch(`${API_BASE}/api/clock-sessions/${activeSessionId}`, { method: 'PUT' }).catch(() => {})
+        setActiveSessionId(null)
+      }
 
       // Show LootDrop modal with earnings and PTO
       const ptoAccrualRate = 0.0385
