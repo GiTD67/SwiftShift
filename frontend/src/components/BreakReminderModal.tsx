@@ -47,8 +47,11 @@ export function BreakReminderModal({
             exit={{ scale: 0.92, opacity: 0, y: 16 }}
             transition={{ type: 'spring', stiffness: 320, damping: 28 }}
             onClick={e => e.stopPropagation()}
-            className="glass rounded-3xl p-8 max-w-md w-full shadow-2xl"
-            style={{ border: `1px solid ${urgencyColor}44` }}
+            className="glass rounded-3xl p-8 max-w-md w-full"
+            style={{
+              border: `1px solid ${urgencyColor}44`,
+              boxShadow: `0 0 80px -20px ${urgencyColor}35, 0 28px 72px -14px rgba(0,0,0,0.85)`,
+            }}
           >
             {/* Icon + state badge */}
             <div className="flex items-center gap-3 mb-5">

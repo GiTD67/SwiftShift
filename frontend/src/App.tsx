@@ -154,7 +154,7 @@ function OctopusChart({ node, expanded, setExpanded, search, expandedAll }: {
       {/* Click Modal */}
       {selected && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70" onClick={() => setSelected(null)}>
-          <div className="glass rounded-2xl p-6 w-80 border border-white/20" onClick={(e) => e.stopPropagation()}>
+          <div className="glass rounded-2xl p-6 w-80 border border-white/20" onClick={(e) => e.stopPropagation()} style={{ boxShadow: '0 0 80px -20px rgba(var(--accent-color-rgb), 0.21), 0 28px 72px -14px rgba(0,0,0,0.85)' }}>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center text-3xl">👤</div>
               <div>
@@ -1007,7 +1007,7 @@ function ForgotPasswordModal({ onClose, accentHex }: { onClose: () => void; acce
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="glass w-full max-w-[360px] rounded-3xl p-8 border border-white/10 mx-4" onClick={e => e.stopPropagation()}>
+      <div className="glass w-full max-w-[360px] rounded-3xl p-8 border border-white/10 mx-4" onClick={e => e.stopPropagation()} style={{ boxShadow: `0 0 80px -20px ${accentHex}35, 0 28px 72px -14px rgba(0,0,0,0.85)` }}>
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-xl font-semibold">Reset Password</h2>
           <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors" aria-label="Close">
@@ -1110,7 +1110,7 @@ function ResetPasswordPage() {
   return (
     <div className="min-h-screen bg-black text-white flex items-center justify-center p-4 relative">
       <div className="absolute inset-0 bg-gradient-to-br from-black via-[#0A0F1E] to-black" />
-      <div className="glass w-full max-w-[380px] rounded-3xl p-8 border border-white/10 relative z-10">
+      <div className="glass w-full max-w-[380px] rounded-3xl p-8 border border-white/10 relative z-10" style={{ boxShadow: `0 0 80px -20px ${accentHex}35, 0 28px 72px -14px rgba(0,0,0,0.85)` }}>
         <div className="flex items-center gap-3 mb-6">
           <LogoSVG className="h-8 w-auto" />
           <span className="font-semibold text-xl tracking-[1px]">SWIFTSHIFT</span>
@@ -2615,6 +2615,14 @@ export default function App() {
     window.location.href = 'login'
   }
 
+  // Read achievement state for navbar (synced to localStorage by useGamification in TimesheetView)
+  const navUnlockedAchievements: string[] = (() => {
+    try {
+      const saved = localStorage.getItem('swiftshift-gamification')
+      return saved ? (JSON.parse(saved).unlockedAchievements || []) : []
+    } catch { return [] }
+  })()
+
   return (
     <div className="ta-app" data-theme={theme} data-overdrive={isOvertimeOverdrive ? 'true' : undefined}>
       <nav className="ta-navbar">
@@ -2636,34 +2644,56 @@ export default function App() {
         </div>
         <div className="ta-navbar-user">
           {/* Achievements badge */}
-          <button
-            onClick={() => navTo('rewards')}
-            title="Achievements"
-            className="flex items-center gap-1.5 px-3 py-1 text-sm text-white/60 border border-white/10 rounded-full hover:border-white/20 hover:bg-white/5 transition-all"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline',verticalAlign:'middle',flexShrink:0}}>
-              <circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
-            </svg>
-            <span className="ta-streak-label" style={{ color: 'var(--accent-color)' }}>Achievements</span>
-          </button>
+          <div className="relative group">
+            <button
+              onClick={() => navTo('rewards')}
+              title="Achievements"
+              className="flex items-center gap-1.5 px-3 py-1 text-sm border border-white/10 rounded-full hover:border-white/20 hover:bg-white/5 transition-all"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline',verticalAlign:'middle',flexShrink:0,stroke:'var(--accent-color)'}}>
+                <circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
+              </svg>
+              {navUnlockedAchievements.slice(0, 3).map(id => {
+                const ach = ACHIEVEMENTS.find(a => a.id === id)
+                return ach ? <span key={id} className="text-xs leading-none">{ach.icon}</span> : null
+              })}
+              <span className="ta-streak-label text-white/40">Achievements</span>
+            </button>
+            {/* Hover dropdown */}
+            <div
+              className="absolute right-0 top-full mt-1 w-72 bg-zinc-900 border border-white/10 rounded-2xl hidden group-hover:block z-50 overflow-hidden"
+              style={{ boxShadow: '0 0 40px -10px rgba(var(--accent-color-rgb), 0.2), 0 8px 24px rgba(0,0,0,0.8)' }}
+            >
+              <div className="px-4 py-2.5 text-xs text-zinc-500 uppercase tracking-wider border-b border-white/10">
+                Today's Achievements
+              </div>
+              {navUnlockedAchievements.length === 0 ? (
+                <div className="px-4 py-3 text-xs text-zinc-500">No achievements yet. Keep going!</div>
+              ) : (
+                ACHIEVEMENTS.filter(a => navUnlockedAchievements.includes(a.id)).map(ach => (
+                  <div key={ach.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors">
+                    <span className="text-base w-6 text-center flex-shrink-0" style={{ color: 'var(--accent-color)' }}>{ach.icon}</span>
+                    <div>
+                      <div className="text-sm font-medium text-white">{ach.name}</div>
+                      <div className="text-xs text-zinc-500">{ach.desc}</div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
           {/* Daily streak counter */}
           <div className="flex items-center gap-1.5 px-3 py-1 text-sm text-white/60 border border-white/10 rounded-full">
             <span style={{ color: 'var(--accent-color)' }}>
               {streak > 0
                 ? (
-                  <svg width="15" height="15" viewBox="0 0 32 36" fill="currentColor" style={{display:'inline',verticalAlign:'middle'}}>
-                    {/* Main flame body */}
-                    <path d="M16 34 C10 34 6 29 6 23 C6 16 10 11 13 7 C13 11 15 13 16 13 C17 13 19 11 19 7 C22 11 26 16 26 23 C26 29 22 34 16 34Z" opacity="0.95"/>
-                    {/* Left short arm */}
-                    <path d="M8 20 C6 17 5 14 6 11 C7 14 8 16 9 17 C8.5 18 8.2 19 8 20Z" opacity="0.85"/>
-                    {/* Right short arm */}
-                    <path d="M24 20 C26 17 27 14 26 11 C25 14 24 16 23 17 C23.5 18 23.8 19 24 20Z" opacity="0.85"/>
-                    {/* Left tall arm */}
-                    <path d="M10 18 C8 13 8 8 10 4 C11 8 11 12 12 15 C11.2 16 10.5 17 10 18Z" opacity="0.75"/>
-                    {/* Right tall arm */}
-                    <path d="M22 18 C24 13 24 8 22 4 C21 8 21 12 20 15 C20.8 16 21.5 17 22 18Z" opacity="0.75"/>
-                    {/* Inner glow */}
-                    <path d="M16 28 C13 28 11 25 11 22 C11 18 13 15 16 14 C19 15 21 18 21 22 C21 25 19 28 16 28Z" opacity="0.35" fill="white"/>
+                  <svg width="15" height="16" viewBox="0 0 30 34" fill="currentColor" style={{display:'inline',verticalAlign:'middle'}}>
+                    {/* Left arm */}
+                    <path d="M8 30C5 28 4 23 6 18C7 21 8 23 8 23C8 20 9 17 10 14C10.5 18 11 22 10 25C9.5 27 8.8 29 8 30Z" opacity="0.8"/>
+                    {/* Center arm — tallest */}
+                    <path d="M15 32C11 32 8 28 8 23C8 17 11 11 15 6C19 11 22 17 22 23C22 28 19 32 15 32Z"/>
+                    {/* Right arm */}
+                    <path d="M22 30C25 28 26 23 24 18C23 21 22 23 22 23C22 20 21 17 20 14C19.5 18 19 22 20 25C20.5 27 21.2 29 22 30Z" opacity="0.8"/>
                   </svg>
                 )
                 : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline',verticalAlign:'middle'}}><circle cx="12" cy="12" r="8"/></svg>}
@@ -3064,10 +3094,9 @@ export default function App() {
                         <span>{Math.min(100, Math.round((todayTotalMs / (8 * 3600000)) * 100))}%</span>
                       </div>
                       <div className="crystal-progress">
-                        <motion.div
+                        <div
                           className="crystal-progress-fill"
-                          animate={{ width: `${Math.min(100, (todayTotalMs / (8 * 3600000)) * 100)}%` }}
-                          transition={{ duration: 1, ease: 'easeOut' }}
+                          style={{ width: `${Math.min(100, (todayTotalMs / (8 * 3600000)) * 100)}%` }}
                         />
                       </div>
                       {/* Work state selector + break law info below the bar */}
@@ -4260,6 +4289,7 @@ export default function App() {
                   <div
                     className="glass rounded-3xl p-6 max-w-2xl w-[90%] max-h-[80vh] overflow-auto border border-white/20"
                     onClick={e => e.stopPropagation()}
+                    style={{ boxShadow: `0 0 80px -20px ${themeAccentHex}35, 0 28px 72px -14px rgba(0,0,0,0.85)` }}
                   >
                     <div className="flex items-center justify-between mb-4">
                       <div className="font-semibold text-lg">{selectedDoc.label}</div>

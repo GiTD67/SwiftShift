@@ -866,3 +866,13 @@ button, [role="button"] {
     size: A4 portrait;
   }
 }
+
+/* ============================================
+   TOAST / NOTIFICATION GLOW EFFECT
+   ============================================ */
+
+[data-sonner-toast] {
+  box-shadow:
+    0 0 40px -10px rgba(var(--accent-color-rgb), 0.25),
+    0 8px 24px -4px rgba(0, 0, 0, 0.8) !important;
+}

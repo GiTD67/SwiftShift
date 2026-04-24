@@ -280,20 +280,30 @@ export function Tour({ onClose, onNavigate, onComplete, accentHex = '#D7FE51' }:
       </AnimatePresence>
 
       {/* Tour box: fixed at center-bottom */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: 24,
+          left: 0,
+          right: 0,
+          display: 'flex',
+          justifyContent: 'center',
+          padding: '0 16px',
+          zIndex: 302,
+          pointerEvents: 'none',
+        }}
+      >
       <motion.div
         key={`box-${step}`}
         initial={{ opacity: 0, y: 20, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: 'spring', stiffness: 320, damping: 38 }}
-        className="fixed glass rounded-3xl border border-white/10"
+        className="glass rounded-3xl border border-white/10"
         style={{
-          bottom: 24,
-          left: '50%',
-          transform: 'translateX(-50%)',
           width: BOX_WIDTH,
-          maxWidth: 'calc(100vw - 32px)',
+          maxWidth: '100%',
           boxShadow: `0 0 80px -20px ${accentHex}35, 0 28px 72px -14px rgba(0,0,0,0.85)`,
-          zIndex: 302,
+          pointerEvents: 'all',
         }}
       >
         <div className="px-7 py-5">
@@ -402,6 +412,7 @@ export function Tour({ onClose, onNavigate, onComplete, accentHex = '#D7FE51' }:
           </div>
         </div>
       </motion.div>
+      </div>
     </div>
   )
 }

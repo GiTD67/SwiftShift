@@ -154,19 +154,21 @@ export function LootDrop({ isOpen, onClose, earnings, ptoHours, durationMin, the
           onClick={(e) => e.stopPropagation()}
         >
           {/* Vault container */}
-          <div className="glass rounded-3xl p-6 text-center relative overflow-hidden border border-white/20">
-            {/* Header row: funny message + close X on same line */}
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-xl font-semibold tracking-tight text-left leading-tight pr-4" style={{ color: accentColor }}>
-                {dailyMessage}
-              </div>
-              <button
-                onClick={onClose}
-                className="w-8 h-8 flex items-center justify-center text-zinc-400 hover:text-white text-2xl leading-none flex-shrink-0"
-                aria-label="Close"
-              >
-                ×
-              </button>
+          <div
+            className="glass rounded-3xl p-6 text-center relative overflow-hidden border border-white/20"
+            style={{ boxShadow: `0 0 80px -20px ${accentColor}35, 0 28px 72px -14px rgba(0,0,0,0.85)` }}
+          >
+            {/* Close X — absolute top-right corner */}
+            <button
+              onClick={onClose}
+              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center text-zinc-400 hover:text-white text-2xl leading-none z-10 rounded-lg hover:bg-white/10 transition-colors"
+              aria-label="Close"
+            >
+              ×
+            </button>
+            {/* Funny message */}
+            <div className="text-xl font-semibold tracking-tight text-left leading-tight mb-4 pr-10" style={{ color: accentColor }}>
+              {dailyMessage}
             </div>
 
             <div className="mb-1 text-xs uppercase tracking-[2px] text-white/60">END OF DAY</div>
