@@ -1,9 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
   <defs>
-    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
     <clipPath id="cc">
       <circle cx="100" cy="100" r="87"/>
     </clipPath>
@@ -15,27 +11,27 @@
   <!-- Clipped interior -->
   <g clip-path="url(#cc)">
 
-    <!-- RIGHT: Concentric clock arcs (right half) -->
-    <path d="M 100 35 A 65 65 0 0 1 100 165" stroke="white" stroke-width="0.8" stroke-dasharray="4 3" opacity="0.3" fill="none"/>
-    <path d="M 100 50 A 50 50 0 0 1 100 150" stroke="white" stroke-width="0.8" opacity="0.2" fill="none"/>
+    <!-- Concentric clock arcs (right half) -->
+    <path d="M 100 35 A 65 65 0 0 1 100 165" stroke="white" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.3" fill="none"/>
+    <path d="M 100 50 A 50 50 0 0 1 100 150" stroke="white" stroke-width="1" opacity="0.2" fill="none"/>
 
-    <!-- RIGHT: Tick marks (right half, -90° to +90°) -->
-    <line x1="100" y1="16" x2="100" y2="24" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.9"/>
-    <line x1="121.5" y1="19.8" x2="119.4" y2="27.6" stroke="white" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
-    <line x1="141.5" y1="28.1" x2="137.5" y2="35" stroke="white" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
-    <line x1="158.7" y1="41.3" x2="153" y2="47" stroke="white" stroke-width="1.5" stroke-linecap="round" opacity="0.8"/>
-    <line x1="171.9" y1="58.5" x2="165" y2="62.5" stroke="white" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
-    <line x1="180.2" y1="78.5" x2="172.5" y2="80.6" stroke="white" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
-    <line x1="183" y1="100" x2="175" y2="100" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.9"/>
-    <line x1="180.2" y1="121.5" x2="172.5" y2="119.4" stroke="white" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
-    <line x1="171.9" y1="141.5" x2="165" y2="137.5" stroke="white" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
-    <line x1="158.7" y1="158.7" x2="153" y2="153" stroke="white" stroke-width="1.5" stroke-linecap="round" opacity="0.8"/>
-    <line x1="141.5" y1="171.9" x2="137.5" y2="165" stroke="white" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
-    <line x1="121.5" y1="180.2" x2="119.4" y2="172.5" stroke="white" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
-    <line x1="100" y1="184" x2="100" y2="176" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.9"/>
+    <!-- Tick marks -->
+    <line x1="100" y1="16" x2="100" y2="27" stroke="white" stroke-width="3.5" stroke-linecap="round" opacity="0.9"/>
+    <line x1="122" y1="20" x2="118" y2="30" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.65"/>
+    <line x1="142" y1="28" x2="136.5" y2="37" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.65"/>
+    <line x1="159" y1="41" x2="152" y2="48" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.8"/>
+    <line x1="172" y1="59" x2="163.5" y2="63.5" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.65"/>
+    <line x1="180" y1="79" x2="171" y2="81.5" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.65"/>
+    <line x1="183" y1="100" x2="173" y2="100" stroke="white" stroke-width="3.5" stroke-linecap="round" opacity="0.9"/>
+    <line x1="180" y1="121" x2="171" y2="118.5" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.65"/>
+    <line x1="172" y1="141" x2="163.5" y2="136.5" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.65"/>
+    <line x1="159" y1="159" x2="152" y2="152" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.8"/>
+    <line x1="142" y1="172" x2="136.5" y2="163" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.65"/>
+    <line x1="122" y1="180" x2="118" y2="170" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.65"/>
+    <line x1="100" y1="184" x2="100" y2="174" stroke="white" stroke-width="3.5" stroke-linecap="round" opacity="0.9"/>
 
-    <!-- LEFT: Neural network connection lines -->
-    <g stroke="white" stroke-width="0.8" opacity="0.45" fill="none">
+    <!-- Neural network lines -->
+    <g stroke="white" stroke-width="1.2" opacity="0.4" fill="none">
       <line x1="42" y1="62" x2="65" y2="47"/>
       <line x1="42" y1="62" x2="56" y2="88"/>
       <line x1="65" y1="47" x2="80" y2="68"/>
@@ -50,41 +46,43 @@
       <line x1="78" y1="25" x2="80" y2="68"/>
     </g>
 
-    <!-- LEFT: Neural nodes -->
-    <g filter="url(#glow)" fill="white">
-      <circle cx="42" cy="62" r="3.5" opacity="0.95"/>
-      <circle cx="65" cy="47" r="3" opacity="0.9"/>
-      <circle cx="80" cy="68" r="3.5" opacity="0.95"/>
-      <circle cx="56" cy="88" r="2.5" opacity="0.85"/>
-      <circle cx="26" cy="85" r="2" opacity="0.7"/>
-      <circle cx="36" cy="110" r="3.5" opacity="0.95"/>
-      <circle cx="62" cy="122" r="3" opacity="0.9"/>
-      <circle cx="48" cy="148" r="2.5" opacity="0.75"/>
-      <circle cx="78" cy="25" r="2" opacity="0.65"/>
+    <!-- Neural nodes -->
+    <g fill="white">
+      <circle cx="42" cy="62" r="4" opacity="0.9"/>
+      <circle cx="65" cy="47" r="3.5" opacity="0.85"/>
+      <circle cx="80" cy="68" r="4" opacity="0.9"/>
+      <circle cx="56" cy="88" r="3" opacity="0.8"/>
+      <circle cx="26" cy="85" r="2.5" opacity="0.65"/>
+      <circle cx="36" cy="110" r="4" opacity="0.9"/>
+      <circle cx="62" cy="122" r="3.5" opacity="0.85"/>
+      <circle cx="48" cy="148" r="3" opacity="0.7"/>
+      <circle cx="78" cy="25" r="2.5" opacity="0.6"/>
     </g>
 
-    <!-- CENTER: Lightning bolt hands (10 o'clock and 2 o'clock) -->
-    <path d="M 100 100 L 87 83 L 93 78 L 74 52" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
-    <path d="M 100 100 L 113 83 L 107 78 L 126 52" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+    <!-- Lightning bolt hands — bold angular zigzags -->
+    <path d="M 100 100 L 84 72 L 95 65 L 70 40" stroke="white" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 100 100 L 116 72 L 105 65 L 130 40" stroke="white" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
 
     <!-- Center pivot -->
-    <circle cx="100" cy="100" r="5" fill="white" filter="url(#glow)"/>
-    <circle cx="100" cy="100" r="10" fill="white" opacity="0.1"/>
+    <circle cx="100" cy="100" r="7" fill="white"/>
+    <circle cx="100" cy="100" r="12" fill="white" opacity="0.1"/>
 
-    <!-- BOTTOM RIGHT: smooth boundary curve -->
-    <path d="M 138 170 C 160 168, 178 150, 181 120" stroke="white" stroke-width="1.5" stroke-linecap="round" opacity="0.5" fill="none"/>
+    <!-- Smooth boundary curve (bottom-right) -->
+    <path d="M 138 170 C 160 168, 178 150, 181 120" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.5" fill="none"/>
 
   </g>
 
-  <!-- Outer ring -->
-  <circle cx="100" cy="100" r="87" stroke="white" stroke-width="2" filter="url(#glow)" opacity="0.9"/>
+  <!-- Clock ring — bottom 240° arc (10 o'clock → bottom → 2 o'clock) -->
+  <path d="M 24.7 56.5 A 87 87 0 1 1 175.3 56.5" stroke="white" stroke-width="5" fill="none" opacity="0.95"/>
 
-  <!-- TOP: Curved sweep arrow (left to right over the top) -->
-  <path d="M 20 85 C 15 10, 185 10, 180 85" stroke="white" stroke-width="3.5" stroke-linecap="round" fill="none" filter="url(#glow)" opacity="0.9"/>
-  <path d="M 180 85 L 185.5 77 L 175.5 77 Z" fill="white" opacity="0.9"/>
+  <!-- Arrow IS the top 120° arc of the clock ring (10 o'clock → top → 2 o'clock) -->
+  <path d="M 24.7 56.5 A 87 87 0 0 1 175.3 56.5" stroke="white" stroke-width="5" stroke-linecap="round" fill="none" opacity="0.95"/>
 
-  <!-- BOTTOM LEFT: Speed/swoosh lines -->
-  <line x1="12" y1="148" x2="55" y2="128" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.8" filter="url(#glow)"/>
-  <line x1="7" y1="162" x2="50" y2="146" stroke="white" stroke-width="1.8" stroke-linecap="round" opacity="0.55"/>
-  <line x1="14" y1="174" x2="47" y2="162" stroke="white" stroke-width="1.2" stroke-linecap="round" opacity="0.35"/>
+  <!-- Arrowhead at 2 o'clock -->
+  <path d="M 175.3 56.5 L 161 48 L 175 40 Z" fill="white" opacity="0.95"/>
+
+  <!-- Speed/swoosh lines (bottom left) -->
+  <line x1="10" y1="148" x2="55" y2="126" stroke="white" stroke-width="4" stroke-linecap="round" opacity="0.85"/>
+  <line x1="5" y1="162" x2="48" y2="144" stroke="white" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+  <line x1="12" y1="175" x2="45" y2="161" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
 </svg>

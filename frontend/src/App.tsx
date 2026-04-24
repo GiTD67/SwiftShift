@@ -899,34 +899,33 @@ function TimesheetView({ user }: { user: any }) {
 function LogoSVG({ className }: { className?: string }) {
   const id = useRef(`svgl-${Math.random().toString(36).slice(2, 7)}`).current
   const clip = `url(#cc-${id})`
-  const glow = `url(#gw-${id})`
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none" className={className}>
       <defs>
-        <filter id={`gw-${id}`} x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>
-          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
         <clipPath id={`cc-${id}`}><circle cx="100" cy="100" r="87"/></clipPath>
       </defs>
+      {/* Background */}
       <circle cx="100" cy="100" r="99" fill="#050810"/>
       <g clipPath={clip}>
-        <path d="M 100 35 A 65 65 0 0 1 100 165" stroke="white" strokeWidth="0.8" strokeDasharray="4 3" opacity="0.3" fill="none"/>
-        <path d="M 100 50 A 50 50 0 0 1 100 150" stroke="white" strokeWidth="0.8" opacity="0.2" fill="none"/>
-        <line x1="100" y1="16" x2="100" y2="24" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.9"/>
-        <line x1="121.5" y1="19.8" x2="119.4" y2="27.6" stroke="white" strokeWidth="1" strokeLinecap="round" opacity="0.6"/>
-        <line x1="141.5" y1="28.1" x2="137.5" y2="35" stroke="white" strokeWidth="1" strokeLinecap="round" opacity="0.6"/>
-        <line x1="158.7" y1="41.3" x2="153" y2="47" stroke="white" strokeWidth="1.5" strokeLinecap="round" opacity="0.8"/>
-        <line x1="171.9" y1="58.5" x2="165" y2="62.5" stroke="white" strokeWidth="1" strokeLinecap="round" opacity="0.6"/>
-        <line x1="180.2" y1="78.5" x2="172.5" y2="80.6" stroke="white" strokeWidth="1" strokeLinecap="round" opacity="0.6"/>
-        <line x1="183" y1="100" x2="175" y2="100" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.9"/>
-        <line x1="180.2" y1="121.5" x2="172.5" y2="119.4" stroke="white" strokeWidth="1" strokeLinecap="round" opacity="0.6"/>
-        <line x1="171.9" y1="141.5" x2="165" y2="137.5" stroke="white" strokeWidth="1" strokeLinecap="round" opacity="0.6"/>
-        <line x1="158.7" y1="158.7" x2="153" y2="153" stroke="white" strokeWidth="1.5" strokeLinecap="round" opacity="0.8"/>
-        <line x1="141.5" y1="171.9" x2="137.5" y2="165" stroke="white" strokeWidth="1" strokeLinecap="round" opacity="0.6"/>
-        <line x1="121.5" y1="180.2" x2="119.4" y2="172.5" stroke="white" strokeWidth="1" strokeLinecap="round" opacity="0.6"/>
-        <line x1="100" y1="184" x2="100" y2="176" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.9"/>
-        <g stroke="white" strokeWidth="0.8" opacity="0.45" fill="none">
+        {/* Concentric clock arcs (right half, subtle) */}
+        <path d="M 100 35 A 65 65 0 0 1 100 165" stroke="white" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.3" fill="none"/>
+        <path d="M 100 50 A 50 50 0 0 1 100 150" stroke="white" strokeWidth="1" opacity="0.2" fill="none"/>
+        {/* Tick marks — thicker to match font weight */}
+        <line x1="100" y1="16" x2="100" y2="27" stroke="white" strokeWidth="3.5" strokeLinecap="round" opacity="0.9"/>
+        <line x1="122" y1="20" x2="118" y2="30" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.65"/>
+        <line x1="142" y1="28" x2="136.5" y2="37" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.65"/>
+        <line x1="159" y1="41" x2="152" y2="48" stroke="white" strokeWidth="2.5" strokeLinecap="round" opacity="0.8"/>
+        <line x1="172" y1="59" x2="163.5" y2="63.5" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.65"/>
+        <line x1="180" y1="79" x2="171" y2="81.5" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.65"/>
+        <line x1="183" y1="100" x2="173" y2="100" stroke="white" strokeWidth="3.5" strokeLinecap="round" opacity="0.9"/>
+        <line x1="180" y1="121" x2="171" y2="118.5" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.65"/>
+        <line x1="172" y1="141" x2="163.5" y2="136.5" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.65"/>
+        <line x1="159" y1="159" x2="152" y2="152" stroke="white" strokeWidth="2.5" strokeLinecap="round" opacity="0.8"/>
+        <line x1="142" y1="172" x2="136.5" y2="163" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.65"/>
+        <line x1="122" y1="180" x2="118" y2="170" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.65"/>
+        <line x1="100" y1="184" x2="100" y2="174" stroke="white" strokeWidth="3.5" strokeLinecap="round" opacity="0.9"/>
+        {/* Neural network lines */}
+        <g stroke="white" strokeWidth="1.2" opacity="0.4" fill="none">
           <line x1="42" y1="62" x2="65" y2="47"/><line x1="42" y1="62" x2="56" y2="88"/>
           <line x1="65" y1="47" x2="80" y2="68"/><line x1="56" y1="88" x2="80" y2="68"/>
           <line x1="56" y1="88" x2="36" y2="110"/><line x1="36" y1="110" x2="62" y2="122"/>
@@ -934,25 +933,33 @@ function LogoSVG({ className }: { className?: string }) {
           <line x1="42" y1="62" x2="26" y2="85"/><line x1="26" y1="85" x2="36" y2="110"/>
           <line x1="65" y1="47" x2="78" y2="25"/><line x1="78" y1="25" x2="80" y2="68"/>
         </g>
-        <g filter={glow} fill="white">
-          <circle cx="42" cy="62" r="3.5" opacity="0.95"/><circle cx="65" cy="47" r="3" opacity="0.9"/>
-          <circle cx="80" cy="68" r="3.5" opacity="0.95"/><circle cx="56" cy="88" r="2.5" opacity="0.85"/>
-          <circle cx="26" cy="85" r="2" opacity="0.7"/><circle cx="36" cy="110" r="3.5" opacity="0.95"/>
-          <circle cx="62" cy="122" r="3" opacity="0.9"/><circle cx="48" cy="148" r="2.5" opacity="0.75"/>
-          <circle cx="78" cy="25" r="2" opacity="0.65"/>
+        {/* Neural nodes */}
+        <g fill="white">
+          <circle cx="42" cy="62" r="4" opacity="0.9"/><circle cx="65" cy="47" r="3.5" opacity="0.85"/>
+          <circle cx="80" cy="68" r="4" opacity="0.9"/><circle cx="56" cy="88" r="3" opacity="0.8"/>
+          <circle cx="26" cy="85" r="2.5" opacity="0.65"/><circle cx="36" cy="110" r="4" opacity="0.9"/>
+          <circle cx="62" cy="122" r="3.5" opacity="0.85"/><circle cx="48" cy="148" r="3" opacity="0.7"/>
+          <circle cx="78" cy="25" r="2.5" opacity="0.6"/>
         </g>
-        <path d="M 100 100 L 87 83 L 93 78 L 74 52" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" filter={glow}/>
-        <path d="M 100 100 L 113 83 L 107 78 L 126 52" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" filter={glow}/>
-        <circle cx="100" cy="100" r="5" fill="white" filter={glow}/>
-        <circle cx="100" cy="100" r="10" fill="white" opacity="0.1"/>
-        <path d="M 138 170 C 160 168, 178 150, 181 120" stroke="white" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" fill="none"/>
+        {/* Lightning bolt hands — bold angular zigzags */}
+        <path d="M 100 100 L 84 72 L 95 65 L 70 40" stroke="white" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M 100 100 L 116 72 L 105 65 L 130 40" stroke="white" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>
+        {/* Center pivot */}
+        <circle cx="100" cy="100" r="7" fill="white"/>
+        <circle cx="100" cy="100" r="12" fill="white" opacity="0.1"/>
+        {/* Smooth boundary curve (bottom-right) */}
+        <path d="M 138 170 C 160 168, 178 150, 181 120" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.5" fill="none"/>
       </g>
-      <circle cx="100" cy="100" r="87" stroke="white" strokeWidth="2" filter={glow} opacity="0.9"/>
-      <path d="M 20 85 C 15 10, 185 10, 180 85" stroke="white" strokeWidth="3.5" strokeLinecap="round" fill="none" filter={glow} opacity="0.9"/>
-      <path d="M 180 85 L 185.5 77 L 175.5 77 Z" fill="white" opacity="0.9"/>
-      <line x1="12" y1="148" x2="55" y2="128" stroke="white" strokeWidth="2.5" strokeLinecap="round" opacity="0.8" filter={glow}/>
-      <line x1="7" y1="162" x2="50" y2="146" stroke="white" strokeWidth="1.8" strokeLinecap="round" opacity="0.55"/>
-      <line x1="14" y1="174" x2="47" y2="162" stroke="white" strokeWidth="1.2" strokeLinecap="round" opacity="0.35"/>
+      {/* Clock ring — bottom 240° arc (10 o'clock → bottom → 2 o'clock) */}
+      <path d="M 24.7 56.5 A 87 87 0 1 1 175.3 56.5" stroke="white" strokeWidth="5" fill="none" opacity="0.95"/>
+      {/* Arrow IS the top 120° arc of the clock ring (10 o'clock → top → 2 o'clock) */}
+      <path d="M 24.7 56.5 A 87 87 0 0 1 175.3 56.5" stroke="white" strokeWidth="5" strokeLinecap="round" fill="none" opacity="0.95"/>
+      {/* Arrowhead at 2 o'clock — pointing in clockwise tangent direction */}
+      <path d="M 175.3 56.5 L 161 48 L 175 40 Z" fill="white" opacity="0.95"/>
+      {/* Speed/swoosh lines (bottom left) — thicker */}
+      <line x1="10" y1="148" x2="55" y2="126" stroke="white" strokeWidth="4" strokeLinecap="round" opacity="0.85"/>
+      <line x1="5" y1="162" x2="48" y2="144" stroke="white" strokeWidth="3" strokeLinecap="round" opacity="0.6"/>
+      <line x1="12" y1="175" x2="45" y2="161" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.4"/>
     </svg>
   )
 }
@@ -1287,6 +1294,11 @@ function LoginPage() {
       {/* Right: Control Panel */}
       <div className="flex-1 flex items-center justify-center p-4 relative z-10">
         <div className="w-full max-w-[420px] space-y-4">
+          {/* Mobile-only brand header */}
+          <div className="lg:hidden flex items-center justify-center gap-3 pt-2 pb-1">
+            <LogoSVG className="h-12 w-auto" />
+            <span className="font-semibold text-3xl tracking-[1px]">SWIFTSHIFT</span>
+          </div>
           {/* Mobile-only feature highlights */}
           <div className="lg:hidden glass rounded-3xl p-5 border border-white/10">
             <div className="text-xs tracking-[3px] text-zinc-500 uppercase mb-3"><span style={{ color: loginAccentHex }}>AI POWERED</span> HR PLATFORM</div>
@@ -1521,6 +1533,11 @@ function SignupPage() {
       {/* Right: Control Panel */}
       <div className="flex-1 flex items-center justify-center p-4 relative z-10">
         <div className="w-full max-w-[420px] space-y-4">
+          {/* Mobile-only brand header */}
+          <div className="lg:hidden flex items-center justify-center gap-3 pt-2 pb-1">
+            <LogoSVG className="h-12 w-auto" />
+            <span className="font-semibold text-3xl tracking-[1px]">SWIFTSHIFT</span>
+          </div>
           {/* Mobile-only feature highlights */}
           <div className="lg:hidden glass rounded-3xl p-5 border border-white/10">
             <div className="text-xs tracking-[3px] text-zinc-500 uppercase mb-3"><span style={{ color: signupAccentHex }}>AI POWERED</span> HR PLATFORM</div>
