@@ -46,6 +46,7 @@ interface RewardsProps {
   onFocus?: () => void
   highlightRate?: boolean
   onRateChange?: (rate: number) => void
+  xpTotalForPTO?: number
 }
 
 const HOURLY_RATE_KEY = 'swiftshift-hourly-rate'
@@ -61,7 +62,7 @@ function computeHourlyRate(user: any): number {
 
 const LEVEL_NAMES = ['Rookie', 'Associate', 'Pro', 'Senior', 'Expert', 'Elite', 'Master', 'Legend']
 
-export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'green', user, onFocus, highlightRate, onRateChange }: RewardsProps) {
+export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'green', user, onFocus, highlightRate, onRateChange, xpTotalForPTO }: RewardsProps) {
   const [hourlyRate, setHourlyRate] = useState(() => computeHourlyRate(user))
   const [ptoAccrualRate, setPtoAccrualRate] = useState(1 / 30)
   const [dailyGoalHours, setDailyGoalHours] = useState(() => {
@@ -426,6 +427,15 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
                 <span className="text-zinc-400 text-xs">hrs worked</span>
               </div>
             </div>
+            {xpTotalForPTO !== undefined && xpTotalForPTO > 0 && (
+              <div className="mt-2 pt-2 border-t border-white/10">
+                <div className="text-xs text-zinc-500">XP bonus PTO</div>
+                <div className="flex items-baseline gap-1 mt-0.5">
+                  <span className="text-sm font-bold" style={{ color: accentColor }}>{(Math.floor(xpTotalForPTO / 1000) * 0.25).toFixed(2)}</span>
+                  <span className="text-xs text-zinc-500">hrs ({Math.floor(xpTotalForPTO / 1000)} milestones × 15 min)</span>
+                </div>
+              </div>
+            )}
           </div>
 
         </div>

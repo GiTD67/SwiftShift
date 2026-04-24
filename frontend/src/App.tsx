@@ -7,6 +7,7 @@ import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { useTimesheet } from './hooks/useTimesheet'
 import { Rewards } from './components/Rewards'
+import { XPCenter } from './components/XPCenter'
 import { LootDrop } from './components/LootDrop'
 import { Tour } from './components/Tour'
 import { FeaturePreview } from './components/FeaturePreview'
@@ -15,7 +16,7 @@ import { STATE_BREAK_RULES, STATE_CODES } from './data/stateBreakRules'
 
 const API_BASE = ''
 
-type View = 'clock' | 'timesheet' | 'rewards' | 'admin' | 'profile' | 'insurance' | 'orgchart' | 'taxes' | 'groktax' | 'grokky' | 'applications' | 'jobs' | 'schedules' | 'payroll' | 'reports' | 'leaves' | 'compliance' | 'hiring'
+type View = 'clock' | 'timesheet' | 'rewards' | 'xpcenter' | 'admin' | 'profile' | 'insurance' | 'orgchart' | 'taxes' | 'groktax' | 'grokky' | 'applications' | 'jobs' | 'schedules' | 'payroll' | 'reports' | 'leaves' | 'compliance' | 'hiring'
 
 function formatMs(ms: number): string {
   const totalSec = Math.floor(ms / 1000)
@@ -361,15 +362,46 @@ interface GamificationState {
   maxPeriodHours: number
   perfectPeriods: number
   unlockedAchievements: string[]
+  weekSubmitStreak: number
+  lastSubmitDate: string
+  weeklyChallenge: { weekId: string; targetHours: number; bonusXP: number; completed: boolean } | null
+  bossChallenge: { fromLevel: number; toLevel: number; req: string; progress: number; target: number; completed: boolean } | null
+  customAccentColor: string
+}
+
+function getWeekMondayId(): string {
+  const d = new Date()
+  const day = d.getDay()
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+  const monday = new Date(d)
+  monday.setDate(diff)
+  return monday.toISOString().slice(0, 10)
 }
 
 function useGamification() {
   const [gState, setGState] = useState<GamificationState>(() => {
     const saved = localStorage.getItem('swiftshift-gamification')
-    if (saved) return JSON.parse(saved)
-    return { totalXP: 0, streak: 0, submits: 0, nlpUses: 0, maxPeriodHours: 0, perfectPeriods: 0, unlockedAchievements: [] }
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      return {
+        totalXP: parsed.totalXP || 0,
+        streak: parsed.streak || 0,
+        submits: parsed.submits || 0,
+        nlpUses: parsed.nlpUses || 0,
+        maxPeriodHours: parsed.maxPeriodHours || 0,
+        perfectPeriods: parsed.perfectPeriods || 0,
+        unlockedAchievements: parsed.unlockedAchievements || [],
+        weekSubmitStreak: parsed.weekSubmitStreak || 0,
+        lastSubmitDate: parsed.lastSubmitDate || '',
+        weeklyChallenge: parsed.weeklyChallenge || null,
+        bossChallenge: parsed.bossChallenge || null,
+        customAccentColor: parsed.customAccentColor || '',
+      }
+    }
+    return { totalXP: 0, streak: 0, submits: 0, nlpUses: 0, maxPeriodHours: 0, perfectPeriods: 0, unlockedAchievements: [], weekSubmitStreak: 0, lastSubmitDate: '', weeklyChallenge: null, bossChallenge: null, customAccentColor: '' }
   })
   const [floatingXP, setFloatingXP] = useState<{ id: number; amount: number; x: number; y: number }[]>([])
+  const streakNotifiedRef = useRef(false)
 
   useEffect(() => {
     localStorage.setItem('swiftshift-gamification', JSON.stringify(gState))
@@ -389,8 +421,26 @@ function useGamification() {
     return Math.min(100, Math.round((earned / range) * 100))
   }, [gState.totalXP, currentLevel, nextLevel])
 
-  const addXP = useCallback((amount: number, x = 50, y = 50) => {
+  const getStreakMultiplier = useCallback(() => {
+    return currentLevel.level >= 5 && gState.weekSubmitStreak >= 2 ? 1.5 : 1
+  }, [currentLevel.level, gState.weekSubmitStreak])
+
+  const addXP = useCallback((rawAmount: number, x = 50, y = 50) => {
+    const multiplier = currentLevel.level >= 5 && gState.weekSubmitStreak >= 2 ? 1.5 : 1
+    const amount = Math.round(rawAmount * multiplier)
+    if (multiplier > 1 && !streakNotifiedRef.current) {
+      streakNotifiedRef.current = true
+      toast.info('🔥 Streak bonus! 1.5× XP', { description: 'Submit weekly to keep your multiplier' })
+    }
     const prevLevel = [...XP_LEVELS].reverse().find(l => gState.totalXP >= l.xpNeeded)!
+    const prevMilestone = Math.floor(gState.totalXP / 1000)
+    const nextTotal = gState.totalXP + amount
+    const nextMilestone = Math.floor(nextTotal / 1000)
+    if (nextMilestone > prevMilestone) {
+      setTimeout(() => {
+        toast.success('📋 HR has been notified', { description: `XP milestone: ${nextMilestone * 1000} XP reached!` })
+      }, 300)
+    }
     setGState(prev => {
       const next = { ...prev, totalXP: prev.totalXP + amount }
       const newUnlocks: string[] = []
@@ -421,27 +471,55 @@ function useGamification() {
     const id = Date.now()
     setFloatingXP(prev => [...prev, { id, amount, x, y }])
     setTimeout(() => setFloatingXP(prev => prev.filter(f => f.id !== id)), 1500)
-  }, [gState.totalXP])
+  }, [gState.totalXP, gState.weekSubmitStreak, currentLevel.level])
 
   const recordNLPUse = useCallback(() => {
     setGState(prev => ({ ...prev, nlpUses: prev.nlpUses + 1 }))
   }, [])
 
   const recordSubmit = useCallback((totalHours: number, allDaysLogged: boolean) => {
+    setGState(prev => {
+      const now = new Date().toISOString()
+      const lastDate = prev.lastSubmitDate ? new Date(prev.lastSubmitDate).getTime() : 0
+      const daysSinceLastSubmit = lastDate > 0 ? (Date.now() - lastDate) / (1000 * 60 * 60 * 24) : 999
+      const newWeekSubmitStreak = daysSinceLastSubmit >= 7 && daysSinceLastSubmit <= 14
+        ? prev.weekSubmitStreak + 1
+        : 1
+      return {
+        ...prev,
+        submits: prev.submits + 1,
+        streak: prev.streak + 1,
+        maxPeriodHours: Math.max(prev.maxPeriodHours, totalHours),
+        perfectPeriods: allDaysLogged ? prev.perfectPeriods + 1 : prev.perfectPeriods,
+        weekSubmitStreak: newWeekSubmitStreak,
+        lastSubmitDate: now,
+      }
+    })
+  }, [])
+
+  const weeklyChallenge = useMemo(() => {
+    const weekId = getWeekMondayId()
+    return {
+      weekId,
+      targetHours: 40,
+      bonusXP: 100,
+      completed: gState.weeklyChallenge?.weekId === weekId && (gState.weeklyChallenge?.completed ?? false),
+    }
+  }, [gState.weeklyChallenge])
+
+  const completeWeeklyChallenge = useCallback(() => {
+    const weekId = getWeekMondayId()
     setGState(prev => ({
       ...prev,
-      submits: prev.submits + 1,
-      streak: prev.streak + 1,
-      maxPeriodHours: Math.max(prev.maxPeriodHours, totalHours),
-      perfectPeriods: allDaysLogged ? prev.perfectPeriods + 1 : prev.perfectPeriods,
+      weeklyChallenge: { weekId, targetHours: 40, bonusXP: 100, completed: true },
     }))
   }, [])
 
-  return { gState, currentLevel, nextLevel, xpProgress, floatingXP, addXP, recordNLPUse, recordSubmit }
+  return { gState, currentLevel, nextLevel, xpProgress, floatingXP, addXP, recordNLPUse, recordSubmit, weeklyChallenge, completeWeeklyChallenge, getStreakMultiplier }
 }
 
 // ===== TimesheetView component =====
-function TimesheetView({ user }: { user: any }) {
+function TimesheetView({ user, gamification }: { user: any; gamification: ReturnType<typeof useGamification> }) {
   const [periodOffset, setPeriodOffset] = useState(0)
   const [entries, setEntries] = useState<Record<string, string>>({})
   const [certified, setCertified] = useState(false)
@@ -452,7 +530,7 @@ function TimesheetView({ user }: { user: any }) {
   const [historyEntries, setHistoryEntries] = useState<Record<string, Record<string, string>>>({})
   const nlpRef = useRef<HTMLInputElement>(null)
 
-  const { gState, currentLevel, nextLevel, xpProgress, floatingXP, addXP, recordNLPUse, recordSubmit } = useGamification()
+  const { gState, currentLevel, nextLevel, xpProgress, floatingXP, addXP, recordNLPUse, recordSubmit } = gamification
   const { start, end, dayDates, periodId } = usePayPeriodRange(periodOffset)
 
   // Previous two periods for history view
@@ -965,6 +1043,7 @@ function LogoSVG({ className }: { className?: string }) {
 }
 
 function getThemeAccentHex(theme: string): string {
+  if (theme === 'custom') return localStorage.getItem('swiftshift-custom-accent') || '#00FF88'
   if (theme === 'white') return '#E5E7EB'
   if (theme === 'orange') return '#F97316'
   if (theme === 'cyan') return '#51FEFE'
@@ -1753,10 +1832,14 @@ export default function App() {
   const [chatHistory, setChatHistory] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([])
   const [attachedFile, setAttachedFile] = useState<{ file_id: string; filename: string } | null>(null)
   const [users, setUsers] = useState<any[]>([])
-  const [theme, setTheme] = useState<'green' | 'white' | 'orange' | 'cyan' | 'pink' | 'purple'>(() => {
+  const [theme, setTheme] = useState<'green' | 'white' | 'orange' | 'cyan' | 'pink' | 'purple' | 'custom'>(() => {
     const saved = localStorage.getItem('theme')
-    return (saved === 'green' || saved === 'white' || saved === 'orange' || saved === 'cyan' || saved === 'pink' || saved === 'purple') ? saved : 'green'
+    return (saved === 'green' || saved === 'white' || saved === 'orange' || saved === 'cyan' || saved === 'pink' || saved === 'purple' || saved === 'custom') ? saved : 'green'
   })
+  const [customAccentColor, setCustomAccentColor] = useState<string>(() => localStorage.getItem('swiftshift-custom-accent') || '#00FF88')
+
+  const gamification = useGamification()
+  const { gState: appGState, currentLevel: appCurrentLevel, nextLevel: appNextLevel } = gamification
   const [orgExpanded, setOrgExpanded] = useState<Set<string>>(new Set())
   const [orgExpandedAll, setOrgExpandedAll] = useState(true)
   const [orgSearch, setOrgSearch] = useState('')
@@ -1928,6 +2011,20 @@ export default function App() {
     document.body.setAttribute('data-theme', theme)
   }, [theme])
 
+  // Apply custom accent color as CSS variable when custom theme is active
+  useEffect(() => {
+    if (theme === 'custom') {
+      document.documentElement.style.setProperty('--accent-color', customAccentColor)
+      const r = parseInt(customAccentColor.slice(1, 3), 16)
+      const g = parseInt(customAccentColor.slice(3, 5), 16)
+      const b = parseInt(customAccentColor.slice(5, 7), 16)
+      document.documentElement.style.setProperty('--accent-color-rgb', `${r}, ${g}, ${b}`)
+    } else {
+      document.documentElement.style.removeProperty('--accent-color')
+      document.documentElement.style.removeProperty('--accent-color-rgb')
+    }
+  }, [theme, customAccentColor])
+
   // Update favicon dynamically when theme changes
   useEffect(() => {
     const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="14" fill="#050810"/><circle cx="32" cy="32" r="27" stroke="white" stroke-width="1.5" opacity="0.9"/><path d="M 32 11 A 21 21 0 0 1 32 53" stroke="white" stroke-width="0.6" stroke-dasharray="2 2" opacity="0.3" fill="none"/><line x1="32" y1="5" x2="32" y2="9" stroke="white" stroke-width="1.2" stroke-linecap="round" opacity="0.9"/><line x1="51.1" y1="12.9" x2="48.3" y2="15.7" stroke="white" stroke-width="0.8" stroke-linecap="round" opacity="0.6"/><line x1="59" y1="32" x2="55" y2="32" stroke="white" stroke-width="1.2" stroke-linecap="round" opacity="0.9"/><line x1="51.1" y1="51.1" x2="48.3" y2="48.3" stroke="white" stroke-width="0.8" stroke-linecap="round" opacity="0.6"/><line x1="32" y1="59" x2="32" y2="55" stroke="white" stroke-width="1.2" stroke-linecap="round" opacity="0.9"/><line x1="12" y1="20" x2="20" y2="14" stroke="white" stroke-width="0.6" opacity="0.5"/><line x1="12" y1="20" x2="17" y2="28" stroke="white" stroke-width="0.6" opacity="0.5"/><line x1="17" y1="28" x2="11" y2="36" stroke="white" stroke-width="0.6" opacity="0.5"/><line x1="11" y1="36" x2="18" y2="44" stroke="white" stroke-width="0.6" opacity="0.4"/><circle cx="12" cy="20" r="1.5" fill="white" opacity="0.9"/><circle cx="20" cy="14" r="1.2" fill="white" opacity="0.85"/><circle cx="17" cy="28" r="1.5" fill="white" opacity="0.9"/><circle cx="11" cy="36" r="1.5" fill="white" opacity="0.9"/><circle cx="18" cy="44" r="1.2" fill="white" opacity="0.8"/><path d="M 32 32 L 26 24 L 29 22 L 22 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M 32 32 L 38 24 L 35 22 L 42 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="32" cy="32" r="3" fill="white"/><path d="M 8 26 C 7 3, 57 3, 56 26" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.9"/><path d="M 56 26 L 59.5 20 L 53 20.5 Z" fill="white" opacity="0.9"/><line x1="3" y1="46" x2="17" y2="40" stroke="white" stroke-width="1.8" stroke-linecap="round" opacity="0.75"/><line x1="1" y1="53" x2="15" y2="48" stroke="white" stroke-width="1.2" stroke-linecap="round" opacity="0.5"/></svg>`
@@ -1941,13 +2038,22 @@ export default function App() {
     link.href = url
   }, [])
 
+  const THEME_UNLOCK_LEVELS: Record<string, number> = { green: 1, white: 1, orange: 1, cyan: 3, pink: 5, purple: 7 }
+  const ALL_THEMES = ['green', 'white', 'orange', 'cyan', 'pink', 'purple', 'custom'] as const
+
   const cycleTheme = () => {
-    setTheme(t => t === 'green' ? 'white' : t === 'white' ? 'orange' : t === 'orange' ? 'cyan' : t === 'cyan' ? 'pink' : t === 'pink' ? 'purple' : 'green')
+    const level = appCurrentLevel.level
+    const available = ALL_THEMES.filter(t => {
+      if (t === 'custom') return level >= 5 && customAccentColor !== ''
+      return (THEME_UNLOCK_LEVELS[t] || 1) <= level
+    })
+    const idx = available.indexOf(theme as any)
+    setTheme(available[(idx + 1) % available.length] as any)
   }
 
-  const themeLabel = theme === 'green' ? 'Green' : theme === 'white' ? 'White' : theme === 'orange' ? 'Orange' : theme === 'cyan' ? 'Cyan' : theme === 'pink' ? 'Pink' : 'Purple'
-  const themeDotColor = theme === 'green' ? 'bg-[#D7FE51]' : theme === 'white' ? 'bg-white' : theme === 'orange' ? 'bg-orange-400' : theme === 'cyan' ? 'bg-[#51FEFE]' : theme === 'pink' ? 'bg-[#FE51D7]' : 'bg-[#9B51FE]'
-  const themeAccentHex = theme === 'green' ? '#D7FE51' : theme === 'white' ? '#E5E7EB' : theme === 'orange' ? '#F97316' : theme === 'cyan' ? '#51FEFE' : theme === 'pink' ? '#FE51D7' : '#9B51FE'
+  const themeLabel = theme === 'custom' ? 'Custom' : theme === 'green' ? 'Green' : theme === 'white' ? 'White' : theme === 'orange' ? 'Orange' : theme === 'cyan' ? 'Cyan' : theme === 'pink' ? 'Pink' : 'Purple'
+  const themeDotColor = theme === 'green' ? 'bg-[#D7FE51]' : theme === 'white' ? 'bg-white' : theme === 'orange' ? 'bg-orange-400' : theme === 'cyan' ? 'bg-[#51FEFE]' : theme === 'pink' ? 'bg-[#FE51D7]' : theme === 'purple' ? 'bg-[#9B51FE]' : 'bg-[#00FF88]'
+  const themeAccentHex = theme === 'custom' ? customAccentColor : theme === 'green' ? '#D7FE51' : theme === 'white' ? '#E5E7EB' : theme === 'orange' ? '#F97316' : theme === 'cyan' ? '#51FEFE' : theme === 'pink' ? '#FE51D7' : '#9B51FE'
 
   // Load users for admin
   useEffect(() => {
@@ -2616,13 +2722,7 @@ export default function App() {
     window.location.href = 'login'
   }
 
-  // Read achievement state for navbar (synced to localStorage by useGamification in TimesheetView)
-  const navUnlockedAchievements: string[] = (() => {
-    try {
-      const saved = localStorage.getItem('swiftshift-gamification')
-      return saved ? (JSON.parse(saved).unlockedAchievements || []) : []
-    } catch { return [] }
-  })()
+  const navUnlockedAchievements = appGState.unlockedAchievements
 
   return (
     <div className="ta-app" data-theme={theme} data-overdrive={isOvertimeOverdrive ? 'true' : undefined}>
@@ -2709,9 +2809,9 @@ export default function App() {
                 ? <img src={profilePicUrl} alt="Profile" className="w-6 h-6 rounded-full object-cover border border-white/20" />
                 : <span className="w-6 h-6 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-xs text-zinc-400">{user.first_name?.[0]?.toUpperCase()}</span>
               }
-              Hi, {user.first_name} ▾
+              Hi, {user.first_name} <span className="text-[10px] px-1.5 py-0.5 rounded-full ml-1" style={{ backgroundColor: 'var(--accent-color)', color: '#000', fontWeight: 700 }}>Lv.{appCurrentLevel.level} {appCurrentLevel.name}</span> ▾
             </span>
-            <div className="absolute right-0 top-full w-48 bg-zinc-900 border border-white/10 rounded-xl shadow-lg hidden group-hover:block z-50 pt-1">
+            <div className="absolute right-0 top-full w-56 bg-zinc-900 border border-white/10 rounded-xl shadow-lg hidden group-hover:block z-50 pt-1">
               <button
                 onClick={() => navTo('profile')}
                 className="w-full text-left px-4 py-2 text-sm hover:bg-white/5 rounded-t-xl"
@@ -2730,16 +2830,55 @@ export default function App() {
               >
                 Settings
               </button>
-              <div className="px-4 py-2 text-sm border-t border-white/10 flex items-center gap-2">
-                <div className="text-zinc-400">Theme:</div>
-                <button
-                  onClick={cycleTheme}
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 hover:bg-white/10 text-xs text-white/80 transition-colors"
-                >
-                  <span className={`w-2 h-2 rounded-full ${themeDotColor}`} />
-                  <span>{themeLabel}</span>
-                </button>
+              <div className="px-3 py-2 border-t border-white/10">
+                <div className="text-xs text-zinc-500 mb-2">Theme</div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: 'green', label: 'Green', color: '#D7FE51', unlock: 1 },
+                    { id: 'white', label: 'White', color: '#E5E7EB', unlock: 1 },
+                    { id: 'orange', label: 'Orange', color: '#F97316', unlock: 1 },
+                    { id: 'cyan', label: 'Ice Blue', color: '#51FEFE', unlock: 3 },
+                    { id: 'pink', label: 'Neon Pink', color: '#FE51D7', unlock: 5 },
+                    { id: 'purple', label: 'Midnight', color: '#9B51FE', unlock: 7 },
+                  ].map(t => {
+                    const unlocked = appCurrentLevel.level >= t.unlock
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => unlocked && setTheme(t.id as any)}
+                        title={unlocked ? t.label : `Unlocks at Level ${t.unlock}`}
+                        className={`flex flex-col items-center gap-0.5 p-1.5 rounded-lg transition-all ${theme === t.id ? 'ring-1 ring-white/40' : ''} ${!unlocked ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/10'}`}
+                      >
+                        <span className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: t.color }} />
+                        <span className="text-[9px] text-zinc-400">{unlocked ? t.label : `L${t.unlock}`}</span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
+              {appCurrentLevel.level >= 5 && (
+                <div className="px-3 py-2 border-t border-white/10">
+                  <div className="text-xs text-zinc-500 mb-1.5">Custom Color <span className="text-[9px]">(Lv.5 unlock)</span></div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={customAccentColor}
+                      onChange={e => {
+                        setCustomAccentColor(e.target.value)
+                        localStorage.setItem('swiftshift-custom-accent', e.target.value)
+                        setTheme('custom' as any)
+                      }}
+                      className="w-8 h-8 rounded cursor-pointer border border-white/20 bg-transparent"
+                    />
+                    <button
+                      onClick={() => setTheme('custom' as any)}
+                      className={`flex-1 text-[10px] px-2 py-1 rounded-lg transition-all ${theme === 'custom' ? 'ring-1 ring-white/40' : 'hover:bg-white/10'} text-zinc-300`}
+                    >
+                      {theme === 'custom' ? '✓ Active' : 'Use custom'}
+                    </button>
+                  </div>
+                </div>
+              )}
               <button
                 onClick={handleLogout}
                 className="w-full text-left px-4 py-2 text-sm hover:bg-white/5 text-red-400 rounded-b-xl border-t border-white/10"
@@ -2788,6 +2927,15 @@ export default function App() {
               <circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
             </svg>
             Rewards
+          </button>
+          <button
+            className={`ta-nav-btn ${activeView === 'xpcenter' ? 'active' : ''}`}
+            onClick={() => navTo('xpcenter')}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+            XP Center
           </button>
           <button
             className={`ta-nav-btn ${activeView === 'insurance' ? 'active' : ''}`}
@@ -3295,16 +3443,17 @@ export default function App() {
           )}
 
           {activeView === 'timesheet' && (
-            <TimesheetView user={user} />
+            <TimesheetView user={user} gamification={gamification} />
           )}
           {activeView === 'rewards' && (
             <Rewards
               totalHours={todayTotalMs / 3600000}
               elapsedSeconds={Math.floor(sessionWorkedMs / 1000)}
               isClockedIn={isClockedIn}
-              theme={theme}
+              theme={theme === 'custom' ? 'green' : theme}
               user={user}
               highlightRate={highlightRate}
+              xpTotalForPTO={appGState.totalXP}
               onRateChange={(rate) => {
                 setClockHourlyRate(rate)
                 localStorage.setItem('swiftshift-hourly-rate', String(rate))
@@ -3316,6 +3465,16 @@ export default function App() {
                   }).catch(() => {})
                 }
               }}
+            />
+          )}
+          {activeView === 'xpcenter' && (
+            <XPCenter
+              gState={appGState}
+              currentLevel={appCurrentLevel}
+              nextLevel={appNextLevel}
+              users={users}
+              accentColor={themeAccentHex}
+              totalHoursThisWeek={todayTotalMs / 3600000}
             />
           )}
           {activeView === 'admin' && (
@@ -3350,6 +3509,7 @@ export default function App() {
                       <th className="text-left py-1">Fulltime</th>
                       <th className="text-left py-1">Pay (hr)</th>
                       <th className="text-left py-1">Salary (yr)</th>
+                      <th className="text-left py-1">XP Level</th>
                       <th className="text-left py-1">Actions</th>
                     </tr>
                   </thead>
@@ -3425,6 +3585,19 @@ export default function App() {
                             value={u.salary ?? ''}
                             onChange={(e) => setUsers(users.map(x => x.id === u.id ? { ...x, salary: e.target.value ? parseFloat(e.target.value) : null } : x))}
                           />
+                        </td>
+                        <td className="py-1">
+                          <div className="flex items-center gap-1">
+                            {(() => {
+                              const simXP = ((u.id * 137 + u.id * 31) % 3200) + 50
+                              const lvl = [...XP_LEVELS].reverse().find(l => simXP >= l.xpNeeded) || XP_LEVELS[0]
+                              return (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
+                                  Lv.{lvl.level} {lvl.name}
+                                </span>
+                              )
+                            })()}
+                          </div>
                         </td>
                         <td className="py-1">
                           <button
@@ -4615,6 +4788,13 @@ export default function App() {
                 <div>
                   <div className="text-2xl font-semibold neon-green">{user.first_name} {user.last_name}</div>
                   <div className="text-sm text-zinc-400 mt-1">{user.job_role || 'Employee'} · {user.email}</div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs px-2.5 py-1 rounded-full font-bold" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
+                      Lv.{appCurrentLevel.level} {appCurrentLevel.name}
+                    </span>
+                    <span className="text-xs text-zinc-500">{appGState.totalXP} XP total</span>
+                    <span className="text-xs text-zinc-500">· {appGState.submits} timesheets submitted</span>
+                  </div>
                   <div className="text-xs text-zinc-600 mt-1">Click the upload button to change your profile photo</div>
                 </div>
               </div>
