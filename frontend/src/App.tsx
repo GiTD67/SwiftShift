@@ -2987,12 +2987,28 @@ export default function App() {
             const grossPay = periodEarnings.pay
             const regularPay = periodEarnings.regular * clockHourlyRate
             const overtimePay = periodEarnings.overtime * clockHourlyRate * 1.5
-            // Tax withholding estimates
-            const federalTaxRate = grossPay > 3000 ? 0.22 : grossPay > 1000 ? 0.12 : 0.10
+            // 2026 federal income tax brackets (single filer, annualized then per-paycheck)
+            const payPeriodsPerYear = 26 // bi-weekly
+            const annualGross = grossPay * payPeriodsPerYear
+            const calcFederal2026 = (income: number) => {
+              const brackets = [
+                [11925, 0.10], [48475, 0.12], [103350, 0.22],
+                [197300, 0.24], [250525, 0.32], [626350, 0.35], [Infinity, 0.37],
+              ] as [number, number][]
+              let tax = 0; let prev = 0
+              for (const [limit, rate] of brackets) {
+                if (income <= prev) break
+                tax += (Math.min(income, limit) - prev) * rate
+                prev = limit
+              }
+              return tax
+            }
+            const annualFederalTax = calcFederal2026(annualGross)
+            const federalTax = annualFederalTax / payPeriodsPerYear
+            const federalEffectiveRate = annualGross > 0 ? annualFederalTax / annualGross : 0
             const stateTaxRate = 0.0593  // CA avg
             const socialSecurityRate = 0.062
             const medicareRate = 0.0145
-            const federalTax = grossPay * federalTaxRate
             const stateTax = grossPay * stateTaxRate
             const socialSecurity = grossPay * socialSecurityRate
             const medicare = grossPay * medicareRate
@@ -3005,6 +3021,13 @@ export default function App() {
                   <h1 className="text-2xl font-semibold neon-green">Payroll</h1>
                   <p className="text-sm text-zinc-400">Pay period: {periodLabel}</p>
                 </div>
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm font-medium transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                  Print Paystub
+                </button>
               </div>
 
               {/* Personal Paystub */}
@@ -3036,7 +3059,7 @@ export default function App() {
                   <div className="space-y-3">
                     <div className="text-xs uppercase tracking-widest text-zinc-500 mb-2">Deductions</div>
                     {[
-                      ['Federal Income Tax', `${(federalTaxRate * 100).toFixed(0)}%`, federalTax],
+                      ['Federal Income Tax', `${(federalEffectiveRate * 100).toFixed(1)}% eff. (2026 brackets)`, federalTax],
                       ['State Income Tax', `${(stateTaxRate * 100).toFixed(1)}% (CA)`, stateTax],
                       ['Social Security', '6.2%', socialSecurity],
                       ['Medicare', '1.45%', medicare],
@@ -3068,15 +3091,18 @@ export default function App() {
                 <div className="mt-4 text-xs text-zinc-500">* Tax estimates are approximate. Actual withholding may differ based on filing status and elections.</div>
               </div>
 
-              {/* Tax Withholding Calculator */}
+              {/* Tax Withholding Calculator — 2026 brackets */}
               <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Tax Withholding Summary</h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Tax Withholding Summary</h2>
+                  <span className="text-xs text-zinc-500 bg-white/5 px-2 py-1 rounded-lg">2026 Federal Brackets</span>
+                </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   {[
-                    ['Federal', `$${federalTax.toFixed(0)}`, `${(federalTaxRate * 100).toFixed(0)}%`],
+                    ['Federal', `$${federalTax.toFixed(0)}`, `${(federalEffectiveRate * 100).toFixed(1)}% eff.`],
                     ['State (CA)', `$${stateTax.toFixed(0)}`, '5.93%'],
                     ['FICA', `$${(socialSecurity + medicare).toFixed(0)}`, '7.65%'],
-                    ['Total', `$${totalDeductions.toFixed(0)}`, `${((totalDeductions / grossPay) * 100).toFixed(1)}%`],
+                    ['Total', `$${totalDeductions.toFixed(0)}`, `${grossPay > 0 ? ((totalDeductions / grossPay) * 100).toFixed(1) : '0.0'}%`],
                   ].map(([label, val, pct]) => (
                     <div key={String(label)} className="bg-white/5 rounded-2xl p-4 text-center">
                       <div className="text-xl font-bold text-red-400">{String(val)}</div>
@@ -3084,6 +3110,9 @@ export default function App() {
                       <div className="text-xs text-zinc-600">{String(pct)}</div>
                     </div>
                   ))}
+                </div>
+                <div className="mt-4 text-xs text-zinc-500">
+                  Annual gross estimate: ${(grossPay * payPeriodsPerYear).toLocaleString()} ({payPeriodsPerYear} pay periods/yr) · Effective federal rate: {(federalEffectiveRate * 100).toFixed(2)}%
                 </div>
               </div>
 
