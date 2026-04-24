@@ -22,7 +22,11 @@ tables = [
       manager_name TEXT,
       is_fulltime INTEGER DEFAULT 1,
       pay REAL,
-      salary REAL
+      salary REAL,
+      hourly_rate REAL DEFAULT 20.0,
+      pto_accrual_rate REAL DEFAULT 0.0385,
+      streak_count INTEGER DEFAULT 0,
+      streak_last_date TEXT
     )
     """,
     """
@@ -39,6 +43,7 @@ tables = [
       clock_in TEXT,
       clock_out TEXT,
       duration_minutes INTEGER,
+      break_minutes INTEGER DEFAULT 0,
       notes TEXT
     )
     """,

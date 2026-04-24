@@ -57,6 +57,24 @@ def _ensure_users_table():
                 db.commit()
             except Exception:
                 pass  # column already exists or other error, ignore
+        for col_def in (
+            "hourly_rate REAL DEFAULT 20.0",
+            "pto_accrual_rate REAL DEFAULT 0.0385",
+            "streak_count INTEGER DEFAULT 0",
+            "streak_last_date TEXT",
+        ):
+            col = col_def.split()[0]
+            try:
+                db.execute(f"ALTER TABLE users ADD COLUMN {col_def}")
+                db.commit()
+            except Exception:
+                pass  # column already exists
+        # Add break_minutes to clock_sessions if upgrading from older schema
+        try:
+            db.execute("ALTER TABLE clock_sessions ADD COLUMN break_minutes INTEGER DEFAULT 0")
+            db.commit()
+        except Exception:
+            pass
 
 
 _ensure_users_table()
@@ -152,7 +170,7 @@ def signup():
     with get_db() as db:
         try:
             user = db.execute(
-                "INSERT INTO users (first_name, last_name, email, password_hash, is_fulltime) VALUES (?, ?, ?, ?, 1) RETURNING id, first_name, last_name, email, job_role, manager_name, is_fulltime, pay, salary",
+                "INSERT INTO users (first_name, last_name, email, password_hash, is_fulltime) VALUES (?, ?, ?, ?, 1) RETURNING id, first_name, last_name, email, job_role, manager_name, is_fulltime, pay, salary, hourly_rate, pto_accrual_rate, streak_count, streak_last_date",
                 (first_name, last_name, email, pw_hash),
             ).fetchone()
         except Exception as e:
@@ -183,4 +201,8 @@ def signin():
         "is_fulltime": row.get("is_fulltime", 1),
         "pay": row.get("pay"),
         "salary": row.get("salary"),
+        "hourly_rate": row.get("hourly_rate"),
+        "pto_accrual_rate": row.get("pto_accrual_rate"),
+        "streak_count": row.get("streak_count"),
+        "streak_last_date": row.get("streak_last_date"),
     })
