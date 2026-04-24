@@ -65,6 +65,16 @@ const SparkleIcon = () => (
   </svg>
 )
 
+const PaletteIcon = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/>
+    <circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/>
+    <circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/>
+    <circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/>
+    <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 011.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>
+  </svg>
+)
+
 interface TourStep {
   icon: React.ReactNode
   title: string
@@ -72,6 +82,7 @@ interface TourStep {
   why: string
   targetId: string | null
   viewId: string | null
+  highlightId?: string | null
 }
 
 const TOUR_STEPS: TourStep[] = [
@@ -82,6 +93,7 @@ const TOUR_STEPS: TourStep[] = [
     why: 'Knowing where everything lives saves you time on day one and helps you get paid faster.',
     targetId: null,
     viewId: null,
+    highlightId: null,
   },
   {
     icon: <ClockIcon />,
@@ -90,38 +102,43 @@ const TOUR_STEPS: TourStep[] = [
     why: 'One tap replaces the whole punch-card ritual. The less friction between you and getting paid, the better.',
     targetId: 'nav-clock',
     viewId: 'clock',
+    highlightId: 'nav-clock',
   },
   {
     icon: <DocumentIcon />,
     title: 'Timesheet',
-    desc: 'All your time entries in one place. Add, edit, and submit your weekly timesheet with ease.',
+    desc: 'All your time entries in one place. Add, edit, and submit your weekly timesheet with ease. You can even use natural language — just type "I worked 8 hours Monday" or "add 7.5 hours today" and it figures out the rest.',
     why: 'A clean, accurate timesheet means no surprises on payday and a permanent record you can always reference.',
     targetId: 'nav-timesheet',
     viewId: 'timesheet',
+    highlightId: 'nav-timesheet',
   },
   {
     icon: <TrophyIcon />,
     title: 'Rewards',
-    desc: 'Stay consistent and earn streak rewards. Watch your real-time earnings climb on the Odometer.',
+    desc: "Stay consistent and earn streak rewards. Watch your real-time earnings climb on the Odometer — it's a live earnings counter that ticks up every second while you're clocked in, so you can literally see money being made.",
     why: 'This gives you instant gratification and helps connect the work to the reward - motivation you can actually see.',
     targetId: 'nav-rewards',
     viewId: 'rewards',
+    highlightId: 'nav-rewards',
   },
   {
     icon: <CreditCardIcon />,
     title: 'Payroll & Reports',
-    desc: 'View pay details, export reports, and track your analytics - all in one dashboard.',
+    desc: 'View pay details, export reports, and track your analytics - all in one dashboard. It also gives you live updates on taxes withheld so you always know exactly how much of your check goes where - no surprises.',
     why: 'Visibility into your pay breakdown and history means you always know where your money is and where it came from.',
     targetId: 'nav-payroll',
     viewId: 'payroll',
+    highlightId: 'nav-payroll',
   },
   {
     icon: <DollarIcon />,
     title: 'AI Tax Filing - Swifty',
-    desc: 'Upload your W-2 or 1099 and Swifty fills out your Form 1040 instantly. No accountant needed.',
+    desc: "Upload your W-2 or 1099 and Swifty fills out your Form 1040 instantly. No accountant needed. It's completely free — and frankly it'll do a better job than a human accountant, with zero errors and zero waiting.",
     why: 'Tax prep can cost hundreds of dollars and hours of stress. Swifty handles it in seconds so you can file with confidence.',
     targetId: 'nav-groktax',
     viewId: 'groktax',
+    highlightId: 'nav-groktax',
   },
   {
     icon: <BotIcon />,
@@ -130,14 +147,25 @@ const TOUR_STEPS: TourStep[] = [
     why: 'Having an always-available HR expert in your pocket means fewer blockers and faster answers when you need them most.',
     targetId: 'nav-grokky',
     viewId: 'grokky',
+    highlightId: 'nav-grokky',
   },
   {
     icon: <LightningIcon />,
     title: 'InstaApply',
-    desc: 'Upload your resume once. SwiftShift matches you to jobs and applies in seconds.',
+    desc: "Upload your resume once. SwiftShift matches you to the perfect jobs for your skills and experience, then applies for you automatically — so you don't have to retype your info 1000x. No more making a new account for every job app. No more filling out your employment history over and over. Just one upload and you're done.",
     why: 'The best opportunities move fast. InstaApply makes sure you never miss a role that fits - with zero extra effort.',
     targetId: 'nav-applications',
     viewId: 'applications',
+    highlightId: 'nav-applications',
+  },
+  {
+    icon: <PaletteIcon />,
+    title: 'Personalize Your Theme',
+    desc: "SwiftShift has 6 color themes you can switch any time. Click your name in the top-right corner and select 'Theme' to cycle through Green, White, Orange, Cyan, Pink, and Purple.",
+    why: "Your workspace should feel like yours. Pick the vibe that keeps you focused.",
+    targetId: null,
+    viewId: null,
+    highlightId: null,
   },
   {
     icon: <CheckCircleIcon />,
@@ -145,37 +173,12 @@ const TOUR_STEPS: TourStep[] = [
     desc: "That covers the highlights. Start by clocking in - your first session is just one click away.",
     why: "You've unlocked +50 XP just for completing the tour. Every feature you use from here builds your streak and earnings.",
     targetId: null,
-    viewId: null,
+    viewId: 'clock',
+    highlightId: null,
   },
 ]
 
-const BOX_WIDTH = 400
-const BOX_HEIGHT_EST = 420
-
-interface BoxPosition {
-  top: number
-  left: number
-  hasArrow: boolean
-  arrowTop: number
-}
-
-function computePosition(stepIndex: number): BoxPosition {
-  const step = TOUR_STEPS[stepIndex]
-  const centered: BoxPosition = {
-    top: Math.max(64, (window.innerHeight - BOX_HEIGHT_EST) / 2),
-    left: Math.max(0, (window.innerWidth - BOX_WIDTH) / 2),
-    hasArrow: false,
-    arrowTop: 0,
-  }
-  if (!step.targetId) return centered
-  const target = document.getElementById(step.targetId)
-  if (!target) return centered
-  const rect = target.getBoundingClientRect()
-  const left = 240 + 28
-  const targetMidY = rect.top + rect.height / 2
-  const top = Math.max(80, Math.min(window.innerHeight - BOX_HEIGHT_EST - 24, targetMidY - BOX_HEIGHT_EST / 2))
-  return { top, left, hasArrow: true, arrowTop: targetMidY - top }
-}
+const BOX_WIDTH = 560
 
 interface TourProps {
   onClose: () => void
@@ -186,19 +189,24 @@ interface TourProps {
 
 export function Tour({ onClose, onNavigate, onComplete, accentHex = '#D7FE51' }: TourProps) {
   const [step, setStep] = useState(0)
-  const [pos, setPos] = useState<BoxPosition>(() => computePosition(0))
+  const [highlightRect, setHighlightRect] = useState<DOMRect | null>(null)
 
   const current = TOUR_STEPS[step]
   const isLast = step === TOUR_STEPS.length - 1
   const isDark = ['#D7FE51', '#E5E7EB', '#51FEFE', '#FE51D7'].includes(accentHex)
 
   useEffect(() => {
-    const newPos = computePosition(step)
-    setPos(newPos)
-
     // Navigate to the view for this step
     if (current.viewId && onNavigate) {
       onNavigate(current.viewId)
+    }
+
+    // Update highlight circle target
+    const highlightTarget = current.highlightId ? document.getElementById(current.highlightId) : null
+    if (highlightTarget) {
+      setHighlightRect(highlightTarget.getBoundingClientRect())
+    } else {
+      setHighlightRect(null)
     }
 
     // Apply highlight to target nav button
@@ -215,7 +223,7 @@ export function Tour({ onClose, onNavigate, onComplete, accentHex = '#D7FE51' }:
         target.style.color = ''
       }
     }
-  }, [step, current.targetId, current.viewId, accentHex, onNavigate])
+  }, [step, current.targetId, current.viewId, current.highlightId, accentHex, onNavigate])
 
   useEffect(() => {
     return () => {
@@ -229,7 +237,8 @@ export function Tour({ onClose, onNavigate, onComplete, accentHex = '#D7FE51' }:
   }, [])
 
   const finish = () => {
-    // Fire confetti on tour complete
+    // Navigate back to clock tab at end
+    if (onNavigate) onNavigate('clock')
     confetti({ particleCount: 200, spread: 100, origin: { y: 0.6 }, colors: [accentHex, '#39FF14', '#00CC00'] })
     setTimeout(() => confetti({ particleCount: 150, spread: 80, origin: { y: 0.5 }, colors: [accentHex] }), 250)
     if (onComplete) onComplete()
@@ -241,45 +250,55 @@ export function Tour({ onClose, onNavigate, onComplete, accentHex = '#D7FE51' }:
 
   return (
     <div
-      className="fixed inset-0 z-[300] bg-black/60"
+      className="fixed inset-0 z-[300]"
+      style={{ background: 'rgba(0,0,0,0.35)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
+      {/* Highlight circle around referenced element */}
+      <AnimatePresence>
+        {highlightRect && (
+          <motion.div
+            key={`circle-${step}`}
+            initial={{ opacity: 0, scale: 1.3 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.1 }}
+            transition={{ duration: 0.3 }}
+            style={{
+              position: 'fixed',
+              left: highlightRect.left - 8,
+              top: highlightRect.top - 8,
+              width: highlightRect.width + 16,
+              height: highlightRect.height + 16,
+              borderRadius: '16px',
+              border: `2px solid ${accentHex}`,
+              boxShadow: `0 0 0 4px ${accentHex}30, 0 0 24px ${accentHex}50`,
+              pointerEvents: 'none',
+              zIndex: 301,
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Tour box: fixed at center-bottom */}
       <motion.div
-        initial={{ top: pos.top, left: pos.left, opacity: 0, scale: 0.96 }}
-        animate={{ top: pos.top, left: pos.left, opacity: 1, scale: 1 }}
+        key={`box-${step}`}
+        initial={{ opacity: 0, y: 20, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: 'spring', stiffness: 320, damping: 38 }}
-        className="absolute glass rounded-3xl border border-white/10"
+        className="fixed glass rounded-3xl border border-white/10"
         style={{
+          bottom: 24,
+          left: '50%',
+          transform: 'translateX(-50%)',
           width: BOX_WIDTH,
+          maxWidth: 'calc(100vw - 32px)',
           boxShadow: `0 0 80px -20px ${accentHex}35, 0 28px 72px -14px rgba(0,0,0,0.85)`,
+          zIndex: 302,
         }}
       >
-        {/* Arrow pointing left toward sidebar */}
-        <AnimatePresence>
-          {pos.hasArrow && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1, top: pos.arrowTop }}
-              exit={{ opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 320, damping: 38 }}
-              style={{
-                position: 'absolute',
-                left: -11,
-                width: 0,
-                height: 0,
-                borderTop: '11px solid transparent',
-                borderBottom: '11px solid transparent',
-                borderRight: `11px solid ${accentHex}`,
-                transform: 'translateY(-50%)',
-                filter: `drop-shadow(-2px 0 6px ${accentHex}50)`,
-              }}
-            />
-          )}
-        </AnimatePresence>
-
-        <div className="p-8">
+        <div className="px-7 py-5">
           {/* Progress bar */}
-          <div className="h-0.5 rounded-full bg-white/10 mb-6 overflow-hidden">
+          <div className="h-0.5 rounded-full bg-white/10 mb-4 overflow-hidden">
             <motion.div
               className="h-full rounded-full"
               style={{ backgroundColor: accentHex }}
@@ -289,7 +308,7 @@ export function Tour({ onClose, onNavigate, onComplete, accentHex = '#D7FE51' }:
           </div>
 
           {/* Step counter */}
-          <div className="text-xs tracking-[2px] text-zinc-500 mb-5 uppercase">
+          <div className="text-xs tracking-[2px] text-zinc-500 mb-3 uppercase">
             Step {step + 1} <span className="text-zinc-700">/ {TOUR_STEPS.length}</span>
           </div>
 
@@ -301,10 +320,11 @@ export function Tour({ onClose, onNavigate, onComplete, accentHex = '#D7FE51' }:
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.16, ease: 'easeOut' }}
+              className="flex gap-5 items-start"
             >
               {/* Icon */}
               <div
-                className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5"
+                className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
                 style={{
                   background: `${accentHex}15`,
                   color: accentHex,
@@ -314,34 +334,54 @@ export function Tour({ onClose, onNavigate, onComplete, accentHex = '#D7FE51' }:
                 {current.icon}
               </div>
 
-              {/* Title */}
-              <h2
-                className="text-2xl font-semibold tracking-tight mb-3"
-                style={{ color: step === 0 || isLast ? accentHex : 'white' }}
-              >
-                {current.title}
-              </h2>
+              <div className="flex-1 min-w-0">
+                {/* Title */}
+                <h2
+                  className="text-lg font-semibold tracking-tight mb-1.5"
+                  style={{ color: step === 0 || isLast ? accentHex : 'white' }}
+                >
+                  {current.title}
+                </h2>
 
-              {/* Description */}
-              <p className="text-zinc-400 text-sm leading-relaxed mb-3">
-                {current.desc}
-              </p>
+                {/* Description */}
+                <p className="text-zinc-400 text-sm leading-relaxed mb-2">
+                  {current.desc}
+                </p>
 
-              {/* Why it matters */}
-              <p className="text-sm leading-relaxed mb-6" style={{ color: `${accentHex}bb` }}>
-                {current.why}
-              </p>
+                {/* Why it matters */}
+                <p className="text-sm leading-relaxed" style={{ color: `${accentHex}bb` }}>
+                  {current.why}
+                </p>
+              </div>
             </motion.div>
           </AnimatePresence>
 
-          {/* Actions */}
-          <div className="flex items-center justify-between gap-3">
-            <button
-              onClick={onClose}
-              className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
-            >
-              Skip tour
-            </button>
+          {/* Actions row */}
+          <div className="flex items-center justify-between gap-3 mt-4">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={onClose}
+                className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
+              >
+                Skip tour
+              </button>
+              {/* Progress dots */}
+              <div className="flex gap-1.5 items-center">
+                {TOUR_STEPS.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setStep(i)}
+                    aria-label={`Go to step ${i + 1}`}
+                    className="rounded-full transition-all duration-200"
+                    style={{
+                      width: i === step ? '14px' : '5px',
+                      height: '5px',
+                      backgroundColor: i === step ? accentHex : i < step ? `${accentHex}55` : 'rgba(255,255,255,0.12)',
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
             <div className="flex items-center gap-2">
               {step > 0 && (
                 <button
@@ -359,23 +399,6 @@ export function Tour({ onClose, onNavigate, onComplete, accentHex = '#D7FE51' }:
                 {isLast ? 'Get started (+50 XP)' : 'Next'}
               </button>
             </div>
-          </div>
-
-          {/* Progress dots */}
-          <div className="flex gap-1.5 mt-6 justify-center">
-            {TOUR_STEPS.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setStep(i)}
-                aria-label={`Go to step ${i + 1}`}
-                className="rounded-full transition-all duration-200"
-                style={{
-                  width: i === step ? '16px' : '6px',
-                  height: '6px',
-                  backgroundColor: i === step ? accentHex : i < step ? `${accentHex}55` : 'rgba(255,255,255,0.12)',
-                }}
-              />
-            ))}
           </div>
         </div>
       </motion.div>

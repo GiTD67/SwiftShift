@@ -64,6 +64,10 @@ const LEVEL_NAMES = ['Rookie', 'Associate', 'Pro', 'Senior', 'Expert', 'Elite', 
 export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'green', user, onFocus, highlightRate, onRateChange }: RewardsProps) {
   const [hourlyRate, setHourlyRate] = useState(() => computeHourlyRate(user))
   const [ptoAccrualRate, setPtoAccrualRate] = useState(1 / 30)
+  const [dailyGoalHours, setDailyGoalHours] = useState(() => {
+    const saved = localStorage.getItem('swiftshift-daily-goal-hours')
+    return saved ? parseFloat(saved) : 8
+  })
   const [hasFiredConfetti, setHasFiredConfetti] = useState(false)
   const [streak, setStreak] = useState(0)
   const prevCentsRef = useRef(0)
@@ -89,7 +93,7 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
   const confettiColor = isOvertime ? '#FFAA00' : accentColor
 
   // Gamification calculations
-  const dailyGoalDollars = hourlyRate * 8
+  const dailyGoalDollars = hourlyRate * dailyGoalHours
   const dailyGoalProgress = Math.min(100, earnedToday > 0 ? (earnedToday / dailyGoalDollars) * 100 : 0)
 
   const totalXP = Math.floor(totalHours * 100)
@@ -187,6 +191,11 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
     localStorage.setItem(HOURLY_RATE_KEY, String(hourlyRate))
     onRateChange?.(hourlyRate)
   }, [hourlyRate]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Persist daily goal hours
+  useEffect(() => {
+    localStorage.setItem('swiftshift-daily-goal-hours', String(dailyGoalHours))
+  }, [dailyGoalHours])
 
   // Scroll to and highlight rate input when triggered from clock view
   useEffect(() => {
@@ -423,6 +432,52 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
       </div>
 
       {/* ═══════════════════════════════════════════
+          ACHIEVEMENTS
+          ═══════════════════════════════════════════ */}
+      <div className="glass rounded-3xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-lg font-semibold neon-green uppercase tracking-[2px]">Achievements</div>
+          <div className="text-xs text-zinc-500">
+            {achievements.filter(a => a.unlocked).length} / {achievements.length} unlocked
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          {achievements.map((ach, i) => (
+            <motion.div
+              key={ach.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: ach.unlocked ? 1 : 0.35, y: 0 }}
+              transition={{ delay: i * 0.07, duration: 0.4 }}
+              className={`glass rounded-2xl p-4 transition-all duration-500 ${!ach.unlocked ? 'grayscale' : ''}`}
+              style={
+                ach.unlocked
+                  ? {
+                      boxShadow: `0 0 18px ${accentColor}18, inset 0 1px 0 rgba(255,255,255,0.08)`,
+                      borderColor: `${accentColor}22`,
+                    }
+                  : {}
+              }
+            >
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-2 select-none" style={{ background: `${accentColor}18`, color: ach.unlocked ? accentColor : 'rgba(255,255,255,0.3)', border: `1px solid ${accentColor}25` }}>
+                {AchievementIcons[ach.iconKey]}
+              </div>
+              <div className="text-sm font-semibold neon-green leading-tight">{ach.label}</div>
+              <div className="text-xs text-zinc-500 mt-1 leading-snug">{ach.desc}</div>
+              {ach.unlocked && (
+                <div
+                  className="text-[10px] mt-2 font-semibold tracking-[2px] uppercase"
+                  style={{ color: accentColor }}
+                >
+                  Unlocked
+                </div>
+              )}
+            </motion.div>
+          ))}
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════
           DAILY MISSION
           ═══════════════════════════════════════════ */}
       <div className="glass rounded-3xl p-6">
@@ -433,14 +488,29 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
               Earn ${dailyGoalDollars.toFixed(0)} today
             </div>
           </div>
-          <div className="text-right">
-            <div
-              className="text-3xl font-bold tabular-nums"
-              style={{ color: dailyGoalProgress >= 100 ? accentColor : 'white' }}
-            >
-              {Math.round(dailyGoalProgress)}%
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-zinc-500">Goal:</span>
+              <input
+                type="number"
+                value={dailyGoalHours}
+                min="1"
+                max="24"
+                step="0.5"
+                onChange={e => setDailyGoalHours(Math.max(0.5, Math.min(24, parseFloat(e.target.value) || 8)))}
+                className="w-14 bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-white/30 text-right font-mono"
+              />
+              <span className="text-xs text-zinc-500">hrs</span>
             </div>
-            <div className="text-xs text-zinc-500">complete</div>
+            <div className="text-right">
+              <div
+                className="text-3xl font-bold tabular-nums"
+                style={{ color: dailyGoalProgress >= 100 ? accentColor : 'white' }}
+              >
+                {Math.round(dailyGoalProgress)}%
+              </div>
+              <div className="text-xs text-zinc-500">complete</div>
+            </div>
           </div>
         </div>
 
@@ -534,52 +604,6 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
           <div className="text-xs text-zinc-500 mt-1.5">
             {Math.round(Math.min(100, (totalHours / 8) * 100))}% of 8-hour day
           </div>
-        </div>
-      </div>
-
-      {/* ═══════════════════════════════════════════
-          ACHIEVEMENTS
-          ═══════════════════════════════════════════ */}
-      <div className="glass rounded-3xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="text-lg font-semibold neon-green uppercase tracking-[2px]">Achievements</div>
-          <div className="text-xs text-zinc-500">
-            {achievements.filter(a => a.unlocked).length} / {achievements.length} unlocked
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-3">
-          {achievements.map((ach, i) => (
-            <motion.div
-              key={ach.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: ach.unlocked ? 1 : 0.35, y: 0 }}
-              transition={{ delay: i * 0.07, duration: 0.4 }}
-              className={`glass rounded-2xl p-4 transition-all duration-500 ${!ach.unlocked ? 'grayscale' : ''}`}
-              style={
-                ach.unlocked
-                  ? {
-                      boxShadow: `0 0 18px ${accentColor}18, inset 0 1px 0 rgba(255,255,255,0.08)`,
-                      borderColor: `${accentColor}22`,
-                    }
-                  : {}
-              }
-            >
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-2 select-none" style={{ background: `${accentColor}18`, color: ach.unlocked ? accentColor : 'rgba(255,255,255,0.3)', border: `1px solid ${accentColor}25` }}>
-                {AchievementIcons[ach.iconKey]}
-              </div>
-              <div className="text-sm font-semibold neon-green leading-tight">{ach.label}</div>
-              <div className="text-xs text-zinc-500 mt-1 leading-snug">{ach.desc}</div>
-              {ach.unlocked && (
-                <div
-                  className="text-[10px] mt-2 font-semibold tracking-[2px] uppercase"
-                  style={{ color: accentColor }}
-                >
-                  Unlocked
-                </div>
-              )}
-            </motion.div>
-          ))}
         </div>
       </div>
 

@@ -1286,7 +1286,29 @@ function LoginPage() {
 
       {/* Right: Control Panel */}
       <div className="flex-1 flex items-center justify-center p-4 relative z-10">
-        <div className="glass w-full max-w-[380px] rounded-3xl p-8 border border-white/10">
+        <div className="w-full max-w-[420px] space-y-4">
+          {/* Mobile-only feature highlights */}
+          <div className="lg:hidden glass rounded-3xl p-5 border border-white/10">
+            <div className="text-xs tracking-[3px] text-zinc-500 uppercase mb-3"><span style={{ color: loginAccentHex }}>AI POWERED</span> HR PLATFORM</div>
+            <h1 className="text-2xl font-semibold tracking-tight mb-3">Time is money.</h1>
+            <div className="text-sm text-zinc-400 space-y-1.5 mb-4">
+              <div>⚡ Frictionless one-tap clock in</div>
+              <div>📈 Real-time visualized earnings</div>
+              <div>🤖 AI tax filing — free &amp; instant</div>
+              <div>💼 Auto job matching &amp; InstaApply</div>
+              <div>🔥 Streak rewards &amp; achievements</div>
+            </div>
+            <div className="flex gap-2">
+              <a href="signup" className="flex-1 text-center py-2 rounded-xl text-sm font-semibold" style={{ background: loginAccentHex, color: '#000' }}>
+                Create free account
+              </a>
+              <button type="button" onClick={() => setShowFeaturePreview(true)} className="px-4 py-2 rounded-xl text-sm border border-white/10 text-zinc-300 hover:bg-white/5">
+                Preview →
+              </button>
+            </div>
+          </div>
+
+        <div className="glass w-full rounded-3xl p-8 border border-white/10">
           {/* Header */}
           <div className="mb-6">
             <div className="text-xs tracking-[2px] text-[#D7FE51] mb-1.5 uppercase">Sign In to SwiftShift</div>
@@ -1370,7 +1392,7 @@ function LoginPage() {
             {/* Links */}
             <div className="flex justify-between text-sm pt-1">
               <button type="button" onClick={() => setShowForgotPassword(true)} className="text-zinc-500 hover:text-white transition-colors">Forgot password?</button>
-              <a href="signup" className="text-zinc-400 hover:text-white underline underline-offset-4">Create account</a>
+              <a href="signup" className="text-zinc-400 hover:text-white underline underline-offset-4">Create account — it's free</a>
             </div>
 
             {/* Tour button */}
@@ -1389,6 +1411,7 @@ function LoginPage() {
           <div className="mt-6 pt-5 border-t border-white/10 text-center text-[10px] text-zinc-500 tracking-[1px]">
             Secure · Encrypted · Audited
           </div>
+        </div>
         </div>
       </div>
 
@@ -1497,11 +1520,34 @@ function SignupPage() {
 
       {/* Right: Control Panel */}
       <div className="flex-1 flex items-center justify-center p-4 relative z-10">
-        <div className="glass w-full max-w-[380px] rounded-3xl p-8 border border-white/10">
+        <div className="w-full max-w-[420px] space-y-4">
+          {/* Mobile-only feature highlights */}
+          <div className="lg:hidden glass rounded-3xl p-5 border border-white/10">
+            <div className="text-xs tracking-[3px] text-zinc-500 uppercase mb-3"><span style={{ color: signupAccentHex }}>AI POWERED</span> HR PLATFORM</div>
+            <h1 className="text-2xl font-semibold tracking-tight mb-1">Time is money.</h1>
+            <p className="text-sm font-semibold mb-3" style={{ color: signupAccentHex }}>100% free to create an account.</p>
+            <div className="text-sm text-zinc-400 space-y-1.5 mb-4">
+              <div>⚡ Frictionless one-tap clock in</div>
+              <div>📈 Real-time visualized earnings</div>
+              <div>🤖 AI tax filing — free &amp; instant</div>
+              <div>💼 Auto job matching &amp; InstaApply</div>
+              <div>🔥 Streak rewards &amp; achievements</div>
+            </div>
+            <div className="flex gap-2">
+              <a href="login" className="flex-1 text-center py-2 rounded-xl text-sm font-semibold border border-white/10 text-zinc-300 hover:bg-white/5">
+                Sign in
+              </a>
+              <button type="button" onClick={() => setShowFeaturePreview(true)} className="px-4 py-2 rounded-xl text-sm border border-white/10 text-zinc-300 hover:bg-white/5">
+                Preview →
+              </button>
+            </div>
+          </div>
+
+        <div className="glass w-full rounded-3xl p-8 border border-white/10">
           <div className="mb-6">
             <div className="text-xs tracking-[2px] text-[#D7FE51] mb-1.5 uppercase">Create Your Account</div>
             <h2 className="text-3xl font-semibold tracking-tight mb-1.5">Get started</h2>
-            <p className="text-zinc-400 text-sm">Set up your account in seconds.</p>
+            <p className="text-zinc-400 text-sm">Set up your free account in seconds.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -1620,8 +1666,9 @@ function SignupPage() {
           </form>
 
           <div className="mt-6 pt-5 border-t border-white/10 text-center text-[10px] text-zinc-500 tracking-[1px]">
-            Secure · Encrypted · Audited
+            Secure · Encrypted · Audited · 100% Free
           </div>
+        </div>
         </div>
       </div>
 
@@ -1709,6 +1756,7 @@ export default function App() {
 
   // Profile tabs state
   const [profileTab, setProfileTab] = useState<'info' | 'schedule' | 'deposit' | 'availability'>('info')
+  const [profilePicUrl, setProfilePicUrl] = useState<string>(() => localStorage.getItem('swiftshift-profile-pic') || '')
   const [, setWorkSchedule] = useState<any>(null)
   const [directDeposit, setDirectDeposit] = useState<any>(null)
   const [, setWorkAvailability] = useState<any>(null)
@@ -2489,10 +2537,10 @@ export default function App() {
       if (res.ok && data.file_id) {
         setAttachedFile({ file_id: data.file_id, filename: data.filename || file.name })
       } else {
-        alert(data.error || 'Upload failed')
+        toast.error(data.error || 'Upload failed')
       }
     } catch {
-      alert('Upload error')
+      toast.error('Upload error', { description: 'Could not upload file. Please try again.' })
     }
     e.target.value = ''
   }
@@ -2512,10 +2560,10 @@ export default function App() {
         // Auto-fill 1040 after upload
         await handleFill1040()
       } else {
-        alert(data.error || 'Upload failed')
+        toast.error(data.error || 'Upload failed')
       }
     } catch {
-      alert('Upload error')
+      toast.error('Upload error', { description: 'Could not upload document. Please try again.' })
     } finally {
       setTaxLoading(false)
       e.target.value = ''
@@ -2536,10 +2584,10 @@ export default function App() {
         setTaxFormData(data)
         if (data.source_files?.length) setTaxUploadedFiles(data.source_files)
       } else {
-        alert(data.error || 'Failed to fill 1040')
+        toast.error(data.error || 'Failed to fill 1040')
       }
     } catch {
-      alert('Error filling form')
+      toast.error('Error filling form', { description: 'Could not connect to tax filing service. Please try again.' })
     } finally {
       setTaxLoading(false)
     }
@@ -2570,16 +2618,35 @@ export default function App() {
           </div>
         </div>
         <div className="ta-navbar-user">
+          {/* Achievements badge */}
+          <button
+            onClick={() => navTo('rewards')}
+            title="Achievements"
+            className="flex items-center gap-1.5 px-3 py-1 text-sm text-white/60 border border-white/10 rounded-full hover:border-white/20 hover:bg-white/5 transition-all"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline',verticalAlign:'middle',flexShrink:0}}>
+              <circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
+            </svg>
+            <span className="ta-streak-label" style={{ color: 'var(--accent-color)' }}>Achievements</span>
+          </button>
           {/* Daily streak counter */}
           <div className="flex items-center gap-1.5 px-3 py-1 text-sm text-white/60 border border-white/10 rounded-full">
             <span style={{ color: 'var(--accent-color)' }}>
               {streak > 0
                 ? (
-                  <svg width="14" height="14" viewBox="0 0 32 32" fill="currentColor" style={{display:'inline',verticalAlign:'middle'}}>
-                    {/* Flame shape: wide base, pointed top, inner highlight */}
-                    <path d="M16 2 C16 2 10 10 10 17 C10 22 13 27 16 27 C19 27 22 22 22 17 C22 10 16 2 16 2Z" opacity="0.9"/>
-                    <path d="M16 8 C16 8 12 14 12 18 C12 22 14 26 16 26 C18 26 20 22 20 18 C20 14 16 8 16 8Z" opacity="0.5" fill="white"/>
-                    <path d="M16 14 C16 14 14 17 14 20 C14 23 15 25 16 25 C17 25 18 23 18 20 C18 17 16 14 16 14Z" opacity="0.3" fill="white"/>
+                  <svg width="15" height="15" viewBox="0 0 32 36" fill="currentColor" style={{display:'inline',verticalAlign:'middle'}}>
+                    {/* Main flame body */}
+                    <path d="M16 34 C10 34 6 29 6 23 C6 16 10 11 13 7 C13 11 15 13 16 13 C17 13 19 11 19 7 C22 11 26 16 26 23 C26 29 22 34 16 34Z" opacity="0.95"/>
+                    {/* Left short arm */}
+                    <path d="M8 20 C6 17 5 14 6 11 C7 14 8 16 9 17 C8.5 18 8.2 19 8 20Z" opacity="0.85"/>
+                    {/* Right short arm */}
+                    <path d="M24 20 C26 17 27 14 26 11 C25 14 24 16 23 17 C23.5 18 23.8 19 24 20Z" opacity="0.85"/>
+                    {/* Left tall arm */}
+                    <path d="M10 18 C8 13 8 8 10 4 C11 8 11 12 12 15 C11.2 16 10.5 17 10 18Z" opacity="0.75"/>
+                    {/* Right tall arm */}
+                    <path d="M22 18 C24 13 24 8 22 4 C21 8 21 12 20 15 C20.8 16 21.5 17 22 18Z" opacity="0.75"/>
+                    {/* Inner glow */}
+                    <path d="M16 28 C13 28 11 25 11 22 C11 18 13 15 16 14 C19 15 21 18 21 22 C21 25 19 28 16 28Z" opacity="0.35" fill="white"/>
                   </svg>
                 )
                 : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline',verticalAlign:'middle'}}><circle cx="12" cy="12" r="8"/></svg>}
@@ -2589,7 +2656,13 @@ export default function App() {
           </div>
           {/* User menu dropdown */}
           <div className="relative group">
-            <span className="text-sm text-zinc-400 cursor-pointer">Hi, {user.first_name} ▾</span>
+            <span className="text-sm text-zinc-400 cursor-pointer flex items-center gap-2">
+              {profilePicUrl
+                ? <img src={profilePicUrl} alt="Profile" className="w-6 h-6 rounded-full object-cover border border-white/20" />
+                : <span className="w-6 h-6 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-xs text-zinc-400">{user.first_name?.[0]?.toUpperCase()}</span>
+              }
+              Hi, {user.first_name} ▾
+            </span>
             <div className="absolute right-0 top-full w-48 bg-zinc-900 border border-white/10 rounded-xl shadow-lg hidden group-hover:block z-50 pt-1">
               <button
                 onClick={() => navTo('profile')}
@@ -2865,21 +2938,6 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* Work state selector for break law compliance */}
-                  <div className="mt-4 flex items-center gap-2">
-                    <span className="text-xs text-zinc-500">Work state:</span>
-                    <select
-                      value={workState}
-                      onChange={e => setWorkState(e.target.value)}
-                      className="text-xs bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-zinc-300 focus:border-white/30 focus:outline-none"
-                    >
-                      {STATE_CODES.map(code => (
-                        <option key={code} value={code}>
-                          {code} - {STATE_BREAK_RULES[code].name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
                     </div>
 
                     {/* Right: Target Ring - 8-hour daily goal */}
@@ -2995,14 +3053,23 @@ export default function App() {
                           transition={{ duration: 1, ease: 'easeOut' }}
                         />
                       </div>
-                      {/* Break law info below the bar */}
-                      <div className="mt-1.5 text-xs text-zinc-500">
-                        Work state: {workState}
-                        {STATE_BREAK_RULES[workState]?.triggerAfterHours > 0 ? (
-                          <span> · {STATE_BREAK_RULES[workState].mealBreakMinutes}-min break required by hour {STATE_BREAK_RULES[workState].triggerAfterHours + 1}</span>
-                        ) : (
-                          <span> · No state break law</span>
-                        )}
+                      {/* Work state selector + break law info below the bar */}
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <select
+                          value={workState}
+                          onChange={e => setWorkState(e.target.value)}
+                          className="text-xs bg-black/40 border border-white/10 rounded-lg px-1.5 py-0.5 text-zinc-300 focus:border-white/30 focus:outline-none"
+                          style={{ maxWidth: '52px' }}
+                        >
+                          {STATE_CODES.map(code => (
+                            <option key={code} value={code}>{code}</option>
+                          ))}
+                        </select>
+                        <span className="text-xs text-zinc-500">
+                          {STATE_BREAK_RULES[workState]?.triggerAfterHours > 0
+                            ? `${STATE_BREAK_RULES[workState].mealBreakMinutes}-min break by hr ${STATE_BREAK_RULES[workState].triggerAfterHours + 1}`
+                            : 'No state break law'}
+                        </span>
                       </div>
                     </div>
                   )}
@@ -4412,14 +4479,44 @@ export default function App() {
             <div className="max-w-5xl mx-auto space-y-6">
               {/* Header */}
               <div className="glass rounded-3xl p-6 flex items-center gap-6">
-                <div className="w-20 h-20 rounded-2xl bg-white/10 flex items-center justify-center flex-shrink-0">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
-                  </svg>
+                <div className="relative flex-shrink-0">
+                  {profilePicUrl
+                    ? <img src={profilePicUrl} alt="Profile" className="w-20 h-20 rounded-2xl object-cover border border-white/20" />
+                    : (
+                      <div className="w-20 h-20 rounded-2xl bg-white/10 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                        </svg>
+                      </div>
+                    )
+                  }
+                  <label className="absolute -bottom-2 -right-2 w-7 h-7 rounded-full flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity" style={{ background: 'var(--accent-color)' }} title="Upload photo">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={e => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        const reader = new FileReader()
+                        reader.onload = ev => {
+                          const url = ev.target?.result as string
+                          setProfilePicUrl(url)
+                          localStorage.setItem('swiftshift-profile-pic', url)
+                        }
+                        reader.readAsDataURL(file)
+                        e.target.value = ''
+                      }}
+                    />
+                  </label>
                 </div>
                 <div>
                   <div className="text-2xl font-semibold neon-green">{user.first_name} {user.last_name}</div>
                   <div className="text-sm text-zinc-400 mt-1">{user.job_role || 'Employee'} · {user.email}</div>
+                  <div className="text-xs text-zinc-600 mt-1">Click the upload button to change your profile photo</div>
                 </div>
               </div>
 
