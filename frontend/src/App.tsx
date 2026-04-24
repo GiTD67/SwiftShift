@@ -1867,14 +1867,31 @@ export default function App() {
   }, [activeView, user?.id])
 
   // Clock state
-  const [clockInAt, setClockInAt] = useState<Date | null>(null)
+  const [clockInAt, setClockInAt] = useState<Date | null>(() => {
+    // Quick-load clock-in time from localStorage so clocked-in state is visible immediately on refresh
+    const saved = localStorage.getItem('swiftshift-clock-in-at')
+    if (saved) {
+      const d = new Date(saved)
+      if (!isNaN(d.getTime())) return d
+    }
+    return null
+  })
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null)
   const [breakStartedAt, setBreakStartedAt] = useState<Date | null>(null)
   const [breakType, setBreakType] = useState<'paid' | 'unpaid' | null>(null)
   const [breakMsAccum, setBreakMsAccum] = useState(0)
   const [paidBreakMsAccum, setPaidBreakMsAccum] = useState(0)
   const [periodTotalMs, setPeriodTotalMs] = useState(0)
-  const [todayWorkedMs, setTodayWorkedMs] = useState(0)
+  const [todayWorkedMs, setTodayWorkedMs] = useState(() => {
+    // Quick-load from localStorage so earnings don't flash at $0 on refresh
+    const saved = localStorage.getItem('swiftshift-today-ms')
+    if (saved) {
+      const { ms, date } = JSON.parse(saved)
+      // Only use if it's still the same day
+      if (date === new Date().toISOString().slice(0, 10)) return Number(ms)
+    }
+    return 0
+  })
   const [now, setNow] = useState(new Date())
   const [_shockwaveActive, setShockwaveActive] = useState(false)
   const [ripplePos, setRipplePos] = useState<{ x: number; y: number } | null>(null)
@@ -1954,6 +1971,7 @@ export default function App() {
             todayMs += activeElapsedMs
           }
           setClockInAt(clockInDate)
+          localStorage.setItem('swiftshift-clock-in-at', clockInDate.toISOString())
           setActiveSessionId(active.id)
           setBreakStartedAt(null)
           setBreakType(null)
@@ -1961,6 +1979,7 @@ export default function App() {
           setPaidBreakMsAccum(0)
         } else {
           setClockInAt(null)
+          localStorage.removeItem('swiftshift-clock-in-at')
           setActiveSessionId(null)
         }
 
@@ -1975,6 +1994,16 @@ export default function App() {
     const id = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(id)
   }, [])
+
+  // Persist todayWorkedMs to localStorage (for quick refresh load)
+  useEffect(() => {
+    if (todayWorkedMs > 0) {
+      localStorage.setItem('swiftshift-today-ms', JSON.stringify({
+        ms: todayWorkedMs,
+        date: new Date().toISOString().slice(0, 10),
+      }))
+    }
+  }, [todayWorkedMs])
 
   // Derived clock values
   const isClockedIn = clockInAt !== null
@@ -2152,6 +2181,7 @@ export default function App() {
   const handleClockIn = (e?: React.MouseEvent<HTMLButtonElement>) => {
     if (!isClockedIn) {
       setClockInAt(now)
+      localStorage.setItem('swiftshift-clock-in-at', now.toISOString())
       setActiveSessionId(null)
       setBreakStartedAt(null)
       setBreakType(null)
@@ -2328,6 +2358,7 @@ export default function App() {
       const session = Math.max(0, now.getTime() - clockInAt!.getTime() - unpaidAccum)
       setTodayWorkedMs(v => v + session)
       setClockInAt(null)
+      localStorage.removeItem('swiftshift-clock-in-at')
       setBreakStartedAt(null)
       setBreakType(null)
       setBreakMsAccum(0)
@@ -3059,6 +3090,7 @@ export default function App() {
               highlightRate={highlightRate}
               onRateChange={(rate) => {
                 setClockHourlyRate(rate)
+                localStorage.setItem('swiftshift-hourly-rate', String(rate))
                 if (user?.id) {
                   fetch(`${API_BASE}/api/users/${user.id}`, {
                     method: 'PUT',
