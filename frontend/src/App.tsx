@@ -1362,6 +1362,27 @@ export default function App() {
   const [selectedDoc, setSelectedDoc] = useState<{ label: string; content: string } | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
+  // Profile tabs state
+  const [profileTab, setProfileTab] = useState<'info' | 'schedule' | 'deposit' | 'availability'>('info')
+  const [workSchedule, setWorkSchedule] = useState<any>(null)
+  const [directDeposit, setDirectDeposit] = useState<any>(null)
+  const [workAvailability, setWorkAvailability] = useState<any>(null)
+  const [scheduleEdit, setScheduleEdit] = useState<any>(null)
+  const [depositEdit, setDepositEdit] = useState<any>(null)
+  const [availabilityEdit, setAvailabilityEdit] = useState<any>(null)
+
+  // Leave Management state
+  const [ptoBalance, setPtoBalance] = useState<any>(null)
+  const [ptoRequests, setPtoRequests] = useState<any[]>([])
+  const [ptoRequestForm, setPtoRequestForm] = useState({ start_date: '', end_date: '', request_type: 'vacation', reason: '', hours_requested: '' })
+  const [showPtoForm, setShowPtoForm] = useState(false)
+
+  // Schedules state
+  const [shiftSwaps, setShiftSwaps] = useState<any[]>([])
+  const [timesheetSubs, setTimesheetSubs] = useState<any[]>([])
+  const [showSwapForm, setShowSwapForm] = useState(false)
+  const [swapForm, setSwapForm] = useState({ shift_date: '', shift_start: '', shift_end: '', reason: '' })
+
   const navTo = (view: View) => {
     setActiveView(view)
     setMobileMenuOpen(false)
@@ -1527,8 +1548,34 @@ export default function App() {
     }
   }, [activeView])
 
+  // Load profile data when navigating to profile
+  useEffect(() => {
+    if (activeView !== 'profile' || !user?.id) return
+    const uid = user.id
+    fetch(`${API_BASE}/api/work-schedule?user_id=${uid}`).then(r => r.json()).then(d => { setWorkSchedule(d); setScheduleEdit(d) }).catch(() => {})
+    fetch(`${API_BASE}/api/direct-deposit?user_id=${uid}`).then(r => r.json()).then(d => { setDirectDeposit(d); setDepositEdit(d) }).catch(() => {})
+    fetch(`${API_BASE}/api/availability?user_id=${uid}`).then(r => r.json()).then(d => { setWorkAvailability(d); setAvailabilityEdit(d) }).catch(() => {})
+  }, [activeView, user?.id])
+
+  // Load leave management data
+  useEffect(() => {
+    if (activeView !== 'leaves' || !user?.id) return
+    const uid = user.id
+    fetch(`${API_BASE}/api/pto/balance?user_id=${uid}`).then(r => r.json()).then(setPtoBalance).catch(() => {})
+    fetch(`${API_BASE}/api/pto/requests?user_id=${uid}`).then(r => r.json()).then(r => setPtoRequests(Array.isArray(r) ? r : [])).catch(() => {})
+  }, [activeView, user?.id])
+
+  // Load schedules data
+  useEffect(() => {
+    if (activeView !== 'schedules' || !user?.id) return
+    const uid = user.id
+    fetch(`${API_BASE}/api/shift-swaps?user_id=${uid}`).then(r => r.json()).then(r => setShiftSwaps(Array.isArray(r) ? r : [])).catch(() => {})
+    fetch(`${API_BASE}/api/timesheet-submissions?user_id=${uid}`).then(r => r.json()).then(r => setTimesheetSubs(Array.isArray(r) ? r : [])).catch(() => {})
+  }, [activeView, user?.id])
+
   // Clock state
   const [clockInAt, setClockInAt] = useState<Date | null>(null)
+  const [activeSessionId, setActiveSessionId] = useState<number | null>(null)
   const [breakStartedAt, setBreakStartedAt] = useState<Date | null>(null)
   const [breakType, setBreakType] = useState<'paid' | 'unpaid' | null>(null)
   const [breakMsAccum, setBreakMsAccum] = useState(0)
@@ -1612,12 +1659,14 @@ export default function App() {
             todayMs += activeElapsedMs
           }
           setClockInAt(clockInDate)
+          setActiveSessionId(active.id)
           setBreakStartedAt(null)
           setBreakType(null)
           setBreakMsAccum(0)
           setPaidBreakMsAccum(0)
         } else {
           setClockInAt(null)
+          setActiveSessionId(null)
         }
 
         setTodayWorkedMs(todayMs)
@@ -1727,19 +1776,103 @@ export default function App() {
     }
   }, [Math.floor((todayTotalMs / 3600000) * 65 / 50)])
 
+  // Overtime warning at 7.5 hours
+  const overtimeWarnFiredRef = useRef(false)
+  useEffect(() => {
+    if (!isClockedIn) { overtimeWarnFiredRef.current = false; return }
+    const hoursWorked = todayTotalMs / 3600000
+    if (hoursWorked >= 7.5 && !overtimeWarnFiredRef.current) {
+      overtimeWarnFiredRef.current = true
+      toast.warning('⚠️ Approaching overtime', {
+        description: 'You\'ve worked 7.5 hours. Any time beyond 8h is overtime (1.5×).',
+        duration: 6000,
+      })
+    }
+  }, [Math.floor(todayTotalMs / (0.5 * 3600000))])
+
+  // Payday notification (fire once on period end day)
+  const paydayFiredRef = useRef(false)
+  useEffect(() => {
+    const period = payPeriodFor(now)
+    const todayStr = now.toISOString().slice(0, 10)
+    const endStr = period.end.toISOString().slice(0, 10)
+    if (todayStr === endStr && !paydayFiredRef.current) {
+      paydayFiredRef.current = true
+      setTimeout(() => {
+        toast.success('💸 Payday!', {
+          description: 'Today is the last day of your pay period. Payday is coming!',
+          duration: 8000,
+        })
+      }, 3000)
+    }
+  }, [now.toISOString().slice(0, 10)])
+
+  // Clock-in reminder if not clocked in by 9:30 AM
+  const clockInReminderFiredRef = useRef(false)
+  useEffect(() => {
+    const todayStr = now.toISOString().slice(0, 10)
+    const key = `swiftshift-clockin-remind-${todayStr}`
+    if (isClockedIn || localStorage.getItem(key)) return
+    const hour = now.getHours()
+    const min = now.getMinutes()
+    if ((hour > 9 || (hour === 9 && min >= 30)) && !clockInReminderFiredRef.current) {
+      clockInReminderFiredRef.current = true
+      localStorage.setItem(key, '1')
+      toast.info("⏰ Don't forget to clock in!", {
+        description: 'You haven\'t clocked in yet today.',
+        duration: 8000,
+      })
+    }
+  }, [Math.floor(now.getTime() / 60000)])
+
   // Pay period
   const period = useMemo(() => payPeriodFor(now), [now])
   const periodLabel = `${period.start.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })} – ${period.end.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })}`
   const periodHours = ((periodTotalMs + sessionWorkedMs) / 3600000).toFixed(1)
 
+  // Overtime 1.5× earnings calculation for pay period sidebar
+  const periodEarnings = useMemo(() => {
+    const totalMs = periodTotalMs + sessionWorkedMs
+    const totalHours = totalMs / 3600000
+    // Approximate: treat hours > 8h/day as overtime (per-day breakdown not tracked in periodTotalMs)
+    // Use today's breakdown: regularToday = min(todayTotal, 8h), overtimeToday = max(0, todayTotal - 8h)
+    const todayHours = (todayWorkedMs + sessionWorkedMs) / 3600000
+    const regularToday = Math.min(todayHours, 8)
+    const overtimeToday = Math.max(0, todayHours - 8)
+    // Prior period hours assumed all regular (no per-day breakdown stored)
+    const priorHours = periodTotalMs / 3600000 - (todayWorkedMs / 3600000)
+    const priorRegular = Math.max(0, priorHours)
+    const regular = priorRegular + regularToday
+    const overtime = overtimeToday
+    return {
+      totalHours,
+      regular,
+      overtime,
+      pay: regular * clockHourlyRate + overtime * clockHourlyRate * 1.5,
+    }
+  }, [periodTotalMs, sessionWorkedMs, todayWorkedMs, clockHourlyRate])
+
   // Actions
   const handleClockIn = (e?: React.MouseEvent<HTMLButtonElement>) => {
     if (!isClockedIn) {
       setClockInAt(now)
+      setActiveSessionId(null)
       setBreakStartedAt(null)
       setBreakType(null)
       setBreakMsAccum(0)
       setPaidBreakMsAccum(0)
+
+      // Persist clock-in to DB
+      if (user?.id) {
+        fetch(`${API_BASE}/api/clock-sessions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ employee_id: user.id }),
+        })
+          .then(r => r.json())
+          .then(row => { if (row?.id) setActiveSessionId(row.id) })
+          .catch(() => {})
+      }
 
       // Update daily streak (freeze over weekends)
       const todayStr = now.toISOString().slice(0, 10)
@@ -1903,6 +2036,19 @@ export default function App() {
       setLootPtoHours(Math.round(hoursWorked * ptoAccrualRate * 100) / 100)
       setLootDurationMin(Math.round(session / 60000))
       setShowLootDrop(true)
+
+      // Persist clock-out to DB
+      const sid = activeSessionId
+      setActiveSessionId(null)
+      if (sid && user?.id) {
+        fetch(`${API_BASE}/api/clock-sessions/${sid}`, { method: 'PUT' }).catch(() => {})
+        // Accrue PTO to DB
+        fetch(`${API_BASE}/api/pto/balance/accrue`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: user.id, hours_worked: hoursWorked }),
+        }).catch(() => {})
+      }
     }
   }
 
@@ -2512,11 +2658,17 @@ export default function App() {
                   <div className="space-y-3 mb-4">
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-zinc-400">Regular hours</span>
-                      <span className="font-mono neon-green">{periodHours} hrs</span>
+                      <span className="font-mono neon-green">{periodEarnings.regular.toFixed(1)} hrs</span>
                     </div>
+                    {periodEarnings.overtime > 0 && (
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-amber-400">Overtime (1.5×)</span>
+                        <span className="font-mono text-amber-400">{periodEarnings.overtime.toFixed(1)} hrs</span>
+                      </div>
+                    )}
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-zinc-400">Earned this period</span>
-                      <span className="font-mono neon-green">${(parseFloat(periodHours) * clockHourlyRate).toFixed(0)}</span>
+                      <span className="font-mono neon-green">${periodEarnings.pay.toFixed(0)}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-zinc-400">Days remaining</span>
@@ -2695,12 +2847,95 @@ export default function App() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h1 className="text-2xl font-semibold neon-green">Schedule Management</h1>
-                  <p className="text-sm text-zinc-400">Manage shifts and employee schedules</p>
+                  <p className="text-sm text-zinc-400">Shift swaps, timesheet submissions, and weekly view</p>
                 </div>
-                <button className="px-4 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
-                  + Add Shift
+                <button onClick={() => setShowSwapForm(v => !v)} className="px-4 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
+                  {showSwapForm ? 'Cancel' : '↔ Request Swap'}
                 </button>
               </div>
+
+              {/* Shift Swap Request Form */}
+              {showSwapForm && (
+                <div className="glass rounded-3xl p-6 space-y-4">
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Request Shift Swap</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {[
+                      { label: 'Shift Date', key: 'shift_date', type: 'date' },
+                      { label: 'Shift Start', key: 'shift_start', type: 'time' },
+                      { label: 'Shift End', key: 'shift_end', type: 'time' },
+                      { label: 'Reason', key: 'reason', type: 'text' },
+                    ].map(({ label, key, type }) => (
+                      <div key={key}>
+                        <div className="text-xs text-zinc-400 mb-1">{label}</div>
+                        <input type={type} value={(swapForm as any)[key]} onChange={e => setSwapForm(f => ({ ...f, [key]: e.target.value }))}
+                          className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={() => {
+                    if (!user?.id || !swapForm.shift_date || !swapForm.shift_start || !swapForm.shift_end) {
+                      toast.error('Please fill shift date, start, and end'); return
+                    }
+                    fetch(`${API_BASE}/api/shift-swaps`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ requester_id: user.id, ...swapForm }),
+                    }).then(r => r.json()).then(row => {
+                      if (row.error) { toast.error(row.error); return }
+                      setShiftSwaps(prev => [row, ...prev])
+                      setShowSwapForm(false)
+                      setSwapForm({ shift_date: '', shift_start: '', shift_end: '', reason: '' })
+                      toast.success('Shift swap requested!')
+                    }).catch(() => toast.error('Failed to submit'))
+                  }} className="px-5 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
+                    Submit Swap Request
+                  </button>
+                </div>
+              )}
+
+              {/* Shift Swaps List */}
+              <div className="glass rounded-3xl p-6">
+                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>My Shift Swaps</h2>
+                {shiftSwaps.length === 0 ? (
+                  <div className="text-sm text-zinc-500 text-center py-6">No shift swap requests yet.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {shiftSwaps.map(sw => (
+                      <div key={sw.id} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
+                        <div>
+                          <div className="font-medium">{sw.shift_date}</div>
+                          <div className="text-xs text-zinc-400">{sw.shift_start} – {sw.shift_end}{sw.reason ? ` · ${sw.reason}` : ''}</div>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${sw.status === 'accepted' ? 'bg-emerald-500/20 text-emerald-400' : sw.status === 'denied' ? 'bg-red-500/20 text-red-400' : sw.status === 'cancelled' ? 'bg-zinc-500/20 text-zinc-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                          {sw.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Timesheet Submissions */}
+              <div className="glass rounded-3xl p-6">
+                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Timesheet Submissions</h2>
+                {timesheetSubs.length === 0 ? (
+                  <div className="text-sm text-zinc-500 text-center py-6">No timesheet submissions yet.</div>
+                ) : (
+                  <div className="space-y-2">
+                    {timesheetSubs.map(sub => (
+                      <div key={sub.id} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3 text-sm">
+                        <div>
+                          <div className="font-medium">{sub.period_start} – {sub.period_end}</div>
+                          <div className="text-xs text-zinc-400">Submitted {sub.submitted_at?.slice(0, 10)}</div>
+                        </div>
+                        <span className="font-mono neon-green">{sub.total_hours}h</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Weekly grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
                 {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
                   <div key={day} className="glass rounded-2xl p-3">
@@ -2712,42 +2947,117 @@ export default function App() {
                         <div className="text-zinc-400 mt-0.5">{i === 0 ? '3 assigned' : '2 assigned'}</div>
                       </div>
                     ))}
-                    <div className="text-xs text-zinc-600 mt-2 text-center cursor-pointer hover:text-zinc-400">+ add</div>
                   </div>
                 ))}
               </div>
-              <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Shift Coverage Summary</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {[['Total Shifts This Week', '14'], ['Filled Shifts', '11'], ['Open Shifts', '3']].map(([label, val]) => (
-                    <div key={label} className="bg-white/5 rounded-2xl p-4 text-center">
-                      <div className="text-2xl font-bold" style={{ color: 'var(--accent-color)' }}>{val}</div>
-                      <div className="text-xs text-zinc-400 mt-1">{label}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
           )}
-          {activeView === 'payroll' && (
+          {activeView === 'payroll' && (() => {
+            // Real paystub calculation based on current pay period
+            const grossPay = periodEarnings.pay
+            const regularPay = periodEarnings.regular * clockHourlyRate
+            const overtimePay = periodEarnings.overtime * clockHourlyRate * 1.5
+            // Tax withholding estimates
+            const federalTaxRate = grossPay > 3000 ? 0.22 : grossPay > 1000 ? 0.12 : 0.10
+            const stateTaxRate = 0.0593  // CA avg
+            const socialSecurityRate = 0.062
+            const medicareRate = 0.0145
+            const federalTax = grossPay * federalTaxRate
+            const stateTax = grossPay * stateTaxRate
+            const socialSecurity = grossPay * socialSecurityRate
+            const medicare = grossPay * medicareRate
+            const totalDeductions = federalTax + stateTax + socialSecurity + medicare
+            const netPay = grossPay - totalDeductions
+            return (
             <div className="max-w-5xl mx-auto space-y-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h1 className="text-2xl font-semibold neon-green">Payroll</h1>
-                  <p className="text-sm text-zinc-400">Current pay period: Apr 15 – Apr 30, 2026</p>
+                  <p className="text-sm text-zinc-400">Pay period: {periodLabel}</p>
                 </div>
-                <button className="px-4 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
-                  Run Payroll
-                </button>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {[['Total Payroll', '$48,320'], ['Employees Paid', '24'], ['Avg Hours/Employee', '38.5h'], ['Overtime Hours', '42h']].map(([label, val]) => (
-                  <div key={label} className="glass rounded-2xl p-4 text-center">
-                    <div className="text-2xl font-bold" style={{ color: 'var(--accent-color)' }}>{val}</div>
-                    <div className="text-xs text-zinc-400 mt-1">{label}</div>
+
+              {/* Personal Paystub */}
+              <div className="glass rounded-3xl p-6">
+                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>My Paystub — {periodLabel}</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  {/* Earnings */}
+                  <div className="space-y-3">
+                    <div className="text-xs uppercase tracking-widest text-zinc-500 mb-2">Earnings</div>
+                    {[
+                      ['Regular Pay', `${periodEarnings.regular.toFixed(1)}h × $${clockHourlyRate}`, regularPay],
+                      ...(periodEarnings.overtime > 0 ? [['Overtime Pay (1.5×)', `${periodEarnings.overtime.toFixed(1)}h × $${(clockHourlyRate * 1.5).toFixed(2)}`, overtimePay]] : []),
+                    ].map(([label, sub, val]) => (
+                      <div key={String(label)} className="flex justify-between items-center bg-white/5 rounded-xl px-4 py-2.5">
+                        <div>
+                          <div className="text-sm font-medium">{String(label)}</div>
+                          <div className="text-xs text-zinc-500">{String(sub)}</div>
+                        </div>
+                        <span className="font-mono neon-green">${Number(val).toFixed(2)}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between items-center border-t border-white/10 pt-3">
+                      <span className="font-semibold">Gross Pay</span>
+                      <span className="font-mono font-bold text-lg neon-green">${grossPay.toFixed(2)}</span>
+                    </div>
                   </div>
-                ))}
+
+                  {/* Deductions */}
+                  <div className="space-y-3">
+                    <div className="text-xs uppercase tracking-widest text-zinc-500 mb-2">Deductions</div>
+                    {[
+                      ['Federal Income Tax', `${(federalTaxRate * 100).toFixed(0)}%`, federalTax],
+                      ['State Income Tax', `${(stateTaxRate * 100).toFixed(1)}% (CA)`, stateTax],
+                      ['Social Security', '6.2%', socialSecurity],
+                      ['Medicare', '1.45%', medicare],
+                    ].map(([label, rate, val]) => (
+                      <div key={String(label)} className="flex justify-between items-center bg-white/5 rounded-xl px-4 py-2.5">
+                        <div>
+                          <div className="text-sm font-medium">{String(label)}</div>
+                          <div className="text-xs text-zinc-500">{String(rate)}</div>
+                        </div>
+                        <span className="font-mono text-red-400">−${Number(val).toFixed(2)}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between items-center border-t border-white/10 pt-3">
+                      <span className="font-semibold">Total Deductions</span>
+                      <span className="font-mono text-red-400">−${totalDeductions.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Net Pay */}
+                <div className="mt-6 bg-white/5 rounded-2xl p-5 flex items-center justify-between">
+                  <div>
+                    <div className="text-zinc-400 text-sm">Net Pay (Take-home)</div>
+                    <div className="text-xs text-zinc-600 mt-0.5">After all deductions</div>
+                  </div>
+                  <div className="text-3xl font-bold neon-green font-mono">${netPay.toFixed(2)}</div>
+                </div>
+
+                <div className="mt-4 text-xs text-zinc-500">* Tax estimates are approximate. Actual withholding may differ based on filing status and elections.</div>
               </div>
+
+              {/* Tax Withholding Calculator */}
+              <div className="glass rounded-3xl p-6">
+                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Tax Withholding Summary</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {[
+                    ['Federal', `$${federalTax.toFixed(0)}`, `${(federalTaxRate * 100).toFixed(0)}%`],
+                    ['State (CA)', `$${stateTax.toFixed(0)}`, '5.93%'],
+                    ['FICA', `$${(socialSecurity + medicare).toFixed(0)}`, '7.65%'],
+                    ['Total', `$${totalDeductions.toFixed(0)}`, `${((totalDeductions / grossPay) * 100).toFixed(1)}%`],
+                  ].map(([label, val, pct]) => (
+                    <div key={String(label)} className="bg-white/5 rounded-2xl p-4 text-center">
+                      <div className="text-xl font-bold text-red-400">{String(val)}</div>
+                      <div className="text-xs text-zinc-400 mt-1">{String(label)}</div>
+                      <div className="text-xs text-zinc-600">{String(pct)}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Employee Payroll Summary (admin view) */}
               <div className="glass rounded-3xl p-6">
                 <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Employee Payroll Summary</h2>
                 <div className="overflow-x-auto">
@@ -2785,7 +3095,8 @@ export default function App() {
                 </div>
               </div>
             </div>
-          )}
+            )
+          })()}
           {activeView === 'reports' && (
             <div className="max-w-5xl mx-auto space-y-6">
               <div>
@@ -2829,39 +3140,124 @@ export default function App() {
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-2xl font-semibold neon-green">Leave Management</h1>
-                  <p className="text-sm text-zinc-400">Manage PTO requests and absence tracking</p>
+                  <p className="text-sm text-zinc-400">Your PTO bank, requests, and payout calculator</p>
                 </div>
+                <button onClick={() => setShowPtoForm(v => !v)} className="px-4 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
+                  {showPtoForm ? 'Cancel' : '+ Request PTO'}
+                </button>
               </div>
+
+              {/* PTO Balance */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {[['Pending Requests', '5'], ['Approved This Month', '12'], ['Denied This Month', '2'], ['Avg PTO Balance', '14.2 days']].map(([label, val]) => (
+                {[
+                  ['Available PTO', ptoBalance ? `${parseFloat(ptoBalance.hours_available || 0).toFixed(1)} hrs` : '—'],
+                  ['Used PTO', ptoBalance ? `${parseFloat(ptoBalance.hours_used || 0).toFixed(1)} hrs` : '—'],
+                  ['Payout Value', ptoBalance ? `$${(parseFloat(ptoBalance.hours_available || 0) * clockHourlyRate).toFixed(0)}` : '—'],
+                  ['Pending Requests', String(ptoRequests.filter(r => r.status === 'pending').length)],
+                ].map(([label, val]) => (
                   <div key={label} className="glass rounded-2xl p-4 text-center">
                     <div className="text-2xl font-bold" style={{ color: 'var(--accent-color)' }}>{val}</div>
                     <div className="text-xs text-zinc-400 mt-1">{label}</div>
                   </div>
                 ))}
               </div>
-              <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Pending Leave Requests</h2>
-                <div className="space-y-3">
-                  {[
-                    { name: 'Parker Kim', type: 'Vacation', dates: 'May 5–9, 2026', days: 5, status: 'Pending' },
-                    { name: 'Quinn Torres', type: 'Sick Leave', dates: 'Apr 24, 2026', days: 1, status: 'Pending' },
-                    { name: 'Skyler Reed', type: 'Personal', dates: 'May 12, 2026', days: 1, status: 'Pending' },
-                    { name: 'Avery Lane', type: 'Vacation', dates: 'May 19–23, 2026', days: 5, status: 'Pending' },
-                    { name: 'Dakota Lane', type: 'Bereavement', dates: 'Apr 25–27, 2026', days: 3, status: 'Pending' },
-                  ].map(({ name, type, dates, days }) => (
-                    <div key={name} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
-                      <div>
-                        <div className="font-medium">{name}</div>
-                        <div className="text-xs text-zinc-400">{type} · {dates} · {days} day{days > 1 ? 's' : ''}</div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button className="px-3 py-1 rounded-lg text-xs font-medium bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors">Approve</button>
-                        <button className="px-3 py-1 rounded-lg text-xs font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors">Deny</button>
-                      </div>
+
+              {/* PTO Payout Calculator */}
+              {ptoBalance && (
+                <div className="glass rounded-3xl p-6">
+                  <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--accent-color)' }}>PTO Payout Calculator</h2>
+                  <div className="flex flex-wrap gap-6 text-sm">
+                    <div>
+                      <div className="text-zinc-400 mb-1">Available Balance</div>
+                      <div className="text-xl font-bold neon-green">{parseFloat(ptoBalance.hours_available || 0).toFixed(2)} hrs</div>
                     </div>
-                  ))}
+                    <div>
+                      <div className="text-zinc-400 mb-1">At ${clockHourlyRate}/hr</div>
+                      <div className="text-xl font-bold neon-green">${(parseFloat(ptoBalance.hours_available || 0) * clockHourlyRate).toFixed(2)}</div>
+                    </div>
+                    <div>
+                      <div className="text-zinc-400 mb-1">Days equivalent (8h)</div>
+                      <div className="text-xl font-bold neon-green">{(parseFloat(ptoBalance.hours_available || 0) / 8).toFixed(1)} days</div>
+                    </div>
+                  </div>
                 </div>
+              )}
+
+              {/* PTO Request Form */}
+              {showPtoForm && (
+                <div className="glass rounded-3xl p-6 space-y-4">
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>New PTO Request</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-xs text-zinc-400 mb-1">Type</div>
+                      <select value={ptoRequestForm.request_type} onChange={e => setPtoRequestForm(f => ({ ...f, request_type: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
+                        {['vacation', 'sick', 'personal', 'bereavement'].map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div className="text-xs text-zinc-400 mb-1">Hours Requested</div>
+                      <input type="number" min="1" step="0.5" value={ptoRequestForm.hours_requested} onChange={e => setPtoRequestForm(f => ({ ...f, hours_requested: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" placeholder="8" />
+                    </div>
+                    <div>
+                      <div className="text-xs text-zinc-400 mb-1">Start Date</div>
+                      <input type="date" value={ptoRequestForm.start_date} onChange={e => setPtoRequestForm(f => ({ ...f, start_date: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                    </div>
+                    <div>
+                      <div className="text-xs text-zinc-400 mb-1">End Date</div>
+                      <input type="date" value={ptoRequestForm.end_date} onChange={e => setPtoRequestForm(f => ({ ...f, end_date: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <div className="text-xs text-zinc-400 mb-1">Reason (optional)</div>
+                      <input type="text" value={ptoRequestForm.reason} onChange={e => setPtoRequestForm(f => ({ ...f, reason: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" placeholder="Optional reason..." />
+                    </div>
+                  </div>
+                  <button onClick={() => {
+                    if (!user?.id || !ptoRequestForm.start_date || !ptoRequestForm.end_date || !ptoRequestForm.hours_requested) {
+                      toast.error('Please fill in all required fields'); return
+                    }
+                    fetch(`${API_BASE}/api/pto/requests`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ user_id: user.id, ...ptoRequestForm, hours_requested: parseFloat(ptoRequestForm.hours_requested) }),
+                    }).then(r => r.json()).then(row => {
+                      if (row.error) { toast.error(row.error); return }
+                      setPtoRequests(prev => [row, ...prev])
+                      setShowPtoForm(false)
+                      setPtoRequestForm({ start_date: '', end_date: '', request_type: 'vacation', reason: '', hours_requested: '' })
+                      toast.success('PTO request submitted!')
+                    }).catch(() => toast.error('Failed to submit request'))
+                  }} className="px-5 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
+                    Submit Request
+                  </button>
+                </div>
+              )}
+
+              {/* My PTO Requests */}
+              <div className="glass rounded-3xl p-6">
+                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>My PTO Requests</h2>
+                {ptoRequests.length === 0 ? (
+                  <div className="text-sm text-zinc-500 text-center py-6">No PTO requests yet. Click "+ Request PTO" to get started.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {ptoRequests.map(req => (
+                      <div key={req.id} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
+                        <div>
+                          <div className="font-medium capitalize">{req.request_type}</div>
+                          <div className="text-xs text-zinc-400">{req.start_date} → {req.end_date} · {req.hours_requested}h</div>
+                          {req.reason && <div className="text-xs text-zinc-500 mt-0.5">{req.reason}</div>}
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${req.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : req.status === 'denied' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                          {req.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -3459,45 +3855,183 @@ export default function App() {
             </div>
           )}
           {activeView === 'profile' && (
-            <div className="max-w-5xl mx-auto">
-              <div className="glass rounded-3xl p-8">
-                <h1 className="text-2xl font-semibold mb-6 neon-green">Profile</h1>
-
-                <div className="flex items-center gap-6 mb-8">
-                  <div className="w-24 h-24 rounded-2xl bg-white/10 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-semibold">{user.first_name} {user.last_name}</div>
-                    <div className="text-sm text-zinc-400 mt-1">{user.job_role || 'Employee'}</div>
-                  </div>
+            <div className="max-w-5xl mx-auto space-y-6">
+              {/* Header */}
+              <div className="glass rounded-3xl p-6 flex items-center gap-6">
+                <div className="w-20 h-20 rounded-2xl bg-white/10 flex items-center justify-center flex-shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                  </svg>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="glass rounded-2xl p-4">
-                    <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-1">Email</div>
-                    <div className="text-base">{user.email || ''}</div>
-                  </div>
-                  <div className="glass rounded-2xl p-4">
-                    <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-1">Manager</div>
-                    <div className="text-base">{user.manager_name || ''}</div>
-                  </div>
-                  <div className="glass rounded-2xl p-4">
-                    <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-1">User ID</div>
-                    <div className="text-base font-mono">{user.id}</div>
-                  </div>
-                  <div className="glass rounded-2xl p-4">
-                    <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-1">Role</div>
-                    <div className="text-base">{user.job_role || ''}</div>
-                  </div>
-                </div>
-
-                <div className="mt-6 text-xs text-zinc-500">
-                  Profile information is pulled from your account. Contact HR to update.
+                <div>
+                  <div className="text-2xl font-semibold neon-green">{user.first_name} {user.last_name}</div>
+                  <div className="text-sm text-zinc-400 mt-1">{user.job_role || 'Employee'} · {user.email}</div>
                 </div>
               </div>
+
+              {/* Tab nav */}
+              <div className="flex gap-2 flex-wrap">
+                {(['info', 'schedule', 'deposit', 'availability'] as const).map(tab => (
+                  <button key={tab} onClick={() => setProfileTab(tab)}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${profileTab === tab ? 'text-black' : 'glass hover:bg-white/10 text-zinc-300'}`}
+                    style={profileTab === tab ? { backgroundColor: 'var(--accent-color)' } : undefined}>
+                    {tab === 'info' ? 'Info' : tab === 'schedule' ? 'Work Schedule' : tab === 'deposit' ? 'Direct Deposit' : 'Availability'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tab: Info */}
+              {profileTab === 'info' && (
+                <div className="glass rounded-3xl p-6">
+                  <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Personal Information</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[['Email', user.email], ['Manager', user.manager_name || '—'], ['User ID', String(user.id)], ['Role', user.job_role || '—'], ['Pay Type', user.salary ? 'Salaried' : 'Hourly'], ['Rate', user.salary ? `$${user.salary.toLocaleString()}/yr` : user.pay ? `$${user.pay}/hr` : '—']].map(([label, val]) => (
+                      <div key={label} className="bg-white/5 rounded-2xl p-4">
+                        <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-1">{label}</div>
+                        <div className="text-base font-mono">{val}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 text-xs text-zinc-500">Contact HR to update personal information.</div>
+                </div>
+              )}
+
+              {/* Tab: Work Schedule */}
+              {profileTab === 'schedule' && (
+                <div className="glass rounded-3xl p-6 space-y-4">
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Work Schedule</h2>
+                  {scheduleEdit !== null && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {[
+                        { label: 'Schedule Type', key: 'schedule_type', type: 'select', options: ['full_time', 'part_time', 'flex'] },
+                        { label: 'Hours / Week', key: 'hours_per_week', type: 'number' },
+                        { label: 'Shift Start', key: 'shift_start', type: 'time' },
+                        { label: 'Shift End', key: 'shift_end', type: 'time' },
+                      ].map(({ label, key, type, options }) => (
+                        <div key={key} className="bg-white/5 rounded-2xl p-4">
+                          <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-2">{label}</div>
+                          {type === 'select' ? (
+                            <select value={scheduleEdit[key] || ''} onChange={e => setScheduleEdit((s: any) => ({ ...s, [key]: e.target.value }))}
+                              className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-white/30">
+                              {(options || []).map(o => <option key={o} value={o}>{o}</option>)}
+                            </select>
+                          ) : (
+                            <input type={type} value={scheduleEdit[key] || ''} onChange={e => setScheduleEdit((s: any) => ({ ...s, [key]: e.target.value }))}
+                              className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-white/30" />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="bg-white/5 rounded-2xl p-4">
+                    <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-2">Work Days</div>
+                    <div className="flex flex-wrap gap-2">
+                      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => {
+                        const current = (scheduleEdit?.work_days || 'Mon,Tue,Wed,Thu,Fri').split(',')
+                        const active = current.includes(d)
+                        return (
+                          <button key={d} onClick={() => {
+                            const next = active ? current.filter((x: string) => x !== d) : [...current, d]
+                            setScheduleEdit((s: any) => ({ ...s, work_days: next.join(',') }))
+                          }} className="px-3 py-1 rounded-full text-xs font-medium transition-all"
+                            style={active ? { backgroundColor: 'var(--accent-color)', color: '#000' } : { backgroundColor: 'rgba(255,255,255,0.1)', color: '#aaa' }}>
+                            {d}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                  <button onClick={() => {
+                    if (!user?.id || !scheduleEdit) return
+                    fetch(`${API_BASE}/api/work-schedule`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: user.id, ...scheduleEdit }) })
+                      .then(r => r.json()).then(d => { setWorkSchedule(d); toast.success('Work schedule saved!') }).catch(() => toast.error('Failed to save'))
+                  }} className="px-5 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
+                    Save Schedule
+                  </button>
+                </div>
+              )}
+
+              {/* Tab: Direct Deposit */}
+              {profileTab === 'deposit' && (
+                <div className="glass rounded-3xl p-6 space-y-4">
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Direct Deposit</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {[
+                      { label: 'Bank Name', key: 'bank_name', type: 'text' },
+                      { label: 'Account Type', key: 'account_type', type: 'select', options: ['checking', 'savings'] },
+                      { label: 'Routing Number', key: 'routing_number', type: 'text', placeholder: '•••••••••' },
+                      { label: 'Account Number', key: 'account_number', type: 'text', placeholder: '••••••••••••' },
+                    ].map(({ label, key, type, options, placeholder }) => (
+                      <div key={key} className="bg-white/5 rounded-2xl p-4">
+                        <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-2">{label}</div>
+                        {type === 'select' ? (
+                          <select value={depositEdit?.[key] || ''} onChange={e => setDepositEdit((s: any) => ({ ...s, [key]: e.target.value }))}
+                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-white/30">
+                            {(options || []).map(o => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        ) : (
+                          <input type={type} value={depositEdit?.[key] || ''} placeholder={placeholder} onChange={e => setDepositEdit((s: any) => ({ ...s, [key]: e.target.value }))}
+                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-white/30" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {directDeposit?.bank_name && (
+                    <div className="text-xs text-zinc-500">Currently on file: <span className="text-zinc-300">{directDeposit.bank_name}</span> ({directDeposit.account_type})</div>
+                  )}
+                  <button onClick={() => {
+                    if (!user?.id || !depositEdit) return
+                    fetch(`${API_BASE}/api/direct-deposit`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: user.id, ...depositEdit }) })
+                      .then(r => r.json()).then(d => { setDirectDeposit(d); toast.success('Direct deposit saved!') }).catch(() => toast.error('Failed to save'))
+                  }} className="px-5 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
+                    Save Banking Info
+                  </button>
+                </div>
+              )}
+
+              {/* Tab: Availability */}
+              {profileTab === 'availability' && (
+                <div className="glass rounded-3xl p-6 space-y-4">
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Weekly Availability</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const).map(day => (
+                      <div key={day} className="bg-white/5 rounded-2xl p-3">
+                        <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-2">{day}</div>
+                        <select value={availabilityEdit?.[day] || 'available'} onChange={e => setAvailabilityEdit((s: any) => ({ ...s, [day]: e.target.value }))}
+                          className="w-full bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-white/30">
+                          <option value="available">Available</option>
+                          <option value="preferred">Preferred</option>
+                          <option value="unavailable">Unavailable</option>
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-white/5 rounded-2xl p-4">
+                      <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-2">Preferred Start</div>
+                      <input type="time" value={availabilityEdit?.preferred_start || '09:00'} onChange={e => setAvailabilityEdit((s: any) => ({ ...s, preferred_start: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-white/30" />
+                    </div>
+                    <div className="bg-white/5 rounded-2xl p-4">
+                      <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-2">Preferred End</div>
+                      <input type="time" value={availabilityEdit?.preferred_end || '17:00'} onChange={e => setAvailabilityEdit((s: any) => ({ ...s, preferred_end: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-white/30" />
+                    </div>
+                  </div>
+                  <div className="bg-white/5 rounded-2xl p-4">
+                    <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-2">Notes</div>
+                    <textarea value={availabilityEdit?.notes || ''} onChange={e => setAvailabilityEdit((s: any) => ({ ...s, notes: e.target.value }))} rows={2}
+                      placeholder="Any scheduling notes..." className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-white/30 resize-none" />
+                  </div>
+                  <button onClick={() => {
+                    if (!user?.id || !availabilityEdit) return
+                    fetch(`${API_BASE}/api/availability`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: user.id, ...availabilityEdit }) })
+                      .then(r => r.json()).then(d => { setWorkAvailability(d); toast.success('Availability saved!') }).catch(() => toast.error('Failed to save'))
+                  }} className="px-5 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
+                    Save Availability
+                  </button>
+                </div>
+              )}
             </div>
           )}
           {activeView === 'applications' && (
