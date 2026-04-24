@@ -1,12 +1,23 @@
 """One-time script to create all database tables. Run once after first deploy."""
 import psycopg2
 import os
+import sys
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
-    raise SystemExit("DATABASE_URL not set")
+    raise SystemExit("DATABASE_URL not set — add it in your Railway/Render environment variables.")
 
-conn = psycopg2.connect(DATABASE_URL)
+try:
+    conn = psycopg2.connect(DATABASE_URL)
+except psycopg2.OperationalError as e:
+    print(f"ERROR: Cannot connect to database: {e}", file=sys.stderr)
+    print(
+        "Check that DATABASE_URL is set to your actual PostgreSQL connection string.\n"
+        "On Railway: link a Postgres service and Railway will inject DATABASE_URL automatically.\n"
+        "On Render: add DATABASE_URL in Environment → Environment Variables.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 conn.autocommit = True
 cur = conn.cursor()
 
