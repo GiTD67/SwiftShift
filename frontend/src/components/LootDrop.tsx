@@ -161,13 +161,12 @@ export function LootDrop({ isOpen, onClose, earnings, ptoHours, durationMin, the
             {/* Close X — absolute top-right corner */}
             <button
               onClick={onClose}
-              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center text-zinc-400 hover:text-white text-2xl leading-none z-10 rounded-lg hover:bg-white/10 transition-colors"
+              className="absolute top-2 right-3 w-8 h-8 flex items-center justify-center text-zinc-400 hover:text-white text-2xl leading-none z-10 rounded-lg hover:bg-white/10 transition-colors"
               aria-label="Close"
             >
               ×
             </button>
             {/* Funny message */}
-            <div className="h-3" />
             <div className="text-xl font-semibold tracking-tight text-center leading-tight mb-4" style={{ color: accentColor }}>
               {dailyMessage}
             </div>

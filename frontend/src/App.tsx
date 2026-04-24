@@ -2148,7 +2148,7 @@ export default function App() {
       const hour = new Date().getHours()
       const g = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
       setTimeout(() => {
-        toast(`Good ${g}, ${user.first_name}! 👋`, {
+        toast(`Good ${g}, ${user.first_name}!`, {
           description: streak > 0 ? `${streak}-day streak - keep it going!` : 'Ready to clock in?',
           duration: 8000,
           icon: '👋',
