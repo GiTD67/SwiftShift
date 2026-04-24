@@ -1366,9 +1366,9 @@ export default function App() {
 
   // Profile tabs state
   const [profileTab, setProfileTab] = useState<'info' | 'schedule' | 'deposit' | 'availability'>('info')
-  const [workSchedule, setWorkSchedule] = useState<any>(null)
+  const [, setWorkSchedule] = useState<any>(null)
   const [directDeposit, setDirectDeposit] = useState<any>(null)
-  const [workAvailability, setWorkAvailability] = useState<any>(null)
+  const [, setWorkAvailability] = useState<any>(null)
   const [scheduleEdit, setScheduleEdit] = useState<any>(null)
   const [depositEdit, setDepositEdit] = useState<any>(null)
   const [availabilityEdit, setAvailabilityEdit] = useState<any>(null)
@@ -1834,7 +1834,6 @@ export default function App() {
   // Pay period
   const period = useMemo(() => payPeriodFor(now), [now])
   const periodLabel = `${period.start.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })} – ${period.end.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })}`
-  const periodHours = ((periodTotalMs + sessionWorkedMs) / 3600000).toFixed(1)
 
   // Overtime 1.5× earnings calculation for pay period sidebar
   const periodEarnings = useMemo(() => {
