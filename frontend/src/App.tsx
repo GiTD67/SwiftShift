@@ -287,6 +287,16 @@ function TimesheetView({ user }: { user: any }) {
       confetti({ particleCount: 150, spread: 90, origin: { y: 0.5 } })
       setTimeout(() => confetti({ particleCount: 100, spread: 70, angle: 75, origin: { x: 0.2, y: 0.6 } }), 150)
       setTimeout(() => confetti({ particleCount: 100, spread: 70, angle: 105, origin: { x: 0.8, y: 0.6 } }), 300)
+      fetch(`${API_BASE}/api/timesheet-submissions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user?.id,
+          period_start: start.toISOString().slice(0, 10),
+          period_end: end.toISOString().slice(0, 10),
+          total_hours: totalHours,
+        }),
+      }).catch(() => {})
     }
   }
 

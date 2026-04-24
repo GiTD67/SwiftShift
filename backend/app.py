@@ -5,7 +5,7 @@ from flask import Flask, jsonify, send_from_directory, request
 from flask_cors import CORS
 
 from db import get_db  # noqa: F401  # ensure db module is loaded
-from routes import health_bp, employees_bp, time_entries_bp, clock_sessions_bp, users_bp, grok_bp, jobs_bp, pto_bp, availability_bp, shift_swaps_bp
+from routes import health_bp, employees_bp, time_entries_bp, clock_sessions_bp, users_bp, grok_bp, jobs_bp, pto_bp, availability_bp, shift_swaps_bp, timesheet_submissions_bp
 from auth import bp as auth_bp
 
 frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
@@ -57,6 +57,7 @@ app.register_blueprint(jobs_bp)
 app.register_blueprint(pto_bp)
 app.register_blueprint(availability_bp)
 app.register_blueprint(shift_swaps_bp)
+app.register_blueprint(timesheet_submissions_bp)
 
 
 # --- Frontend SPA ---
