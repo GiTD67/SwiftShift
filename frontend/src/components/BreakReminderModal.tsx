@@ -74,7 +74,7 @@ export function BreakReminderModal({
             {/* Message */}
             <div className="glass rounded-2xl p-4 mb-5">
               <p className="text-sm text-zinc-300 leading-relaxed">
-                You've worked <span className="font-semibold text-white">{workedLabel}</span> — {rule.name} requires a{' '}
+                You've worked <span className="font-semibold text-white">{workedLabel}</span> - {rule.name} requires a{' '}
                 <span className="font-semibold text-white">
                   {rule.mealBreakMinutes}-minute {rule.isPaid ? 'paid' : 'unpaid'}
                 </span>{' '}

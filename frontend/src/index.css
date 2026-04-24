@@ -789,3 +789,80 @@ button, [role="button"] {
   background: linear-gradient(90deg, #FFA500, #FFD700, #FFEC6E);
   box-shadow: 0 0 12px rgba(255, 215, 0, 0.7), 0 0 24px rgba(255, 165, 0, 0.4);
 }
+
+/* ============================================
+   PRINT STYLES — Paystub printing
+   ============================================ */
+@media print {
+  /* Hide everything except paystub content */
+  .ta-sidebar,
+  .ta-navbar,
+  nav,
+  aside,
+  .print-hide,
+  button,
+  [class*="sidebar"],
+  [class*="navbar"] {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Reset glass panels to plain white for print */
+  .glass {
+    background: #ffffff !important;
+    border: 1px solid #cccccc !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Make all text dark for print readability */
+  * {
+    color: #000000 !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+  }
+
+  .neon-green,
+  [style*="color: var(--accent-color)"],
+  [style*="--accent-color"] {
+    color: #1a6e1a !important;
+  }
+
+  .text-zinc-400,
+  .text-zinc-500,
+  .text-zinc-600 {
+    color: #555555 !important;
+  }
+
+  .text-red-400 {
+    color: #cc0000 !important;
+  }
+
+  /* Progress bars: hide glow */
+  .crystal-progress-fill {
+    background: #1a6e1a !important;
+    box-shadow: none !important;
+  }
+
+  /* Paystub specific layout */
+  .max-w-5xl {
+    max-width: 100% !important;
+  }
+
+  /* Page break settings */
+  @page {
+    margin: 1.5cm;
+    size: A4 portrait;
+  }
+}

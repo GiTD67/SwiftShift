@@ -238,16 +238,45 @@ function parseNLPEntry(text: string, dayDates: Date[]): { dayIndex: number; hour
     if (idx !== -1) targetDayIndex = idx
   }
 
-  // Day names like "monday", "tuesday"
+  // "tomorrow"
+  if (targetDayIndex === null && t.includes('tomorrow')) {
+    const tom = new Date(today.getTime() + 86400000)
+    const tomStr = tom.toISOString().slice(0, 10)
+    const idx = dayDates.findIndex(d => d.toISOString().slice(0, 10) === tomStr)
+    if (idx !== -1) targetDayIndex = idx
+  }
+
+  // Day names like "monday", "tuesday" (also handles "last monday", "next friday")
   // DAY_NAMES: 0=Mon,1=Tue,...,6=Sun; JS getDay(): 0=Sun,1=Mon,...,6=Sat
   const dowToJsDay: Record<number, number> = { 0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 0 }
   if (targetDayIndex === null) {
     for (const [name, dow] of Object.entries(DAY_NAMES)) {
       if (t.includes(name)) {
         const jsDay = dowToJsDay[dow]
-        const idx = dayDates.findIndex(d => d.getDay() === jsDay)
-        if (idx !== -1) { targetDayIndex = idx; break }
+        // For "last X", prefer earlier occurrence; for "next X", prefer later; default: first match
+        const isLast = t.includes(`last ${name}`)
+        const isNext = t.includes(`next ${name}`)
+        const matches = dayDates.reduce<number[]>((acc, d, i) => {
+          if (d.getDay() === jsDay) acc.push(i)
+          return acc
+        }, [])
+        if (matches.length > 0) {
+          if (isLast) targetDayIndex = matches[0]
+          else if (isNext) targetDayIndex = matches[matches.length - 1]
+          else targetDayIndex = matches[0]
+          break
+        }
       }
+    }
+  }
+
+  // If no day found, default to today if the sentence is about hours worked
+  if (targetDayIndex === null) {
+    const workedMatch = t.match(/(?:worked|logged|clocked|did|put in|had)\s+.*?(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)/)
+    if (workedMatch) {
+      const todayStr = today.toISOString().slice(0, 10)
+      const idx = dayDates.findIndex(d => d.toISOString().slice(0, 10) === todayStr)
+      if (idx !== -1) targetDayIndex = idx
     }
   }
 
@@ -256,20 +285,40 @@ function parseNLPEntry(text: string, dayDates: Date[]): { dayIndex: number; hour
   // Extract hours
   let hours: number | null = null
 
-  // "from 9am to 5pm" or "from 9 to 5"
-  const fromToMatch = t.match(/from\s+(\d+(?:\.\d+)?)\s*(?:am|pm)?\s+to\s+(\d+(?:\.\d+)?)\s*(am|pm)?/)
+  // "from 9am to 5pm", "from 9:00 to 17:00", "from 9 to 5"
+  const fromToMatch = t.match(/from\s+(\d+)(?::(\d+))?\s*(am|pm)?\s+to\s+(\d+)(?::(\d+))?\s*(am|pm)?/)
   if (fromToMatch) {
-    let start = parseFloat(fromToMatch[1])
-    let end = parseFloat(fromToMatch[2])
-    const endSuffix = fromToMatch[3]
-    if (endSuffix === 'pm' && end < 12) end += 12
-    if (!endSuffix && end <= start) end += 12
-    hours = Math.max(0, end - start)
+    let startH = parseFloat(fromToMatch[1])
+    const startMin = fromToMatch[2] ? parseFloat(fromToMatch[2]) / 60 : 0
+    const startSuffix = fromToMatch[3]
+    let endH = parseFloat(fromToMatch[4])
+    const endMin = fromToMatch[5] ? parseFloat(fromToMatch[5]) / 60 : 0
+    const endSuffix = fromToMatch[6]
+    if (startSuffix === 'pm' && startH < 12) startH += 12
+    if (endSuffix === 'pm' && endH < 12) endH += 12
+    if (!endSuffix && endH <= startH) endH += 12
+    hours = Math.max(0, (endH + endMin) - (startH + startMin))
   }
 
-  // "X hours" or just a plain number
+  // "half a day" / "half day" = 4 hours
+  if (hours === null && (t.includes('half a day') || t.includes('half day') || t.includes('half-day'))) {
+    hours = 4
+  }
+
+  // "a full day" / "full day" / "whole day" = 8 hours
+  if (hours === null && (t.includes('full day') || t.includes('whole day') || t.includes('all day'))) {
+    hours = 8
+  }
+
+  // "X hours" or "X hrs" or just a plain number like "set monday to 7.5"
   if (hours === null) {
-    const numMatch = t.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)?/)
+    const numMatch = t.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h\b)/)
+    if (numMatch) hours = parseFloat(numMatch[1])
+  }
+
+  // Plain number fallback (e.g. "monday 8" or "set monday to 8")
+  if (hours === null) {
+    const numMatch = t.match(/(?:to|:|\bat\b|=)\s*(\d+(?:\.\d+)?)/) || t.match(/(\d+(?:\.\d+)?)$/)
     if (numMatch) hours = parseFloat(numMatch[1])
   }
 
@@ -1165,13 +1214,13 @@ function LoginPage() {
               Time is money.
             </h1>
             <div className="text-base text-zinc-400 space-y-2">
-              <div>Log in one time, and STAY logged in.</div>
-              <div>Effortless navigation.</div>
-              <div>Frictionless clock in.</div>
-              <div>Real time visualized earnings.</div>
-              <div>Find the best-matched jobs.</div>
-              <div>Taxes filed instantly with AI.</div>
-              <div>AI assisted HR support with Swifty.</div>
+              <div>- Log in one time, and STAY logged in.</div>
+              <div>- Effortless navigation.</div>
+              <div>- Frictionless clock in.</div>
+              <div>- Real time visualized earnings.</div>
+              <div>- Find the best-matched jobs.</div>
+              <div>- Taxes filed instantly with AI.</div>
+              <div>- AI assisted HR support with Swifty.</div>
             </div>
           </div>
         </div>
@@ -1376,13 +1425,13 @@ function SignupPage() {
               Time is money.
             </h1>
             <div className="text-base text-zinc-400 space-y-2">
-              <div>Log in one time, and STAY logged in.</div>
-              <div>Effortless navigation.</div>
-              <div>Frictionless clock in.</div>
-              <div>Real time visualized earnings.</div>
-              <div>Find the best-matched jobs.</div>
-              <div>Taxes filed instantly with AI.</div>
-              <div>AI assisted HR support with Swifty.</div>
+              <div>- Log in one time, and STAY logged in.</div>
+              <div>- Effortless navigation.</div>
+              <div>- Frictionless clock in.</div>
+              <div>- Real time visualized earnings.</div>
+              <div>- Find the best-matched jobs.</div>
+              <div>- Taxes filed instantly with AI.</div>
+              <div>- AI assisted HR support with Swifty.</div>
             </div>
           </div>
         </div>
@@ -1818,14 +1867,31 @@ export default function App() {
   }, [activeView, user?.id])
 
   // Clock state
-  const [clockInAt, setClockInAt] = useState<Date | null>(null)
+  const [clockInAt, setClockInAt] = useState<Date | null>(() => {
+    // Quick-load clock-in time from localStorage so clocked-in state is visible immediately on refresh
+    const saved = localStorage.getItem('swiftshift-clock-in-at')
+    if (saved) {
+      const d = new Date(saved)
+      if (!isNaN(d.getTime())) return d
+    }
+    return null
+  })
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null)
   const [breakStartedAt, setBreakStartedAt] = useState<Date | null>(null)
   const [breakType, setBreakType] = useState<'paid' | 'unpaid' | null>(null)
   const [breakMsAccum, setBreakMsAccum] = useState(0)
   const [paidBreakMsAccum, setPaidBreakMsAccum] = useState(0)
   const [periodTotalMs, setPeriodTotalMs] = useState(0)
-  const [todayWorkedMs, setTodayWorkedMs] = useState(0)
+  const [todayWorkedMs, setTodayWorkedMs] = useState(() => {
+    // Quick-load from localStorage so earnings don't flash at $0 on refresh
+    const saved = localStorage.getItem('swiftshift-today-ms')
+    if (saved) {
+      const { ms, date } = JSON.parse(saved)
+      // Only use if it's still the same day
+      if (date === new Date().toISOString().slice(0, 10)) return Number(ms)
+    }
+    return 0
+  })
   const [now, setNow] = useState(new Date())
   const [_shockwaveActive, setShockwaveActive] = useState(false)
   const [ripplePos, setRipplePos] = useState<{ x: number; y: number } | null>(null)
@@ -1905,6 +1971,7 @@ export default function App() {
             todayMs += activeElapsedMs
           }
           setClockInAt(clockInDate)
+          localStorage.setItem('swiftshift-clock-in-at', clockInDate.toISOString())
           setActiveSessionId(active.id)
           setBreakStartedAt(null)
           setBreakType(null)
@@ -1912,6 +1979,7 @@ export default function App() {
           setPaidBreakMsAccum(0)
         } else {
           setClockInAt(null)
+          localStorage.removeItem('swiftshift-clock-in-at')
           setActiveSessionId(null)
         }
 
@@ -1926,6 +1994,16 @@ export default function App() {
     const id = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(id)
   }, [])
+
+  // Persist todayWorkedMs to localStorage (for quick refresh load)
+  useEffect(() => {
+    if (todayWorkedMs > 0) {
+      localStorage.setItem('swiftshift-today-ms', JSON.stringify({
+        ms: todayWorkedMs,
+        date: new Date().toISOString().slice(0, 10),
+      }))
+    }
+  }, [todayWorkedMs])
 
   // Derived clock values
   const isClockedIn = clockInAt !== null
@@ -1953,7 +2031,7 @@ export default function App() {
       const g = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
       setTimeout(() => {
         toast(`Good ${g}, ${user.first_name}! 👋`, {
-          description: streak > 0 ? `${streak}-day streak — keep it going!` : 'Ready to clock in?',
+          description: streak > 0 ? `${streak}-day streak - keep it going!` : 'Ready to clock in?',
           duration: 8000,
           icon: '👋',
           style: {
@@ -1973,13 +2051,13 @@ export default function App() {
     if (hoursWorked >= 1 && !hoursMilestoneFiredRef.current.has(hoursWorked)) {
       hoursMilestoneFiredRef.current.add(hoursWorked)
       const hourMsgs: Record<number, string> = {
-        1: '1 hour in — nice start!',
+        1: '1 hour in - nice start!',
         2: '2 hours down!',
-        3: '3 hours — you\'re in the zone!',
-        4: 'Halfway there — 4 hours! 💪',
-        5: '5 hours — almost done!',
-        6: '6 hours — strong work!',
-        7: '7 hours — one more to go!',
+        3: '3 hours - you\'re in the zone!',
+        4: 'Halfway there - 4 hours! 💪',
+        5: '5 hours - almost done!',
+        6: '6 hours - strong work!',
+        7: '7 hours - one more to go!',
         8: 'Full 8-hour day complete! 🎉',
       }
       toast.success(hourMsgs[hoursWorked] || `${hoursWorked} hours worked!`, {
@@ -2000,7 +2078,7 @@ export default function App() {
         const msgs: Record<number, string> = {
           25: '25% of your day done! 🏁',
           50: 'Halfway through your day! ⚡',
-          75: '75% complete — almost there! 🚀',
+          75: '75% complete - almost there! 🚀',
         }
         toast.success(msgs[m], { description: `${user.first_name}, you're crushing it!` })
         confetti({ particleCount: 40, spread: 45, origin: { y: 0.75 }, colors: [themeAccentHex] })
@@ -2103,6 +2181,7 @@ export default function App() {
   const handleClockIn = (e?: React.MouseEvent<HTMLButtonElement>) => {
     if (!isClockedIn) {
       setClockInAt(now)
+      localStorage.setItem('swiftshift-clock-in-at', now.toISOString())
       setActiveSessionId(null)
       setBreakStartedAt(null)
       setBreakType(null)
@@ -2217,11 +2296,11 @@ export default function App() {
       setBreakType(null)
       const breakMins = Math.round(delta / 60000)
       const msgs = [
-        "You're back — let's get it!",
+        "You're back - let's get it!",
         "Refreshed and ready to crush it!",
-        "Break over — back to greatness!",
+        "Break over - back to greatness!",
         "Recharged! Time to earn! ⚡",
-        "Welcome back — you've got this!",
+        "Welcome back - you've got this!",
       ]
       toast.success(msgs[Math.floor(Math.random() * msgs.length)], {
         description: `${breakType === 'paid' ? 'Paid break' : 'Lunch'}: ${breakMins} min`,
@@ -2279,6 +2358,7 @@ export default function App() {
       const session = Math.max(0, now.getTime() - clockInAt!.getTime() - unpaidAccum)
       setTodayWorkedMs(v => v + session)
       setClockInAt(null)
+      localStorage.removeItem('swiftshift-clock-in-at')
       setBreakStartedAt(null)
       setBreakType(null)
       setBreakMsAccum(0)
@@ -2442,7 +2522,14 @@ export default function App() {
           <div className="flex items-center gap-1.5 px-3 py-1 text-sm text-white/60 border border-white/10 rounded-full">
             <span style={{ color: 'var(--accent-color)' }}>
               {streak > 0
-                ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline',verticalAlign:'middle'}}><path d="M8.5 14.5A2.5 2.5 0 0011 17h2a2.5 2.5 0 002.5-2.5c0-1.5-.5-2-1-3a6 6 0 001-6.5A6 6 0 018 7c-1 2-1.5 3.5-.5 6 .5 1.5 1 2 1 2z"/><path d="M12 22c2.5 0 4-1.5 4-4h-8c0 2.5 1.5 4 4 4z"/></svg>
+                ? (
+                  <svg width="14" height="14" viewBox="0 0 32 32" fill="currentColor" style={{display:'inline',verticalAlign:'middle'}}>
+                    {/* Flame shape: wide base, pointed top, inner highlight */}
+                    <path d="M16 2 C16 2 10 10 10 17 C10 22 13 27 16 27 C19 27 22 22 22 17 C22 10 16 2 16 2Z" opacity="0.9"/>
+                    <path d="M16 8 C16 8 12 14 12 18 C12 22 14 26 16 26 C18 26 20 22 20 18 C20 14 16 8 16 8Z" opacity="0.5" fill="white"/>
+                    <path d="M16 14 C16 14 14 17 14 20 C14 23 15 25 16 25 C17 25 18 23 18 20 C18 17 16 14 16 14Z" opacity="0.3" fill="white"/>
+                  </svg>
+                )
                 : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline',verticalAlign:'middle'}}><circle cx="12" cy="12" r="8"/></svg>}
             </span>
             <span className="font-semibold" style={{ color: 'var(--accent-color)' }}>{streak}</span>
@@ -2736,17 +2823,10 @@ export default function App() {
                     >
                       {STATE_CODES.map(code => (
                         <option key={code} value={code}>
-                          {code} — {STATE_BREAK_RULES[code].name}
+                          {code} - {STATE_BREAK_RULES[code].name}
                         </option>
                       ))}
                     </select>
-                    {STATE_BREAK_RULES[workState]?.triggerAfterHours > 0 ? (
-                      <span className="text-xs text-zinc-500">
-                        · {STATE_BREAK_RULES[workState].mealBreakMinutes}-min break required by hour {STATE_BREAK_RULES[workState].triggerAfterHours + 1}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-zinc-600">· No state break law</span>
-                    )}
                   </div>
                     </div>
 
@@ -2863,6 +2943,15 @@ export default function App() {
                           transition={{ duration: 1, ease: 'easeOut' }}
                         />
                       </div>
+                      {/* Break law info below the bar */}
+                      <div className="mt-1.5 text-xs text-zinc-500">
+                        Work state: {workState}
+                        {STATE_BREAK_RULES[workState]?.triggerAfterHours > 0 ? (
+                          <span> · {STATE_BREAK_RULES[workState].mealBreakMinutes}-min break required by hour {STATE_BREAK_RULES[workState].triggerAfterHours + 1}</span>
+                        ) : (
+                          <span> · No state break law</span>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -2871,9 +2960,27 @@ export default function App() {
 
               {/* Right sidebar: Real Time Rewards (top) + This pay period */}
               <aside className="xl:w-80 shrink-0 flex flex-col sm:flex-row xl:flex-col gap-4">
-                {/* Real Time Rewards module — at top */}
+                {/* Real Time Rewards module - at top */}
                 <div className="glass rounded-3xl p-8 flex-1 flex flex-col">
-                  <div className="text-sm uppercase tracking-[2px] text-white mb-5">Real Time Rewards</div>
+                  <div className="flex items-center justify-between mb-5">
+                    <div className="text-sm uppercase tracking-[2px] text-white">Real Time Rewards</div>
+                    {isClockedIn && (
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full animate-pulse inline-block"
+                          style={{
+                            background: isOvertimeOverdrive ? '#FFD700' : '#22ff7a',
+                            boxShadow: isOvertimeOverdrive
+                              ? '0 0 8px #FFD700, 0 0 16px #FFD70060'
+                              : '0 0 8px #22ff7a, 0 0 16px #22ff7a60',
+                          }}
+                        />
+                        <span className="text-xs uppercase tracking-widest text-zinc-300 font-medium">
+                          {isOvertimeOverdrive ? 'overdrive' : 'live'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                   <motion.div
                     key={Math.floor((todayTotalMs / 3600000) * clockHourlyRate * 10)}
                     initial={isClockedIn ? { scale: 1.08, color: 'var(--accent-color)' } : false}
@@ -2891,22 +2998,6 @@ export default function App() {
                     >
                       Today's earnings so far at ${clockHourlyRate}/hr
                     </button>
-                    {isClockedIn && (
-                      <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full animate-pulse inline-block"
-                          style={{
-                            background: isOvertimeOverdrive ? '#FFD700' : '#22ff7a',
-                            boxShadow: isOvertimeOverdrive
-                              ? '0 0 8px #FFD700, 0 0 16px #FFD70060'
-                              : '0 0 8px #22ff7a, 0 0 16px #22ff7a60',
-                          }}
-                        />
-                        <span className="text-xs uppercase tracking-widest text-zinc-300 font-medium">
-                          {isOvertimeOverdrive ? 'overdrive' : 'live'}
-                        </span>
-                      </div>
-                    )}
                   </div>
                   <div className="mt-auto pt-10">
                     <div className="flex justify-between items-center mb-5">
@@ -2924,9 +3015,23 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* This pay period — below Real Time Rewards */}
+                {/* This pay period - below Real Time Rewards */}
                 <div className="glass rounded-3xl p-8 flex-1">
-                  <div className="text-sm uppercase tracking-[2px] text-white mb-4">This pay period</div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="text-sm uppercase tracking-[2px] text-white">This pay period</div>
+                    {isClockedIn && (
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full animate-pulse inline-block"
+                          style={{
+                            background: '#22ff7a',
+                            boxShadow: '0 0 8px #22ff7a, 0 0 16px #22ff7a60',
+                          }}
+                        />
+                        <span className="text-xs uppercase tracking-widest text-zinc-300 font-medium">live</span>
+                      </div>
+                    )}
+                  </div>
                   <div className="text-base font-medium mb-4 neon-green">{periodLabel}</div>
                   <div className="space-y-3 mb-4">
                     <div className="flex justify-between items-center text-sm">
@@ -2985,6 +3090,7 @@ export default function App() {
               highlightRate={highlightRate}
               onRateChange={(rate) => {
                 setClockHourlyRate(rate)
+                localStorage.setItem('swiftshift-hourly-rate', String(rate))
                 if (user?.id) {
                   fetch(`${API_BASE}/api/users/${user.id}`, {
                     method: 'PUT',
@@ -3284,7 +3390,7 @@ export default function App() {
 
               {/* Personal Paystub */}
               <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>My Paystub — {periodLabel}</h2>
+                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>My Paystub - {periodLabel}</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   {/* Earnings */}
                   <div className="space-y-3">
@@ -3880,8 +3986,93 @@ export default function App() {
               </div>
             </div>
           )}
-          {activeView === 'taxes' && (
-            <div className="max-w-5xl mx-auto">
+          {activeView === 'taxes' && (() => {
+            // Paystub calculation (same as payroll tab)
+            const _gp = periodEarnings.pay
+            const _rp = periodEarnings.regular * clockHourlyRate
+            const _op = periodEarnings.overtime * clockHourlyRate * 1.5
+            const _ppy = 26
+            const _ag = _gp * _ppy
+            const _calcFed = (inc: number) => {
+              const b = [[11925,0.10],[48475,0.12],[103350,0.22],[197300,0.24],[250525,0.32],[626350,0.35],[Infinity,0.37]] as [number,number][]
+              let t = 0; let p = 0
+              for (const [lim, rate] of b) { if (inc <= p) break; t += (Math.min(inc, lim) - p) * rate; p = lim }
+              return t
+            }
+            const _ft = _calcFed(_ag) / _ppy
+            const _fer = _ag > 0 ? _calcFed(_ag) / _ag : 0
+            const _st = _gp * 0.0593
+            const _ss = _gp * 0.062
+            const _med = _gp * 0.0145
+            const _td = _ft + _st + _ss + _med
+            const _np = _gp - _td
+            return (
+            <div className="max-w-5xl mx-auto space-y-6">
+              {/* My Paystub module */}
+              <div className="glass rounded-3xl p-6">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>My Paystub - {periodLabel}</h2>
+                  <button
+                    onClick={() => window.print()}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm font-medium transition-colors print-hide"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                    Print Paystub
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <div className="text-xs uppercase tracking-widest text-zinc-500 mb-2">Earnings</div>
+                    {[
+                      ['Regular Pay', `${periodEarnings.regular.toFixed(1)}h x $${clockHourlyRate}`, _rp],
+                      ...(_op > 0 ? [['Overtime Pay (1.5x)', `${periodEarnings.overtime.toFixed(1)}h x $${(clockHourlyRate * 1.5).toFixed(2)}`, _op]] : []),
+                    ].map(([label, sub, val]) => (
+                      <div key={String(label)} className="flex justify-between items-center bg-white/5 rounded-xl px-4 py-2.5">
+                        <div>
+                          <div className="text-sm font-medium">{String(label)}</div>
+                          <div className="text-xs text-zinc-500">{String(sub)}</div>
+                        </div>
+                        <span className="font-mono neon-green">${Number(val).toFixed(2)}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between items-center border-t border-white/10 pt-3">
+                      <span className="font-semibold">Gross Pay</span>
+                      <span className="font-mono font-bold text-lg neon-green">${_gp.toFixed(2)}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="text-xs uppercase tracking-widest text-zinc-500 mb-2">Deductions</div>
+                    {[
+                      ['Federal Income Tax', `${(_fer * 100).toFixed(1)}% eff. (2026 brackets)`, _ft],
+                      ['State Income Tax', '5.93% (CA)', _st],
+                      ['Social Security', '6.2%', _ss],
+                      ['Medicare', '1.45%', _med],
+                    ].map(([label, rate, val]) => (
+                      <div key={String(label)} className="flex justify-between items-center bg-white/5 rounded-xl px-4 py-2.5">
+                        <div>
+                          <div className="text-sm font-medium">{String(label)}</div>
+                          <div className="text-xs text-zinc-500">{String(rate)}</div>
+                        </div>
+                        <span className="font-mono text-red-400">-${Number(val).toFixed(2)}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between items-center border-t border-white/10 pt-3">
+                      <span className="font-semibold">Total Deductions</span>
+                      <span className="font-mono text-red-400">-${_td.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-6 bg-white/5 rounded-2xl p-5 flex items-center justify-between">
+                  <div>
+                    <div className="text-zinc-400 text-sm">Net Pay (Take-home)</div>
+                    <div className="text-xs text-zinc-600 mt-0.5">After all deductions</div>
+                  </div>
+                  <div className="text-3xl font-bold neon-green font-mono">${_np.toFixed(2)}</div>
+                </div>
+                <div className="mt-4 text-xs text-zinc-500">* Tax estimates are approximate. Actual withholding may differ based on filing status and elections.</div>
+              </div>
+
+              {/* Files module */}
               <div className="glass rounded-3xl p-8">
                 <h1 className="text-2xl font-semibold mb-2 neon-green">Files</h1>
                 <p className="text-sm text-zinc-400 mb-6">Quick access to all your documents</p>
@@ -3952,7 +4143,7 @@ export default function App() {
                 </div>
               )}
             </div>
-          )}
+          )})()}
           {activeView === 'groktax' && (
             <div className="max-w-5xl mx-auto">
               <div className="glass rounded-3xl flex flex-col h-[calc(100vh-140px)] overflow-hidden">
@@ -4002,10 +4193,10 @@ export default function App() {
                       <div className="glass rounded-3xl p-8">
                         <div className="flex items-center justify-between mb-4">
                           <div>
-                            <div className="text-lg font-medium">Form 1040: U.S. Individual Income Tax Return</div>
+                            <div className="text-lg font-medium" style={{ color: 'var(--accent-color)' }}>Form 1040: U.S. Individual Income Tax Return</div>
                             <div className="text-xs text-zinc-500">Pre-filled from your documents via RAG</div>
                           </div>
-                          <div className="text-xs px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400">AI-Completed</div>
+                          <div className="text-xs px-3 py-1 rounded-full" style={{ background: 'var(--accent-color-dim, rgba(215,254,81,0.15))', color: 'var(--accent-color)' }}>AI-Completed</div>
                         </div>
 
                         {taxFormData ? (
@@ -4541,6 +4732,10 @@ export default function App() {
             onClose={() => {
               setShowTour(false)
               localStorage.setItem('swiftshift-tour-seen', '1')
+            }}
+            onNavigate={(viewId) => navTo(viewId as any)}
+            onComplete={() => {
+              toast.success('Tour complete! +50 XP', { description: 'You unlocked the Explorer badge!' })
             }}
             accentHex={themeAccentHex}
           />
