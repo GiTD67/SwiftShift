@@ -9,8 +9,7 @@ npm run build
 cd ..
 
 echo "Installing backend dependencies..."
-cd backend
-pip install --no-cache-dir -r requirements.txt
-cd ..
+python3 -m venv /app/venv
+/app/venv/bin/pip install --no-cache-dir -r backend/requirements.txt
 
 echo "Done!"
