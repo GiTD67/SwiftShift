@@ -467,7 +467,7 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
             className="mt-3 text-center text-xs font-semibold tracking-[3px] uppercase"
             style={{ color: accentColor }}
           >
-            Daily goal complete — great work
+            Daily goal complete - great work
           </motion.div>
         )}
       </div>
@@ -491,7 +491,7 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
             {streak === 0
               ? 'Clock in to start'
               : streak === 1
-              ? 'Day one — keep going!'
+              ? 'Day one - keep going!'
               : `${streak} days in a row`}
           </div>
         </div>
@@ -584,7 +584,7 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
       </div>
 
       <div className="text-center text-xs text-zinc-500 pt-2 pb-4">
-        SwiftShift — Instant gratification for your hard work.
+        SwiftShift - Instant gratification for your hard work.
       </div>
     </div>
   )

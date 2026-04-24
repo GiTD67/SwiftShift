@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import confetti from 'canvas-confetti'
 
 // Fintech-style SVG icon components
 const ClockIcon = () => (
@@ -68,7 +69,9 @@ interface TourStep {
   icon: React.ReactNode
   title: string
   desc: string
+  why: string
   targetId: string | null
+  viewId: string | null
 }
 
 const TOUR_STEPS: TourStep[] = [
@@ -76,60 +79,78 @@ const TOUR_STEPS: TourStep[] = [
     icon: <SparkleIcon />,
     title: 'Welcome to SwiftShift!',
     desc: "You're in. Let's take a 60-second tour of the key features so you can hit the ground running.",
+    why: 'Knowing where everything lives saves you time on day one and helps you get paid faster.',
     targetId: null,
+    viewId: null,
   },
   {
     icon: <ClockIcon />,
     title: 'Time Clock',
-    desc: 'Clock in and out with one click. Your earnings update in real time — every second counts. Track breaks too.',
+    desc: 'Clock in and out with one click. Your earnings update in real time - every second counts. Track breaks too.',
+    why: 'One tap replaces the whole punch-card ritual. The less friction between you and getting paid, the better.',
     targetId: 'nav-clock',
+    viewId: 'clock',
   },
   {
     icon: <DocumentIcon />,
     title: 'Timesheet',
     desc: 'All your time entries in one place. Add, edit, and submit your weekly timesheet with ease.',
+    why: 'A clean, accurate timesheet means no surprises on payday and a permanent record you can always reference.',
     targetId: 'nav-timesheet',
+    viewId: 'timesheet',
   },
   {
     icon: <TrophyIcon />,
     title: 'Rewards',
     desc: 'Stay consistent and earn streak rewards. Watch your real-time earnings climb on the Odometer.',
+    why: 'This gives you instant gratification and helps connect the work to the reward - motivation you can actually see.',
     targetId: 'nav-rewards',
+    viewId: 'rewards',
   },
   {
     icon: <CreditCardIcon />,
     title: 'Payroll & Reports',
-    desc: 'View pay details, export reports, and track your analytics — all in one dashboard.',
+    desc: 'View pay details, export reports, and track your analytics - all in one dashboard.',
+    why: 'Visibility into your pay breakdown and history means you always know where your money is and where it came from.',
     targetId: 'nav-payroll',
+    viewId: 'payroll',
   },
   {
     icon: <DollarIcon />,
-    title: 'AI Tax Filing — Swifty',
+    title: 'AI Tax Filing - Swifty',
     desc: 'Upload your W-2 or 1099 and Swifty fills out your Form 1040 instantly. No accountant needed.',
+    why: 'Tax prep can cost hundreds of dollars and hours of stress. Swifty handles it in seconds so you can file with confidence.',
     targetId: 'nav-groktax',
+    viewId: 'groktax',
   },
   {
     icon: <BotIcon />,
-    title: 'AI Assistant — Swifty',
-    desc: 'Ask Swifty anything — leave policies, HR questions, company info. Instant, intelligent answers.',
+    title: 'AI Assistant - Swifty',
+    desc: 'Ask Swifty anything - leave policies, HR questions, company info. Instant, intelligent answers.',
+    why: 'Having an always-available HR expert in your pocket means fewer blockers and faster answers when you need them most.',
     targetId: 'nav-grokky',
+    viewId: 'grokky',
   },
   {
     icon: <LightningIcon />,
     title: 'InstaApply',
     desc: 'Upload your resume once. SwiftShift matches you to jobs and applies in seconds.',
+    why: 'The best opportunities move fast. InstaApply makes sure you never miss a role that fits - with zero extra effort.',
     targetId: 'nav-applications',
+    viewId: 'applications',
   },
   {
     icon: <CheckCircleIcon />,
     title: "You're all set!",
-    desc: "That covers the highlights. Start by clocking in — your first session is just one click away.",
+    desc: "That covers the highlights. Start by clocking in - your first session is just one click away.",
+    why: "You've unlocked +50 XP just for completing the tour. Every feature you use from here builds your streak and earnings.",
     targetId: null,
+    viewId: null,
   },
 ]
 
 const BOX_WIDTH = 400
-const BOX_HEIGHT_EST = 390
+const BOX_HEIGHT_EST = 420
 
 interface BoxPosition {
   top: number
@@ -158,10 +179,12 @@ function computePosition(stepIndex: number): BoxPosition {
 
 interface TourProps {
   onClose: () => void
+  onNavigate?: (viewId: string) => void
+  onComplete?: () => void
   accentHex?: string
 }
 
-export function Tour({ onClose, accentHex = '#D7FE51' }: TourProps) {
+export function Tour({ onClose, onNavigate, onComplete, accentHex = '#D7FE51' }: TourProps) {
   const [step, setStep] = useState(0)
   const [pos, setPos] = useState<BoxPosition>(() => computePosition(0))
 
@@ -172,6 +195,11 @@ export function Tour({ onClose, accentHex = '#D7FE51' }: TourProps) {
   useEffect(() => {
     const newPos = computePosition(step)
     setPos(newPos)
+
+    // Navigate to the view for this step
+    if (current.viewId && onNavigate) {
+      onNavigate(current.viewId)
+    }
 
     // Apply highlight to target nav button
     const target = current.targetId ? document.getElementById(current.targetId) : null
@@ -187,7 +215,7 @@ export function Tour({ onClose, accentHex = '#D7FE51' }: TourProps) {
         target.style.color = ''
       }
     }
-  }, [step, current.targetId, accentHex])
+  }, [step, current.targetId, current.viewId, accentHex, onNavigate])
 
   useEffect(() => {
     return () => {
@@ -200,12 +228,20 @@ export function Tour({ onClose, accentHex = '#D7FE51' }: TourProps) {
     }
   }, [])
 
-  const next = () => { if (isLast) onClose(); else setStep(s => s + 1) }
+  const finish = () => {
+    // Fire confetti on tour complete
+    confetti({ particleCount: 200, spread: 100, origin: { y: 0.6 }, colors: [accentHex, '#39FF14', '#00CC00'] })
+    setTimeout(() => confetti({ particleCount: 150, spread: 80, origin: { y: 0.5 }, colors: [accentHex] }), 250)
+    if (onComplete) onComplete()
+    onClose()
+  }
+
+  const next = () => { if (isLast) finish(); else setStep(s => s + 1) }
   const prev = () => { if (step > 0) setStep(s => s - 1) }
 
   return (
     <div
-      className="fixed inset-0 z-[300] bg-black/75 backdrop-blur-sm"
+      className="fixed inset-0 z-[300] bg-black/60"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <motion.div
@@ -287,8 +323,13 @@ export function Tour({ onClose, accentHex = '#D7FE51' }: TourProps) {
               </h2>
 
               {/* Description */}
-              <p className="text-zinc-400 text-sm leading-relaxed mb-8">
+              <p className="text-zinc-400 text-sm leading-relaxed mb-3">
                 {current.desc}
+              </p>
+
+              {/* Why it matters */}
+              <p className="text-sm leading-relaxed mb-6" style={{ color: `${accentHex}bb` }}>
+                {current.why}
               </p>
             </motion.div>
           </AnimatePresence>
@@ -315,7 +356,7 @@ export function Tour({ onClose, accentHex = '#D7FE51' }: TourProps) {
                 className="px-6 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.97] hover:opacity-90"
                 style={{ background: accentHex, color: isDark ? '#000' : '#fff' }}
               >
-                {isLast ? 'Get started' : 'Next'}
+                {isLast ? 'Get started (+50 XP)' : 'Next'}
               </button>
             </div>
           </div>

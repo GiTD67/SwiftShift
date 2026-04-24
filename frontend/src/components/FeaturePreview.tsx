@@ -65,7 +65,7 @@ const FEATURES = [
   { iconKey: 'card', title: 'Payroll & Reports', desc: 'Full pay details, analytics dashboards, and exportable reports.' },
   { iconKey: 'dollar', title: 'AI Tax Filing', desc: 'Upload your W-2 or 1099 and Swifty AI fills out your 1040 instantly.' },
   { iconKey: 'bot', title: 'AI Assistant', desc: 'Chat with Swifty for instant HR answers, leave policy info, and more.' },
-  { iconKey: 'lightning', title: 'InstaApply', desc: 'Upload your resume once — get matched to jobs and apply in seconds.' },
+  { iconKey: 'lightning', title: 'InstaApply', desc: 'Upload your resume once - get matched to jobs and apply in seconds.' },
   { iconKey: 'shield', title: 'Insurance & Benefits', desc: 'Browse and manage your health, dental, and vision benefits.' },
   { iconKey: 'orgchart', title: 'Org Chart', desc: 'Visualize your entire company structure at a glance.' },
 ]
@@ -137,7 +137,7 @@ export function FeaturePreview({ onClose, accentHex = '#D7FE51' }: FeaturePrevie
             className="w-full py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
             style={{ background: accentHex, color: isDark ? '#000' : '#fff' }}
           >
-            Got it — let's go
+            Got it - let's go
           </button>
         </div>
       </motion.div>

@@ -11,15 +11,15 @@ interface LootDropProps {
   theme?: 'green' | 'white' | 'orange' | 'cyan' | 'pink' | 'purple'
 }
 
-// Funny daily messages that rotate by date
+// Funny clock-out messages - random each time
 const FUNNY_MESSAGES = [
+  "Another day, another dollar. Mostly.",
   "Congratulations! You survived today.",
   "You did it! Another day in the books.",
   "Not bad. The boss might even notice.",
   "Heroic effort. The coffee is proud of you.",
   "You made it through the chaos. Nice.",
   "Clocked out like a pro. Take a bow.",
-  "Another day, another dollar. Mostly.",
   "You crushed it. Now go do something fun.",
   "Victory! The inbox didn't win this time.",
   "Done. You're basically unstoppable.",
@@ -36,26 +36,39 @@ const FUNNY_MESSAGES = [
   "That's a day. Not bad. Not bad at all.",
   "Shift complete. Time to be a normal human again.",
   "You're done. Go be magnificent elsewhere.",
+  "Exit stage left. Perfectly executed.",
+  "Money secured. Dignity intact. Go home.",
+  "The spreadsheet has been fed. You may leave.",
+  "Productivity: achieved. Pants: optional now.",
+  "Clock stopped. You cannot be stopped.",
+  "Outstanding work. The Wi-Fi will miss you.",
+  "You earned it. Every cent, every minute.",
+  "Pack it up. Legend detected.",
+  "Shift's over. Your couch has been waiting all day.",
+  "You came, you worked, you conquered. Mic drop.",
+  "Day complete. Human achievement unlocked.",
+  "Rest mode activated. You've earned it.",
+  "Time to recharge. You were absolutely electric today.",
+  "Clocked out before overtime. Respectable restraint.",
+  "That meeting could have been an email, but you survived anyway.",
+  "Professional. Efficient. Possibly a robot. Impressive.",
+  "Your bank account is smiling. Go celebrate.",
 ]
 
-function getDailyMessage(): string {
-  const daySeed = new Date().toISOString().slice(0, 10)
-  let hash = 0
-  for (let i = 0; i < daySeed.length; i++) {
-    hash = (hash * 31 + daySeed.charCodeAt(i)) >>> 0
-  }
-  return FUNNY_MESSAGES[hash % FUNNY_MESSAGES.length]
+function getRandomMessage(): string {
+  return FUNNY_MESSAGES[Math.floor(Math.random() * FUNNY_MESSAGES.length)]
 }
 
 export function LootDrop({ isOpen, onClose, earnings, ptoHours, durationMin, theme = 'green' }: LootDropProps) {
   const [stage, setStage] = useState<'dropping' | 'settled'>('dropping')
-  const [dailyMessage] = useState(() => getDailyMessage())
+  const [dailyMessage, setDailyMessage] = useState(() => getRandomMessage())
   const hasFiredConfettiRef = useRef(false)
 
-  // Reset confetti flag when modal opens
+  // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
       hasFiredConfettiRef.current = false
+      setDailyMessage(getRandomMessage())
     }
   }, [isOpen])
 
@@ -142,21 +155,21 @@ export function LootDrop({ isOpen, onClose, earnings, ptoHours, durationMin, the
         >
           {/* Vault container */}
           <div className="glass rounded-3xl p-6 text-center relative overflow-hidden border border-white/20">
-            {/* Close X */}
-            <button
-              onClick={onClose}
-              className="absolute top-4 right-4 w-7 h-7 flex items-center justify-center text-zinc-400 hover:text-white text-xl leading-none"
-              aria-label="Close"
-            >
-              ×
-            </button>
-
-            {/* Daily funny message */}
-            <div className="mb-2 text-base font-medium tracking-tight" style={{ color: accentColor }}>
-              {dailyMessage}
+            {/* Header row: funny message + close X on same line */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-xl font-semibold tracking-tight text-left leading-tight pr-4" style={{ color: accentColor }}>
+                {dailyMessage}
+              </div>
+              <button
+                onClick={onClose}
+                className="w-8 h-8 flex items-center justify-center text-zinc-400 hover:text-white text-2xl leading-none flex-shrink-0"
+                aria-label="Close"
+              >
+                ×
+              </button>
             </div>
 
-            <div className="mb-1 text-xs uppercase tracking-[2px] text-white">END OF DAY</div>
+            <div className="mb-1 text-xs uppercase tracking-[2px] text-white/60">END OF DAY</div>
 
             {/* The Vault */}
             <div className="relative mx-auto w-32 h-32 mb-6">
@@ -220,7 +233,8 @@ export function LootDrop({ isOpen, onClose, earnings, ptoHours, durationMin, the
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="mt-6 text-emerald-400 text-sm font-medium"
+                className="mt-6 text-sm font-medium"
+                style={{ color: accentColor }}
               >
                 ✓ Deposited to your vault
               </motion.div>
