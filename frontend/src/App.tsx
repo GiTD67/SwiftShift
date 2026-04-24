@@ -973,72 +973,10 @@ function TimesheetView({ user, gamification }: { user: any; gamification: Return
   )
 }
 
-// ===== Logo SVG =====
+// ===== Logo =====
 function LogoSVG({ className }: { className?: string }) {
-  const id = useRef(`svgl-${Math.random().toString(36).slice(2, 7)}`).current
-  const clip = `url(#cc-${id})`
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none" className={className}>
-      <defs>
-        <clipPath id={`cc-${id}`}><circle cx="100" cy="100" r="87"/></clipPath>
-      </defs>
-      {/* Background */}
-      <circle cx="100" cy="100" r="99" fill="#050810"/>
-      <g clipPath={clip}>
-        {/* Concentric clock arcs (right half, subtle) */}
-        <path d="M 100 35 A 65 65 0 0 1 100 165" stroke="white" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.3" fill="none"/>
-        <path d="M 100 50 A 50 50 0 0 1 100 150" stroke="white" strokeWidth="1" opacity="0.2" fill="none"/>
-        {/* Tick marks — thicker to match font weight */}
-        <line x1="100" y1="16" x2="100" y2="27" stroke="white" strokeWidth="3.5" strokeLinecap="round" opacity="0.9"/>
-        <line x1="122" y1="20" x2="118" y2="30" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.65"/>
-        <line x1="142" y1="28" x2="136.5" y2="37" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.65"/>
-        <line x1="159" y1="41" x2="152" y2="48" stroke="white" strokeWidth="2.5" strokeLinecap="round" opacity="0.8"/>
-        <line x1="172" y1="59" x2="163.5" y2="63.5" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.65"/>
-        <line x1="180" y1="79" x2="171" y2="81.5" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.65"/>
-        <line x1="183" y1="100" x2="173" y2="100" stroke="white" strokeWidth="3.5" strokeLinecap="round" opacity="0.9"/>
-        <line x1="180" y1="121" x2="171" y2="118.5" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.65"/>
-        <line x1="172" y1="141" x2="163.5" y2="136.5" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.65"/>
-        <line x1="159" y1="159" x2="152" y2="152" stroke="white" strokeWidth="2.5" strokeLinecap="round" opacity="0.8"/>
-        <line x1="142" y1="172" x2="136.5" y2="163" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.65"/>
-        <line x1="122" y1="180" x2="118" y2="170" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.65"/>
-        <line x1="100" y1="184" x2="100" y2="174" stroke="white" strokeWidth="3.5" strokeLinecap="round" opacity="0.9"/>
-        {/* Neural network lines */}
-        <g stroke="white" strokeWidth="1.2" opacity="0.4" fill="none">
-          <line x1="42" y1="62" x2="65" y2="47"/><line x1="42" y1="62" x2="56" y2="88"/>
-          <line x1="65" y1="47" x2="80" y2="68"/><line x1="56" y1="88" x2="80" y2="68"/>
-          <line x1="56" y1="88" x2="36" y2="110"/><line x1="36" y1="110" x2="62" y2="122"/>
-          <line x1="62" y1="122" x2="78" y2="68"/><line x1="62" y1="122" x2="48" y2="148"/>
-          <line x1="42" y1="62" x2="26" y2="85"/><line x1="26" y1="85" x2="36" y2="110"/>
-          <line x1="65" y1="47" x2="78" y2="25"/><line x1="78" y1="25" x2="80" y2="68"/>
-        </g>
-        {/* Neural nodes */}
-        <g fill="white">
-          <circle cx="42" cy="62" r="4" opacity="0.9"/><circle cx="65" cy="47" r="3.5" opacity="0.85"/>
-          <circle cx="80" cy="68" r="4" opacity="0.9"/><circle cx="56" cy="88" r="3" opacity="0.8"/>
-          <circle cx="26" cy="85" r="2.5" opacity="0.65"/><circle cx="36" cy="110" r="4" opacity="0.9"/>
-          <circle cx="62" cy="122" r="3.5" opacity="0.85"/><circle cx="48" cy="148" r="3" opacity="0.7"/>
-          <circle cx="78" cy="25" r="2.5" opacity="0.6"/>
-        </g>
-        {/* Lightning bolt hands — bold angular zigzags */}
-        <path d="M 100 100 L 84 72 L 95 65 L 70 40" stroke="white" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M 100 100 L 116 72 L 105 65 L 130 40" stroke="white" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>
-        {/* Center pivot */}
-        <circle cx="100" cy="100" r="7" fill="white"/>
-        <circle cx="100" cy="100" r="12" fill="white" opacity="0.1"/>
-        {/* Smooth boundary curve (bottom-right) */}
-        <path d="M 138 170 C 160 168, 178 150, 181 120" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.5" fill="none"/>
-      </g>
-      {/* Clock ring — bottom 240° arc (10 o'clock → bottom → 2 o'clock) */}
-      <path d="M 24.7 56.5 A 87 87 0 1 1 175.3 56.5" stroke="white" strokeWidth="5" fill="none" opacity="0.95"/>
-      {/* Arrow IS the top 120° arc of the clock ring (10 o'clock → top → 2 o'clock) */}
-      <path d="M 24.7 56.5 A 87 87 0 0 1 175.3 56.5" stroke="white" strokeWidth="5" strokeLinecap="round" fill="none" opacity="0.95"/>
-      {/* Arrowhead at 2 o'clock — pointing in clockwise tangent direction */}
-      <path d="M 175.3 56.5 L 161 48 L 175 40 Z" fill="white" opacity="0.95"/>
-      {/* Speed/swoosh lines (bottom left) — thicker */}
-      <line x1="10" y1="148" x2="55" y2="126" stroke="white" strokeWidth="4" strokeLinecap="round" opacity="0.85"/>
-      <line x1="5" y1="162" x2="48" y2="144" stroke="white" strokeWidth="3" strokeLinecap="round" opacity="0.6"/>
-      <line x1="12" y1="175" x2="45" y2="161" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.4"/>
-    </svg>
+    <img src="/logo.png" alt="SwiftShift" className={className} style={{ objectFit: 'contain' }} />
   )
 }
 
@@ -2025,17 +1963,16 @@ export default function App() {
     }
   }, [theme, customAccentColor])
 
-  // Update favicon dynamically when theme changes
+  // Set favicon to logo.png
   useEffect(() => {
-    const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="14" fill="#050810"/><circle cx="32" cy="32" r="27" stroke="white" stroke-width="1.5" opacity="0.9"/><path d="M 32 11 A 21 21 0 0 1 32 53" stroke="white" stroke-width="0.6" stroke-dasharray="2 2" opacity="0.3" fill="none"/><line x1="32" y1="5" x2="32" y2="9" stroke="white" stroke-width="1.2" stroke-linecap="round" opacity="0.9"/><line x1="51.1" y1="12.9" x2="48.3" y2="15.7" stroke="white" stroke-width="0.8" stroke-linecap="round" opacity="0.6"/><line x1="59" y1="32" x2="55" y2="32" stroke="white" stroke-width="1.2" stroke-linecap="round" opacity="0.9"/><line x1="51.1" y1="51.1" x2="48.3" y2="48.3" stroke="white" stroke-width="0.8" stroke-linecap="round" opacity="0.6"/><line x1="32" y1="59" x2="32" y2="55" stroke="white" stroke-width="1.2" stroke-linecap="round" opacity="0.9"/><line x1="12" y1="20" x2="20" y2="14" stroke="white" stroke-width="0.6" opacity="0.5"/><line x1="12" y1="20" x2="17" y2="28" stroke="white" stroke-width="0.6" opacity="0.5"/><line x1="17" y1="28" x2="11" y2="36" stroke="white" stroke-width="0.6" opacity="0.5"/><line x1="11" y1="36" x2="18" y2="44" stroke="white" stroke-width="0.6" opacity="0.4"/><circle cx="12" cy="20" r="1.5" fill="white" opacity="0.9"/><circle cx="20" cy="14" r="1.2" fill="white" opacity="0.85"/><circle cx="17" cy="28" r="1.5" fill="white" opacity="0.9"/><circle cx="11" cy="36" r="1.5" fill="white" opacity="0.9"/><circle cx="18" cy="44" r="1.2" fill="white" opacity="0.8"/><path d="M 32 32 L 26 24 L 29 22 L 22 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M 32 32 L 38 24 L 35 22 L 42 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="32" cy="32" r="3" fill="white"/><path d="M 8 26 C 7 3, 57 3, 56 26" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.9"/><path d="M 56 26 L 59.5 20 L 53 20.5 Z" fill="white" opacity="0.9"/><line x1="3" y1="46" x2="17" y2="40" stroke="white" stroke-width="1.8" stroke-linecap="round" opacity="0.75"/><line x1="1" y1="53" x2="15" y2="48" stroke="white" stroke-width="1.2" stroke-linecap="round" opacity="0.5"/></svg>`
-    const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgContent)}`
     let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']")
     if (!link) {
       link = document.createElement('link')
       link.rel = 'icon'
       document.head.appendChild(link)
     }
-    link.href = url
+    link.type = 'image/png'
+    link.href = '/logo.png'
   }, [])
 
   const THEME_UNLOCK_LEVELS: Record<string, number> = { green: 1, white: 1, orange: 1, cyan: 3, pink: 5, purple: 7 }
