@@ -66,6 +66,17 @@ tables = [
       location TEXT
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS timesheet_submissions (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      period_start TEXT NOT NULL,
+      period_end TEXT NOT NULL,
+      total_hours REAL NOT NULL,
+      submitted_at TEXT NOT NULL DEFAULT (NOW()::text),
+      UNIQUE (user_id, period_start)
+    )
+    """,
 ]
 
 for sql in tables:
