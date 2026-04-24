@@ -2249,9 +2249,9 @@ export default function App() {
             <>
               <div className="flex flex-col xl:flex-row gap-6 items-stretch max-w-[1200px] mx-auto">
               {/* Left: Dashboard */}
-              <div className="flex-1 space-y-6">
+              <div className="flex-1 flex flex-col">
                 {/* Dashboard card */}
-                <div className="glass rounded-3xl p-5 sm:p-8">
+                <div className="glass rounded-3xl p-5 sm:p-8 flex-1 flex flex-col">
                   <div className="flex flex-col sm:flex-row items-start gap-6 sm:gap-10">
                     {/* Left: Greeting, Time, Status, Buttons */}
                     <div className="flex-1">
@@ -2366,22 +2366,22 @@ export default function App() {
                           setOverdriveConfettiFired(true)
                         }
 
-                        const radius = 82
+                        const radius = 106
                         const circumference = 2 * Math.PI * radius
                         // Progress ring: empty at 0, full at 100%
                         const offset = circumference * (1 - Math.min(progress, 1))
 
                         return (
-                          <div className="relative w-[200px] h-[200px] flex items-center justify-center">
-                            <svg width="200" height="200" className="absolute" style={isOverdrive ? { filter: 'drop-shadow(0 0 12px #FFAA00) drop-shadow(0 0 24px #FFD700)' } : undefined}>
+                          <div className="relative w-[260px] h-[260px] flex items-center justify-center">
+                            <svg width="260" height="260" className="absolute" style={isOverdrive ? { filter: 'drop-shadow(0 0 12px #FFAA00) drop-shadow(0 0 24px #FFD700)' } : undefined}>
                               {/* Background ring */}
-                              <circle cx="100" cy="100" r={radius} fill="none" stroke="#222" strokeWidth="10" />
+                              <circle cx="130" cy="130" r={radius} fill="none" stroke="#222" strokeWidth="12" />
                               {/* Progress arc */}
                               <motion.circle
-                                cx="100" cy="100" r={radius}
+                                cx="130" cy="130" r={radius}
                                 fill="none"
                                 stroke={isOverdrive ? '#FFAA00' : 'var(--accent-color)'}
-                                strokeWidth={isOverdrive ? 12 : 10}
+                                strokeWidth={isOverdrive ? 14 : 12}
                                 strokeLinecap="round"
                                 initial={{ strokeDashoffset: circumference }}
                                 animate={{ strokeDashoffset: offset }}
@@ -2391,13 +2391,13 @@ export default function App() {
                             </svg>
                             {/* Center content */}
                             <div className="text-center z-10">
-                              <div className={`text-[10px] uppercase tracking-[2px] mb-1 ${isOverdrive ? 'text-[#FFAA00]' : 'text-zinc-500'}`}>
+                              <div className={`text-xs uppercase tracking-[2px] mb-1.5 ${isOverdrive ? 'text-[#FFAA00]' : 'text-zinc-500'}`}>
                                 {isOverdrive ? 'OVERDRIVE' : 'Time Remaining'}
                               </div>
-                              <div className={`font-mono text-2xl tabular-nums tracking-[1px] ${isOverdrive ? 'text-[#FFAA00]' : 'text-white'}`}>
+                              <div className={`font-mono text-3xl tabular-nums tracking-[1px] ${isOverdrive ? 'text-[#FFAA00]' : 'text-white'}`}>
                                 {isOverdrive ? `+${formatMs(todayTotalMs - EIGHT_HOURS_MS)}` : countdown}
                               </div>
-                              <div className="text-[10px] text-zinc-500 mt-1">{isOverdrive ? 'time-and-a-half' : '8-hour day'}</div>
+                              <div className="text-xs text-zinc-500 mt-1.5">{isOverdrive ? 'time-and-a-half' : '8-hour day'}</div>
                             </div>
                           </div>
                         )
@@ -2405,7 +2405,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                  <div className="mt-auto pt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                     <div className="glass rounded-2xl p-4">
                       <div className="text-zinc-400 mb-1">Session</div>
                       <motion.div
@@ -2457,7 +2457,7 @@ export default function App() {
               {/* Right sidebar: Real Time Rewards (top) + This pay period */}
               <aside className="xl:w-80 shrink-0 flex flex-col sm:flex-row xl:flex-col gap-4">
                 {/* Real Time Rewards module — at top */}
-                <div className="glass rounded-3xl p-8 flex-1">
+                <div className="glass rounded-3xl p-8 flex-1 flex flex-col">
                   <div className="text-sm uppercase tracking-[2px] text-white mb-5">Real Time Rewards</div>
                   <motion.div
                     key={Math.floor((todayTotalMs / 3600000) * clockHourlyRate * 10)}
@@ -2468,7 +2468,7 @@ export default function App() {
                   >
                     ${((todayTotalMs / 3600000) * clockHourlyRate).toFixed(2)}
                   </motion.div>
-                  <div className="flex items-center justify-between mb-5">
+                  <div className="flex items-center justify-between">
                     <button
                       onClick={navToRewardsWithHighlight}
                       className="text-xs text-zinc-400 hover:text-white text-left underline decoration-zinc-600 hover:decoration-white transition-colors cursor-pointer leading-snug"
@@ -2493,18 +2493,20 @@ export default function App() {
                       </div>
                     )}
                   </div>
-                  <div className="flex justify-between items-center mb-4">
-                    <div className="text-sm text-zinc-400">PTO Accrued:</div>
-                    <div className="text-sm font-semibold neon-green">
-                      {((todayTotalMs / 3600000) / 30).toFixed(3)} hrs
+                  <div className="mt-auto pt-10">
+                    <div className="flex justify-between items-center mb-5">
+                      <div className="text-sm text-zinc-400">PTO Accrued:</div>
+                      <div className="text-sm font-semibold neon-green">
+                        {((todayTotalMs / 3600000) / 30).toFixed(3)} hrs
+                      </div>
                     </div>
+                    <button
+                      onClick={() => navTo('rewards')}
+                      className="text-sm underline decoration-white/30 hover:decoration-white"
+                    >
+                      See rewards →
+                    </button>
                   </div>
-                  <button
-                    onClick={() => navTo('rewards')}
-                    className="text-sm underline decoration-white/30 hover:decoration-white"
-                  >
-                    See rewards →
-                  </button>
                 </div>
 
                 {/* This pay period — below Real Time Rewards */}
