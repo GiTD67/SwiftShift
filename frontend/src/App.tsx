@@ -12,11 +12,12 @@ import { LootDrop } from './components/LootDrop'
 import { Tour } from './components/Tour'
 import { FeaturePreview } from './components/FeaturePreview'
 import { BreakReminderModal } from './components/BreakReminderModal'
+import { SalesKPI } from './components/SalesKPI'
 import { STATE_BREAK_RULES, STATE_CODES } from './data/stateBreakRules'
 
 const API_BASE = ''
 
-type View = 'clock' | 'timesheet' | 'rewards' | 'xpcenter' | 'admin' | 'profile' | 'insurance' | 'orgchart' | 'taxes' | 'groktax' | 'grokky' | 'applications' | 'jobs' | 'schedules' | 'payroll' | 'reports' | 'leaves' | 'compliance' | 'hiring'
+type View = 'clock' | 'timesheet' | 'rewards' | 'xpcenter' | 'admin' | 'profile' | 'insurance' | 'orgchart' | 'taxes' | 'groktax' | 'grokky' | 'applications' | 'jobs' | 'schedules' | 'payroll' | 'reports' | 'leaves' | 'compliance' | 'hiring' | 'kpi'
 
 function formatMs(ms: number): string {
   const totalSec = Math.floor(ms / 1000)
@@ -2961,6 +2962,16 @@ export default function App() {
             Reports &amp; Analytics
           </button>
           <button
+            id="nav-kpi"
+            className={`ta-nav-btn ${activeView === 'kpi' ? 'active' : ''}`}
+            onClick={() => navTo('kpi')}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+            Sales KPIs
+          </button>
+          <button
             className={`ta-nav-btn ${activeView === 'leaves' ? 'active' : ''}`}
             onClick={() => navTo('leaves')}
           >
@@ -3878,6 +3889,14 @@ export default function App() {
                 </div>
               </div>
             </div>
+          )}
+          {activeView === 'kpi' && (
+            <SalesKPI
+              user={user}
+              users={users}
+              isAdmin={isAdmin}
+              accentColor={themeAccentHex}
+            />
           )}
           {activeView === 'leaves' && (
             <div className="max-w-5xl mx-auto space-y-6">
