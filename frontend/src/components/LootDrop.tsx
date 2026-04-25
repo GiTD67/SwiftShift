@@ -8,7 +8,7 @@ interface LootDropProps {
   earnings: number // dollars earned this session
   ptoHours: number // PTO hours accrued this session
   durationMin: number
-  theme?: 'green' | 'white' | 'orange' | 'cyan' | 'pink' | 'purple'
+  theme?: 'green' | 'white' | 'orange' | 'cyan' | 'pink' | 'purple' | 'custom'
 }
 
 // Funny clock-out messages - random each time
@@ -73,15 +73,16 @@ export function LootDrop({ isOpen, onClose, earnings, ptoHours, durationMin, the
   }, [isOpen])
 
   // Theme-aware accent color
-  const themeColors: Record<'green' | 'white' | 'orange' | 'cyan' | 'pink' | 'purple', string> = {
+  const themeColors: Record<'green' | 'white' | 'orange' | 'cyan' | 'pink' | 'purple' | 'custom', string> = {
     green: '#D7FE51',
     white: '#E5E7EB',
     orange: '#F97316',
     cyan: '#51FEFE',
     pink: '#FE51D7',
     purple: '#9B51FE',
+    custom: '#00FF88',
   }
-  const accentColor = themeColors[theme]
+  const accentColor = themeColors[theme ?? 'green']
 
   // Auto-close after animation
   useEffect(() => {
