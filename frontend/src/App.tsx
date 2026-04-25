@@ -1976,21 +1976,6 @@ export default function App() {
     link.href = '/logo.png'
   }, [])
 
-  const THEME_UNLOCK_LEVELS: Record<string, number> = { green: 1, white: 1, orange: 1, cyan: 3, pink: 5, purple: 7 }
-  const ALL_THEMES = ['green', 'white', 'orange', 'cyan', 'pink', 'purple', 'custom'] as const
-
-  const cycleTheme = () => {
-    const level = appCurrentLevel.level
-    const available = ALL_THEMES.filter(t => {
-      if (t === 'custom') return level >= 5 && customAccentColor !== ''
-      return (THEME_UNLOCK_LEVELS[t] || 1) <= level
-    })
-    const idx = available.indexOf(theme as any)
-    setTheme(available[(idx + 1) % available.length] as any)
-  }
-
-  const themeLabel = theme === 'custom' ? 'Custom' : theme === 'green' ? 'Green' : theme === 'white' ? 'White' : theme === 'orange' ? 'Orange' : theme === 'cyan' ? 'Cyan' : theme === 'pink' ? 'Pink' : 'Purple'
-  const themeDotColor = theme === 'green' ? 'bg-[#D7FE51]' : theme === 'white' ? 'bg-white' : theme === 'orange' ? 'bg-orange-400' : theme === 'cyan' ? 'bg-[#51FEFE]' : theme === 'pink' ? 'bg-[#FE51D7]' : theme === 'purple' ? 'bg-[#9B51FE]' : 'bg-[#00FF88]'
   const themeAccentHex = theme === 'custom' ? customAccentColor : theme === 'green' ? '#D7FE51' : theme === 'white' ? '#E5E7EB' : theme === 'orange' ? '#F97316' : theme === 'cyan' ? '#51FEFE' : theme === 'pink' ? '#FE51D7' : '#9B51FE'
 
   // Load users for admin
@@ -5146,7 +5131,7 @@ export default function App() {
           earnings={lootEarnings}
           ptoHours={lootPtoHours}
           durationMin={lootDurationMin}
-          theme={theme}
+          theme={theme === 'custom' ? undefined : theme}
         />
 
         {/* Shockwave ripple on clock in */}
