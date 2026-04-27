@@ -259,4 +259,59 @@
   .ta-navbar-user {
     gap: 8px;
   }
+
+  /* Prevent horizontal overflow on all views */
+  .ta-main > div {
+    min-width: 0;
+  }
+
+  /* Make tables scroll horizontally instead of overflowing */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Ensure glass cards don't clip content */
+  .glass {
+    word-break: break-word;
+  }
+
+  /* Tighten up card padding on mobile */
+  .glass.rounded-3xl {
+    border-radius: 16px;
+  }
+
+  /* Full-width buttons on mobile when stacked */
+  .ta-main .flex.gap-3 > button,
+  .ta-main .flex.gap-2 > button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Prevent long words from breaking layout */
+  .ta-main h1,
+  .ta-main h2,
+  .ta-main p {
+    overflow-wrap: break-word;
+  }
+}
+
+/* Extra-small screens (phones < 400px) */
+@media (max-width: 400px) {
+  .ta-navbar {
+    padding: 8px 12px;
+  }
+
+  .ta-main {
+    padding: 12px;
+  }
+
+  /* Single column grid on very small screens */
+  .grid.grid-cols-2 {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+
+  /* Hide level badge text, show only number */
+  .ta-level-badge-name {
+    display: none;
+  }
 }

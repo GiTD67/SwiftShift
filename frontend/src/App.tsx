@@ -988,6 +988,10 @@ function getThemeAccentHex(theme: string): string {
   if (theme === 'cyan') return '#51FEFE'
   if (theme === 'pink') return '#FE51D7'
   if (theme === 'purple') return '#9B51FE'
+  if (theme === 'red') return '#EF4444'
+  if (theme === 'gold') return '#F59E0B'
+  if (theme === 'teal') return '#2DD4BF'
+  if (theme === 'blue') return '#60A5FA'
   return '#D7FE51'
 }
 
@@ -1771,9 +1775,9 @@ export default function App() {
   const [chatHistory, setChatHistory] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([])
   const [attachedFile, setAttachedFile] = useState<{ file_id: string; filename: string } | null>(null)
   const [users, setUsers] = useState<any[]>([])
-  const [theme, setTheme] = useState<'green' | 'white' | 'orange' | 'cyan' | 'pink' | 'purple' | 'custom'>(() => {
+  const [theme, setTheme] = useState<'green' | 'white' | 'orange' | 'cyan' | 'pink' | 'purple' | 'red' | 'gold' | 'teal' | 'blue' | 'custom'>(() => {
     const saved = localStorage.getItem('theme')
-    return (saved === 'green' || saved === 'white' || saved === 'orange' || saved === 'cyan' || saved === 'pink' || saved === 'purple' || saved === 'custom') ? saved : 'green'
+    return (saved === 'green' || saved === 'white' || saved === 'orange' || saved === 'cyan' || saved === 'pink' || saved === 'purple' || saved === 'red' || saved === 'gold' || saved === 'teal' || saved === 'blue' || saved === 'custom') ? saved : 'green'
   })
   const [customAccentColor, setCustomAccentColor] = useState<string>(() => localStorage.getItem('swiftshift-custom-accent') || '#00FF88')
 
@@ -1976,7 +1980,7 @@ export default function App() {
     link.href = '/logo.png'
   }, [])
 
-  const themeAccentHex = theme === 'custom' ? customAccentColor : theme === 'green' ? '#D7FE51' : theme === 'white' ? '#E5E7EB' : theme === 'orange' ? '#F97316' : theme === 'cyan' ? '#51FEFE' : theme === 'pink' ? '#FE51D7' : '#9B51FE'
+  const themeAccentHex = theme === 'custom' ? customAccentColor : theme === 'green' ? '#D7FE51' : theme === 'white' ? '#E5E7EB' : theme === 'orange' ? '#F97316' : theme === 'cyan' ? '#51FEFE' : theme === 'pink' ? '#FE51D7' : theme === 'purple' ? '#9B51FE' : theme === 'red' ? '#EF4444' : theme === 'gold' ? '#F59E0B' : theme === 'teal' ? '#2DD4BF' : theme === 'blue' ? '#60A5FA' : '#D7FE51'
 
   // Load users for admin
   useEffect(() => {
@@ -2711,13 +2715,9 @@ export default function App() {
             <span style={{ color: 'var(--accent-color)' }}>
               {streak > 0
                 ? (
-                  <svg width="15" height="16" viewBox="0 0 30 34" fill="currentColor" style={{display:'inline',verticalAlign:'middle'}}>
-                    {/* Left arm */}
-                    <path d="M8 30C5 28 4 23 6 18C7 21 8 23 8 23C8 20 9 17 10 14C10.5 18 11 22 10 25C9.5 27 8.8 29 8 30Z" opacity="0.8"/>
-                    {/* Center arm — tallest */}
-                    <path d="M15 32C11 32 8 28 8 23C8 17 11 11 15 6C19 11 22 17 22 23C22 28 19 32 15 32Z"/>
-                    {/* Right arm */}
-                    <path d="M22 30C25 28 26 23 24 18C23 21 22 23 22 23C22 20 21 17 20 14C19.5 18 19 22 20 25C20.5 27 21.2 29 22 30Z" opacity="0.8"/>
+                  <svg width="13" height="16" viewBox="0 0 26 32" fill="currentColor" style={{display:'inline',verticalAlign:'middle'}}>
+                    <path d="M13 1 C13 1, 3 10, 3 18 C3 25, 7.5 31, 13 31 C18.5 31, 23 25, 23 18 C23 10, 13 1, 13 1 Z M13 10 C13 10, 7 16, 7 20 C7 23.5, 9.7 26, 13 26 C16.3 26, 19 23.5, 19 20 C19 16, 13 10, 13 10 Z" fillRule="evenodd" opacity="0.95"/>
+                    <path d="M13 14 C13 14, 9.5 18, 9.5 21 C9.5 23.2, 11 25, 13 25 C15 25, 16.5 23.2, 16.5 21 C16.5 18, 13 14, 13 14 Z" opacity="0.35"/>
                   </svg>
                 )
                 : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline',verticalAlign:'middle'}}><circle cx="12" cy="12" r="8"/></svg>}
@@ -2732,7 +2732,7 @@ export default function App() {
                 ? <img src={profilePicUrl} alt="Profile" className="w-6 h-6 rounded-full object-cover border border-white/20" />
                 : <span className="w-6 h-6 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-xs text-zinc-400">{user.first_name?.[0]?.toUpperCase()}</span>
               }
-              Hi, {user.first_name} <span className="text-[10px] px-1.5 py-0.5 rounded-full ml-1" style={{ backgroundColor: 'var(--accent-color)', color: '#000', fontWeight: 700 }}>Lv.{appCurrentLevel.level} {appCurrentLevel.name}</span> ▾
+              Hi, {user.first_name} <span className="text-[10px] px-1.5 py-0.5 rounded-full ml-1" style={{ backgroundColor: 'var(--accent-color)', color: '#000', fontWeight: 700 }}>Lv.{appCurrentLevel.level}<span className="ta-level-badge-name"> {appCurrentLevel.name}</span></span> ▾
             </span>
             <div className="absolute right-0 top-full w-56 bg-zinc-900 border border-white/10 rounded-xl shadow-lg hidden group-hover:block z-50 pt-1">
               <button
@@ -2755,14 +2755,18 @@ export default function App() {
               </button>
               <div className="px-3 py-2 border-t border-white/10">
                 <div className="text-xs text-zinc-500 mb-2">Theme</div>
-                <div className="grid grid-cols-3 gap-1.5">
+                <div className="grid grid-cols-4 gap-1">
                   {[
                     { id: 'green', label: 'Green', color: '#D7FE51', unlock: 1 },
-                    { id: 'white', label: 'White', color: '#E5E7EB', unlock: 1 },
-                    { id: 'orange', label: 'Orange', color: '#F97316', unlock: 1 },
-                    { id: 'cyan', label: 'Ice Blue', color: '#51FEFE', unlock: 3 },
+                    { id: 'white', label: 'White', color: '#E5E7EB', unlock: 2 },
+                    { id: 'orange', label: 'Orange', color: '#F97316', unlock: 3 },
+                    { id: 'cyan', label: 'Ice Blue', color: '#51FEFE', unlock: 4 },
                     { id: 'pink', label: 'Neon Pink', color: '#FE51D7', unlock: 5 },
-                    { id: 'purple', label: 'Midnight', color: '#9B51FE', unlock: 7 },
+                    { id: 'purple', label: 'Midnight', color: '#9B51FE', unlock: 6 },
+                    { id: 'red', label: 'Red', color: '#EF4444', unlock: 7 },
+                    { id: 'gold', label: 'Gold', color: '#F59E0B', unlock: 8 },
+                    { id: 'teal', label: 'Teal', color: '#2DD4BF', unlock: 9 },
+                    { id: 'blue', label: 'Blue', color: '#60A5FA', unlock: 10 },
                   ].map(t => {
                     const unlocked = appCurrentLevel.level >= t.unlock
                     return (
@@ -2770,10 +2774,20 @@ export default function App() {
                         key={t.id}
                         onClick={() => unlocked && setTheme(t.id as any)}
                         title={unlocked ? t.label : `Unlocks at Level ${t.unlock}`}
-                        className={`flex flex-col items-center gap-0.5 p-1.5 rounded-lg transition-all ${theme === t.id ? 'ring-1 ring-white/40' : ''} ${!unlocked ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/10'}`}
+                        className={`flex flex-col items-center gap-0.5 p-1.5 rounded-lg transition-all ${theme === t.id ? 'ring-1 ring-white/40' : ''} ${!unlocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/10'}`}
                       >
-                        <span className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: t.color }} />
-                        <span className="text-[9px] text-zinc-400">{unlocked ? t.label : `L${t.unlock}`}</span>
+                        <div className="relative">
+                          <span className="w-4 h-4 rounded-full border border-white/20 block" style={{ backgroundColor: t.color }} />
+                          {!unlocked && (
+                            <span className="absolute -top-1 -right-1.5">
+                              <svg width="8" height="9" viewBox="0 0 10 12" fill="currentColor" className="text-zinc-400">
+                                <rect x="1" y="5" width="8" height="7" rx="1.5" fill="currentColor"/>
+                                <path d="M3 5V3.5a2 2 0 0 1 4 0V5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                              </svg>
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[8px] text-zinc-400 leading-tight">{unlocked ? t.label : `L${t.unlock}`}</span>
                       </button>
                     )
                   })}
@@ -3383,7 +3397,7 @@ export default function App() {
               totalHours={todayTotalMs / 3600000}
               elapsedSeconds={Math.floor(sessionWorkedMs / 1000)}
               isClockedIn={isClockedIn}
-              theme={theme === 'custom' ? 'green' : theme}
+              theme={(['green','white','orange','cyan','pink','purple'] as const).includes(theme as any) ? theme as 'green'|'white'|'orange'|'cyan'|'pink'|'purple' : 'green'}
               user={user}
               highlightRate={highlightRate}
               xpTotalForPTO={appGState.totalXP}
@@ -3870,6 +3884,181 @@ export default function App() {
                         <div className="h-full rounded-full transition-all" style={{ width: `${Math.round(((used as number) / (total as number)) * 100)}%`, backgroundColor: 'var(--accent-color)' }} />
                       </div>
                     </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Manager Hub */}
+              <div className="pt-2">
+                <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Manager Hub</h2>
+                <p className="text-sm text-zinc-400 -mt-3 mb-5">Real-time insights and action items for team managers</p>
+              </div>
+
+              {/* Pending Approvals */}
+              <div className="glass rounded-3xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Pending Approvals</h2>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-medium">5 pending</span>
+                </div>
+                <div className="space-y-2">
+                  {[
+                    { type: 'Timesheet', name: 'Alex Rivera', detail: 'Week of Apr 21 · 42.5h', urgency: 'High' },
+                    { type: 'PTO Request', name: 'Jordan Lee', detail: 'May 5–9 · 40h vacation', urgency: 'Normal' },
+                    { type: 'Timesheet', name: 'Casey Brooks', detail: 'Week of Apr 21 · 38h', urgency: 'Normal' },
+                    { type: 'PTO Request', name: 'Sam Carter', detail: 'Apr 30 · 8h sick leave', urgency: 'Normal' },
+                    { type: 'Overtime Auth', name: 'Dana Morales', detail: 'Apr 28 · 6h OT requested', urgency: 'High' },
+                  ].map(({ type, name, detail, urgency }) => (
+                    <div key={name + type} className="flex flex-wrap items-center gap-3 bg-white/5 rounded-xl px-4 py-3">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${urgency === 'High' ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/10 text-blue-400'}`}>{type}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium">{name}</div>
+                        <div className="text-xs text-zinc-500">{detail}</div>
+                      </div>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <button className="px-3 py-1 rounded-lg text-xs font-medium bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors">Approve</button>
+                        <button className="px-3 py-1 rounded-lg text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors">Reject</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Live Team Status + Top Performers */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="glass rounded-3xl p-6">
+                  <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Live Team Status</h2>
+                  <div className="space-y-2">
+                    {[
+                      { name: 'Alex Rivera', role: 'Engineer', status: 'clocked-in', since: '8:02 AM' },
+                      { name: 'Jordan Lee', role: 'Designer', status: 'clocked-in', since: '9:15 AM' },
+                      { name: 'Casey Brooks', role: 'Infra Lead', status: 'on-break', since: '10:30 AM' },
+                      { name: 'Dana Morales', role: 'Finance', status: 'clocked-out', since: '—' },
+                      { name: 'Mia Thompson', role: 'Designer', status: 'clocked-in', since: '8:45 AM' },
+                      { name: 'Sam Carter', role: 'Frontend Eng', status: 'clocked-out', since: '—' },
+                    ].map(({ name, role, status, since }) => (
+                      <div key={name} className="flex items-center gap-3 bg-white/5 rounded-xl px-3 py-2.5">
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${status === 'clocked-in' ? 'bg-emerald-400' : status === 'on-break' ? 'bg-amber-400' : 'bg-zinc-600'}`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{name}</div>
+                          <div className="text-xs text-zinc-500">{role}</div>
+                        </div>
+                        <span className="text-xs text-zinc-500 flex-shrink-0">{status === 'clocked-in' ? `Since ${since}` : status === 'on-break' ? 'On break' : 'Off'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="glass rounded-3xl p-6">
+                  <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Top Performers</h2>
+                  <div className="space-y-2">
+                    {[
+                      { rank: 1, name: 'Alex Rivera', metric: '98% on-time', hours: '164h', badge: '🥇' },
+                      { rank: 2, name: 'Mia Thompson', metric: '96% on-time', hours: '158h', badge: '🥈' },
+                      { rank: 3, name: 'Jordan Lee', metric: '94% on-time', hours: '152h', badge: '🥉' },
+                      { rank: 4, name: 'Casey Brooks', metric: '91% on-time', hours: '148h', badge: '' },
+                      { rank: 5, name: 'Dana Morales', metric: '89% on-time', hours: '141h', badge: '' },
+                    ].map(({ rank, name, metric, hours, badge }) => (
+                      <div key={name} className="flex items-center gap-3 bg-white/5 rounded-xl px-3 py-2.5">
+                        <span className="text-base w-5 text-center flex-shrink-0">{badge || <span className="text-xs text-zinc-500">#{rank}</span>}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{name}</div>
+                          <div className="text-xs text-zinc-500">{metric}</div>
+                        </div>
+                        <span className="text-xs font-mono flex-shrink-0" style={{ color: 'var(--accent-color)' }}>{hours}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Labor Budget Tracker */}
+              <div className="glass rounded-3xl p-6">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Labor Budget Tracker</h2>
+                  <span className="text-xs text-zinc-500">April 2026 · 27 days elapsed</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+                  {[
+                    { label: 'Monthly Budget', value: '$98,000', sub: 'approved' },
+                    { label: 'Spent to Date', value: '$94,600', sub: '96.5% of budget', warn: false },
+                    { label: 'Remaining', value: '$3,400', sub: '3 days left', warn: true },
+                  ].map(({ label, value, sub, warn }) => (
+                    <div key={label} className="bg-white/5 rounded-2xl p-4">
+                      <div className="text-xs text-zinc-400 mb-1">{label}</div>
+                      <div className="text-2xl font-bold" style={{ color: warn ? '#F59E0B' : 'var(--accent-color)' }}>{value}</div>
+                      <div className="text-xs text-zinc-500 mt-0.5">{sub}</div>
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <div className="flex justify-between text-xs text-zinc-400 mb-1">
+                    <span>Budget used</span>
+                    <span>96.5%</span>
+                  </div>
+                  <div className="h-3 bg-white/10 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all" style={{ width: '96.5%', background: 'linear-gradient(90deg, var(--accent-color) 0%, #F59E0B 100%)' }} />
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[
+                    { dept: 'Engineering', budget: 40000, spent: 39200 },
+                    { dept: 'Sales', budget: 25000, spent: 22800 },
+                    { dept: 'HR', budget: 15000, spent: 14600 },
+                    { dept: 'Marketing', budget: 12000, spent: 11200 },
+                    { dept: 'Finance', budget: 6000, spent: 6800 },
+                  ].map(({ dept, budget, spent }) => {
+                    const pct = Math.min(100, Math.round(spent / budget * 100))
+                    const over = spent > budget
+                    return (
+                      <div key={dept}>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span>{dept}</span>
+                          <span className={over ? 'text-red-400' : 'text-zinc-400'}>${spent.toLocaleString()} / ${budget.toLocaleString()}{over ? ' ⚠ Over' : ''}</span>
+                        </div>
+                        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: over ? '#EF4444' : 'var(--accent-color)' }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Schedule Gap Alerts */}
+              <div className="glass rounded-3xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Schedule Coverage Alerts</h2>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-medium">3 gaps</span>
+                </div>
+                <div className="space-y-2">
+                  {[
+                    { shift: 'Wed Apr 30 · Morning (8AM–12PM)', dept: 'Engineering', needed: 4, scheduled: 2, gap: 2 },
+                    { shift: 'Thu May 1 · Afternoon (1PM–5PM)', dept: 'Sales', needed: 3, scheduled: 1, gap: 2 },
+                    { shift: 'Fri May 2 · All-Day', dept: 'HR', needed: 2, scheduled: 0, gap: 2 },
+                  ].map(({ shift, dept, needed, scheduled, gap }) => (
+                    <div key={shift} className="flex flex-wrap items-center gap-3 bg-red-500/5 border border-red-500/10 rounded-xl px-4 py-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium">{shift}</div>
+                        <div className="text-xs text-zinc-500">{dept} · {scheduled}/{needed} staff scheduled</div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-xs text-red-400 font-medium">−{gap} staff</span>
+                        <button className="px-3 py-1 rounded-lg text-xs font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>Fill Gap</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Quick Export */}
+              <div className="glass rounded-3xl p-6">
+                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Quick Export</h2>
+                <div className="flex flex-wrap gap-3">
+                  {['Timesheet CSV', 'Payroll Summary PDF', 'PTO Balance Report', 'Headcount Report', 'Compliance Summary'].map(label => (
+                    <button key={label} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm border border-white/10 transition-colors">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                      {label}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -4486,7 +4675,7 @@ export default function App() {
                     <i className="bx bx-receipt text-xl" style={{ color: 'var(--accent-color)' }} />
                   </div>
                   <div>
-                    <div className="font-semibold" style={{ color: 'var(--accent-color)' }}>Shifty AI Tax Filing</div>
+                    <div className="font-semibold" style={{ color: 'var(--accent-color)' }}>Swifty AI Tax Filing</div>
                     <div className="text-xs text-zinc-500">AI-powered tax filing</div>
                   </div>
                 </div>
@@ -5131,7 +5320,7 @@ export default function App() {
           earnings={lootEarnings}
           ptoHours={lootPtoHours}
           durationMin={lootDurationMin}
-          theme={theme === 'custom' ? undefined : theme}
+          theme={(['green','white','orange','cyan','pink','purple'] as const).includes(theme as any) ? theme as 'green'|'white'|'orange'|'cyan'|'pink'|'purple' : undefined}
         />
 
         {/* Shockwave ripple on clock in */}
