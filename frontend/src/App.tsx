@@ -17,7 +17,7 @@ import { STATE_BREAK_RULES, STATE_CODES } from './data/stateBreakRules'
 
 const API_BASE = ''
 
-type View = 'clock' | 'timesheet' | 'rewards' | 'xpcenter' | 'admin' | 'profile' | 'insurance' | 'orgchart' | 'taxes' | 'groktax' | 'grokky' | 'applications' | 'jobs' | 'schedules' | 'payroll' | 'reports' | 'leaves' | 'compliance' | 'hiring' | 'kpi' | 'teamkpi' | 'announcements' | 'pricing'
+type View = 'clock' | 'timesheet' | 'rewards' | 'xpcenter' | 'admin' | 'profile' | 'insurance' | 'orgchart' | 'taxes' | 'groktax' | 'grokky' | 'applications' | 'jobs' | 'schedules' | 'payroll' | 'reports' | 'leaves' | 'compliance' | 'hiring' | 'kpi' | 'teamkpi' | 'announcements' | 'pricing' | 'auditlog' | 'enterprise'
 
 function formatMs(ms: number): string {
   const totalSec = Math.floor(ms / 1000)
@@ -2207,6 +2207,35 @@ export default function App() {
     'Casey Morgan': false,
   })
 
+  // Enterprise: ROI Calculator state
+  const [roiHeadcount, setRoiHeadcount] = useState(150)
+  const [roiAvgHourlyRate, setRoiAvgHourlyRate] = useState(45)
+
+  // Enterprise: Audit log state
+  const [auditLogFilter, setAuditLogFilter] = useState<'all' | 'admin' | 'timesheet' | 'payroll' | 'user'>('all')
+  const AUDIT_LOG_ENTRIES = [
+    { id: 1, ts: '2026-04-28T17:32:00Z', actor: 'Dana Morales', action: 'Approved timesheet', target: 'Alex Rivera — Week of Apr 21', category: 'timesheet', ip: '10.0.1.14' },
+    { id: 2, ts: '2026-04-28T16:55:00Z', actor: 'Dana Morales', action: 'Rejected overtime request', target: 'Casey Brooks — 6h OT Apr 28', category: 'timesheet', ip: '10.0.1.14' },
+    { id: 3, ts: '2026-04-28T15:10:00Z', actor: 'System', action: 'Payroll run initiated', target: 'Pay period Apr 14–27', category: 'payroll', ip: 'system' },
+    { id: 4, ts: '2026-04-28T14:48:00Z', actor: 'Admin', action: 'Updated user pay rate', target: 'Jordan Lee — $52/hr', category: 'user', ip: '10.0.1.2' },
+    { id: 5, ts: '2026-04-28T13:22:00Z', actor: 'Admin', action: 'Created new user', target: 'Mia Thompson', category: 'admin', ip: '10.0.1.2' },
+    { id: 6, ts: '2026-04-27T17:00:00Z', actor: 'System', action: 'Timesheet deadline reminder sent', target: 'All 42 employees', category: 'admin', ip: 'system' },
+    { id: 7, ts: '2026-04-27T11:30:00Z', actor: 'Casey Morgan', action: 'Approved PTO request', target: 'Jordan Lee — May 5–9', category: 'timesheet', ip: '10.0.1.8' },
+    { id: 8, ts: '2026-04-27T09:05:00Z', actor: 'Admin', action: 'Changed role permissions', target: 'Sam Carter — Manager → Employee', category: 'admin', ip: '10.0.1.2' },
+    { id: 9, ts: '2026-04-26T16:40:00Z', actor: 'System', action: 'Payroll disbursed', target: '$94,600 — 42 employees', category: 'payroll', ip: 'system' },
+    { id: 10, ts: '2026-04-26T10:15:00Z', actor: 'Dana Morales', action: 'Exported compliance report', target: 'Q1 2026 Labor Compliance', category: 'admin', ip: '10.0.1.14' },
+    { id: 11, ts: '2026-04-25T14:22:00Z', actor: 'Admin', action: 'SSO configuration updated', target: 'Okta — SAML endpoint refreshed', category: 'admin', ip: '10.0.1.2' },
+    { id: 12, ts: '2026-04-25T09:00:00Z', actor: 'Dana Morales', action: 'Published announcement', target: 'Timesheet deadline reminder', category: 'admin', ip: '10.0.1.14' },
+  ]
+
+  // Enterprise: RBAC state
+  const [rbacRoles, setRbacRoles] = useState([
+    { role: 'Super Admin', users: 1, canApprove: true, canPayroll: true, canHire: true, canExport: true, canAudit: true },
+    { role: 'HR Admin', users: 2, canApprove: true, canPayroll: true, canHire: true, canExport: true, canAudit: false },
+    { role: 'Manager', users: 8, canApprove: true, canPayroll: false, canHire: false, canExport: false, canAudit: false },
+    { role: 'Employee', users: 156, canApprove: false, canPayroll: false, canHire: false, canExport: false, canAudit: false },
+  ])
+
   const navTo = (view: View) => {
     setActiveView(view)
     setMobileMenuOpen(false)
@@ -2374,7 +2403,7 @@ export default function App() {
   }, [isAdmin])
 
   // Auto-open manager section when navigating to a manager view
-  const managerViews: View[] = ['admin', 'schedules', 'payroll', 'reports', 'leaves', 'compliance', 'hiring', 'teamkpi', 'announcements']
+  const managerViews: View[] = ['admin', 'schedules', 'payroll', 'reports', 'leaves', 'compliance', 'hiring', 'teamkpi', 'announcements', 'auditlog', 'enterprise']
   useEffect(() => {
     if (managerViews.includes(activeView)) setManagerSectionOpen(true)
   }, [activeView]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -3478,6 +3507,14 @@ export default function App() {
                   <button className={`ta-nav-btn ${activeView === 'announcements' ? 'active' : ''}`} onClick={() => navTo('announcements')}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M22 17H2a3 3 0 000 6h20a3 3 0 000-6z"/><path d="M17 8V2"/><path d="M12 8V5"/><path d="M7 8V1"/></svg>
                     Announcements
+                  </button>
+                  <button className={`ta-nav-btn ${activeView === 'auditlog' ? 'active' : ''}`} onClick={() => navTo('auditlog')}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    Audit Log
+                  </button>
+                  <button className={`ta-nav-btn ${activeView === 'enterprise' ? 'active' : ''}`} onClick={() => navTo('enterprise')} style={{ color: 'var(--accent-color)' }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+                    Enterprise Hub
                   </button>
                 </>
               )}
@@ -6436,8 +6473,323 @@ export default function App() {
             </div>
           )}
 
+          {activeView === 'auditlog' && (() => {
+            const filtered = auditLogFilter === 'all' ? AUDIT_LOG_ENTRIES : AUDIT_LOG_ENTRIES.filter(e => e.category === auditLogFilter)
+            const catColor: Record<string, string> = { admin: 'text-purple-400 bg-purple-500/10', timesheet: 'text-blue-400 bg-blue-500/10', payroll: 'text-emerald-400 bg-emerald-500/10', user: 'text-amber-400 bg-amber-500/10' }
+            return (
+              <div className="max-w-5xl mx-auto space-y-6">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h1 className="text-2xl font-semibold neon-green">Audit Log</h1>
+                    <p className="text-sm text-zinc-400">Immutable record of all system actions — SOC2 & GDPR compliant</p>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <button className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 hover:bg-white/20 transition-colors text-zinc-300">
+                      ↓ Export CSV
+                    </button>
+                    <button className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 hover:bg-white/20 transition-colors text-zinc-300">
+                      ↓ Export PDF
+                    </button>
+                  </div>
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {[
+                    { label: 'Events (30 days)', value: '1,284' },
+                    { label: 'Unique Actors', value: '18' },
+                    { label: 'High-Risk Actions', value: '3' },
+                    { label: 'Last Export', value: 'Apr 26' },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="glass rounded-2xl p-4 text-center">
+                      <div className="text-2xl font-bold" style={{ color: 'var(--accent-color)' }}>{value}</div>
+                      <div className="text-xs text-zinc-400 mt-1">{label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Filter */}
+                <div className="flex gap-2 flex-wrap">
+                  {(['all', 'admin', 'timesheet', 'payroll', 'user'] as const).map(f => (
+                    <button
+                      key={f}
+                      onClick={() => setAuditLogFilter(f)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors capitalize ${auditLogFilter === f ? 'text-black' : 'bg-white/10 text-zinc-300 hover:bg-white/20'}`}
+                      style={auditLogFilter === f ? { backgroundColor: 'var(--accent-color)' } : undefined}
+                    >
+                      {f === 'all' ? 'All Events' : f.charAt(0).toUpperCase() + f.slice(1)}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Log entries */}
+                <div className="glass rounded-3xl overflow-hidden">
+                  <div className="px-5 py-3 border-b border-white/10 grid grid-cols-[140px_1fr_1fr_80px] gap-3 text-[10px] uppercase tracking-wider text-zinc-500">
+                    <div>Timestamp</div><div>Actor</div><div>Action</div><div>Category</div>
+                  </div>
+                  <div className="divide-y divide-white/5">
+                    {filtered.map(entry => (
+                      <div key={entry.id} className="px-5 py-3 grid grid-cols-[140px_1fr_1fr_80px] gap-3 items-center hover:bg-white/3 transition-colors">
+                        <div className="text-xs text-zinc-500 font-mono">{new Date(entry.ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                        <div>
+                          <div className="text-sm font-medium text-white">{entry.actor}</div>
+                          <div className="text-[10px] text-zinc-600 font-mono">{entry.ip}</div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-zinc-200">{entry.action}</div>
+                          <div className="text-[10px] text-zinc-500 truncate">{entry.target}</div>
+                        </div>
+                        <div>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium capitalize ${catColor[entry.category] || 'text-zinc-400 bg-white/5'}`}>{entry.category}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Retention notice */}
+                <div className="glass rounded-2xl p-4 flex items-start gap-3 border border-white/5">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 flex-shrink-0"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  <div>
+                    <div className="text-sm font-medium text-white mb-0.5">Tamper-proof retention</div>
+                    <div className="text-xs text-zinc-400">Audit logs are stored immutably for 7 years on encrypted, geo-redundant infrastructure. Meets SOC2 Type II, GDPR Article 30, and HIPAA audit trail requirements.</div>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
+          {activeView === 'enterprise' && (() => {
+            const workdayCostPerEmployee = 22
+            const swiftshiftCostPerEmployee = 12
+            const avgHoursWastedPerEmployeePerYear = 18
+            const annualWorkdayCost = roiHeadcount * workdayCostPerEmployee * 12
+            const annualSwiftshiftCost = roiHeadcount * swiftshiftCostPerEmployee * 12
+            const licenseSavings = annualWorkdayCost - annualSwiftshiftCost
+            const productivitySavings = roiHeadcount * avgHoursWastedPerEmployeePerYear * roiAvgHourlyRate
+            const totalAnnualSavings = licenseSavings + productivitySavings
+            const roiPct = Math.round((totalAnnualSavings / annualWorkdayCost) * 100)
+            return (
+              <div className="max-w-5xl mx-auto space-y-8">
+                <div>
+                  <h1 className="text-2xl font-semibold neon-green">Enterprise Hub</h1>
+                  <p className="text-sm text-zinc-400">Security controls, ROI analysis, and access management for enterprise deployments</p>
+                </div>
+
+                {/* ROI Calculator */}
+                <div className="glass rounded-3xl p-6 sm:p-8">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-white">ROI Calculator vs. Workday</h2>
+                      <p className="text-xs text-zinc-400">See your 12-month savings from switching to SwiftShift</p>
+                    </div>
+                  </div>
+                  <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="space-y-5">
+                      <div>
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="text-zinc-300">Team Size</span>
+                          <span className="font-bold" style={{ color: 'var(--accent-color)' }}>{roiHeadcount} employees</span>
+                        </div>
+                        <input type="range" min={10} max={5000} step={10} value={roiHeadcount} onChange={e => setRoiHeadcount(Number(e.target.value))} className="w-full accent-current" style={{ accentColor: 'var(--accent-color)' }} />
+                        <div className="flex justify-between text-[10px] text-zinc-600 mt-1"><span>10</span><span>5,000</span></div>
+                      </div>
+                      <div>
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="text-zinc-300">Avg. Hourly Rate</span>
+                          <span className="font-bold" style={{ color: 'var(--accent-color)' }}>${roiAvgHourlyRate}/hr</span>
+                        </div>
+                        <input type="range" min={15} max={200} step={5} value={roiAvgHourlyRate} onChange={e => setRoiAvgHourlyRate(Number(e.target.value))} className="w-full" style={{ accentColor: 'var(--accent-color)' }} />
+                        <div className="flex justify-between text-[10px] text-zinc-600 mt-1"><span>$15</span><span>$200</span></div>
+                      </div>
+                      <div className="bg-white/5 rounded-2xl p-4 space-y-2 text-sm">
+                        <div className="flex justify-between"><span className="text-zinc-400">Workday license cost/yr</span><span className="text-red-400 font-medium">${annualWorkdayCost.toLocaleString()}</span></div>
+                        <div className="flex justify-between"><span className="text-zinc-400">SwiftShift license cost/yr</span><span style={{ color: 'var(--accent-color)' }} className="font-medium">${annualSwiftshiftCost.toLocaleString()}</span></div>
+                        <div className="flex justify-between"><span className="text-zinc-400">License savings</span><span className="text-emerald-400 font-medium">+${licenseSavings.toLocaleString()}</span></div>
+                        <div className="border-t border-white/10 pt-2 flex justify-between"><span className="text-zinc-400">Productivity savings/yr</span><span className="text-emerald-400 font-medium">+${productivitySavings.toLocaleString()}</span></div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-center justify-center bg-black/30 rounded-2xl p-6 text-center border border-white/10">
+                      <div className="text-xs uppercase tracking-[3px] text-zinc-500 mb-3">12-Month Total Savings</div>
+                      <div className="text-5xl font-black mb-2" style={{ color: 'var(--accent-color)', textShadow: '0 0 40px var(--accent-color)' }}>
+                        ${totalAnnualSavings.toLocaleString()}
+                      </div>
+                      <div className="text-sm text-zinc-400 mb-4">vs. staying on Workday</div>
+                      <div className="flex gap-4 text-center">
+                        <div>
+                          <div className="text-2xl font-bold text-emerald-400">{roiPct}%</div>
+                          <div className="text-[10px] text-zinc-500">ROI</div>
+                        </div>
+                        <div className="w-px bg-white/10" />
+                        <div>
+                          <div className="text-2xl font-bold text-white">{Math.round(12 / (roiPct / 100))}mo</div>
+                          <div className="text-[10px] text-zinc-500">Payback</div>
+                        </div>
+                        <div className="w-px bg-white/10" />
+                        <div>
+                          <div className="text-2xl font-bold text-white">{avgHoursWastedPerEmployeePerYear}h</div>
+                          <div className="text-[10px] text-zinc-500">Saved/employee</div>
+                        </div>
+                      </div>
+                      <button className="mt-5 px-5 py-2.5 rounded-xl text-sm font-semibold text-black transition-opacity hover:opacity-90" style={{ backgroundColor: 'var(--accent-color)' }}>
+                        Get Custom ROI Report →
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Security & Compliance */}
+                <div className="glass rounded-3xl p-6">
+                  <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--accent-color)' }}>Security & Compliance</h2>
+                  <p className="text-xs text-zinc-400 mb-5">Enterprise-grade security controls and certifications</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {[
+                      { label: 'SSO / SAML 2.0', status: 'Active', detail: 'Okta · Last sync 2h ago', ok: true },
+                      { label: 'Multi-Factor Authentication', status: 'Enforced', detail: '100% of users enrolled', ok: true },
+                      { label: 'SOC 2 Type II', status: 'Certified', detail: 'Audit report available on request', ok: true },
+                      { label: 'GDPR Compliance', status: 'Enabled', detail: 'EU data residency · DPA signed', ok: true },
+                      { label: 'HIPAA', status: 'Available', detail: 'BAA available for healthcare orgs', ok: true },
+                      { label: 'Data Encryption', status: 'AES-256', detail: 'At rest & in transit', ok: true },
+                      { label: 'Penetration Testing', status: 'Q1 2026', detail: 'Annual third-party pentest', ok: true },
+                      { label: 'ISO 27001', status: 'In progress', detail: 'Certification expected Q3 2026', ok: false },
+                    ].map(({ label, status, detail, ok }) => (
+                      <div key={label} className="flex items-start gap-3 bg-white/5 rounded-2xl p-4">
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${ok ? 'bg-emerald-500/20' : 'bg-amber-500/20'}`}>
+                          {ok
+                            ? <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            : <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                          }
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium text-white">{label}</span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${ok ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'}`}>{status}</span>
+                          </div>
+                          <div className="text-xs text-zinc-500 mt-0.5">{detail}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* RBAC */}
+                <div className="glass rounded-3xl p-6">
+                  <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--accent-color)' }}>Role-Based Access Control</h2>
+                  <p className="text-xs text-zinc-400 mb-5">Granular permission matrix — control exactly what each role can see and do</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm" style={{ minWidth: '580px' }}>
+                      <thead>
+                        <tr className="text-zinc-500 text-xs uppercase tracking-wider border-b border-white/10">
+                          <th className="text-left py-2 pr-4">Role</th>
+                          <th className="text-left py-2 pr-4">Users</th>
+                          <th className="text-center py-2 px-2">Approve</th>
+                          <th className="text-center py-2 px-2">Payroll</th>
+                          <th className="text-center py-2 px-2">Hire</th>
+                          <th className="text-center py-2 px-2">Export</th>
+                          <th className="text-center py-2 px-2">Audit</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {rbacRoles.map((r, i) => (
+                          <tr key={r.role} className="hover:bg-white/3 transition-colors">
+                            <td className="py-3 pr-4">
+                              <span className="text-sm font-medium text-white">{r.role}</span>
+                            </td>
+                            <td className="py-3 pr-4 text-zinc-400 text-xs">{r.users} {r.users === 1 ? 'user' : 'users'}</td>
+                            {(['canApprove', 'canPayroll', 'canHire', 'canExport', 'canAudit'] as const).map(perm => (
+                              <td key={perm} className="py-3 px-2 text-center">
+                                <button
+                                  onClick={() => setRbacRoles(prev => prev.map((x, j) => j === i ? { ...x, [perm]: !x[perm] } : x))}
+                                  disabled={r.role === 'Super Admin'}
+                                  className={`w-8 h-5 rounded-full transition-colors ${r[perm] ? 'bg-emerald-500' : 'bg-white/10'} ${r.role === 'Super Admin' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                >
+                                  <span className={`block w-4 h-4 rounded-full bg-white shadow transition-transform mx-0.5 ${r[perm] ? 'translate-x-3' : 'translate-x-0'}`} />
+                                </button>
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="mt-4 flex gap-2">
+                    <button className="px-4 py-2 rounded-xl text-sm font-medium text-black transition-opacity hover:opacity-90" style={{ backgroundColor: 'var(--accent-color)' }}>Save Permissions</button>
+                    <button className="px-4 py-2 rounded-xl text-sm font-medium bg-white/10 hover:bg-white/20 text-zinc-300 transition-colors">+ Create Custom Role</button>
+                  </div>
+                </div>
+
+                {/* Integrations */}
+                <div className="glass rounded-3xl p-6">
+                  <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--accent-color)' }}>Integrations</h2>
+                  <p className="text-xs text-zinc-400 mb-5">Connect SwiftShift to your existing enterprise stack</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      { name: 'Okta', category: 'SSO / Identity', status: 'Connected', icon: '🔐' },
+                      { name: 'ADP Workforce Now', category: 'Payroll', status: 'Connected', icon: '💼' },
+                      { name: 'Slack', category: 'Notifications', status: 'Connected', icon: '💬' },
+                      { name: 'Gusto', category: 'Payroll', status: 'Available', icon: '📊' },
+                      { name: 'BambooHR', category: 'HRIS', status: 'Available', icon: '🌿' },
+                      { name: 'Workday', category: 'Migration', status: 'Import data', icon: '📁' },
+                      { name: 'QuickBooks', category: 'Accounting', status: 'Available', icon: '📒' },
+                      { name: 'REST API', category: 'Custom', status: 'Active — 4 keys', icon: '⚡' },
+                    ].map(({ name, category, status, icon }) => (
+                      <div key={name} className="flex items-center gap-3 bg-white/5 rounded-2xl px-4 py-3">
+                        <div className="text-xl w-8 text-center flex-shrink-0">{icon}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-white">{name}</div>
+                          <div className="text-xs text-zinc-500">{category}</div>
+                        </div>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${status === 'Connected' || status.startsWith('Active') ? 'bg-emerald-500/15 text-emerald-400' : 'bg-white/10 text-zinc-400'}`}>{status}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Migration from Workday */}
+                <div className="rounded-3xl p-6 border" style={{ background: 'linear-gradient(135deg, rgba(var(--accent-color-rgb),0.08), rgba(var(--accent-color-rgb),0.02))', borderColor: 'var(--accent-color)' }}>
+                  <h2 className="text-lg font-semibold mb-1 text-white">Switch from Workday in 3 steps</h2>
+                  <p className="text-xs text-zinc-400 mb-5">Average migration takes 2 weeks. Zero data loss. Your team is productive on day one.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+                    {[
+                      { step: '01', title: 'Export your data', desc: 'Download your employee roster, historical timesheets, and payroll records from Workday in CSV format.' },
+                      { step: '02', title: 'Bulk import', desc: 'Upload to SwiftShift — our importer maps Workday fields automatically. Review & confirm in minutes.' },
+                      { step: '03', title: 'Go live', desc: 'Flip the switch. Employees clock in through SwiftShift on day one. Your manager hub is pre-configured.' },
+                    ].map(({ step, title, desc }) => (
+                      <div key={step} className="bg-black/30 rounded-2xl p-4">
+                        <div className="text-3xl font-black mb-2" style={{ color: 'var(--accent-color)', opacity: 0.4 }}>{step}</div>
+                        <div className="text-sm font-semibold text-white mb-1">{title}</div>
+                        <div className="text-xs text-zinc-400 leading-relaxed">{desc}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <button className="px-5 py-2.5 rounded-xl text-sm font-bold text-black transition-opacity hover:opacity-90" style={{ backgroundColor: 'var(--accent-color)' }}>
+                    Schedule a migration call →
+                  </button>
+                </div>
+              </div>
+            )
+          })()}
+
           {activeView === 'pricing' && (
             <div className="max-w-5xl mx-auto">
+              {/* Trust badges */}
+              <div className="flex flex-wrap items-center justify-center gap-4 mb-8">
+                {[
+                  { label: 'SOC 2 Type II', icon: '🔒' },
+                  { label: 'GDPR Compliant', icon: '🇪🇺' },
+                  { label: 'HIPAA Ready', icon: '🏥' },
+                  { label: 'ISO 27001', icon: '✅' },
+                  { label: '99.9% Uptime SLA', icon: '⚡' },
+                ].map(({ label, icon }) => (
+                  <div key={label} className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-3 py-1.5 text-xs font-medium text-zinc-300">
+                    <span>{icon}</span><span>{label}</span>
+                  </div>
+                ))}
+              </div>
+
               <div className="text-center mb-10">
                 <h1 className="text-4xl font-bold neon-green mb-3">Simple, transparent pricing</h1>
                 <p className="text-zinc-400 text-lg">Start free, scale when you're ready. No hidden fees.</p>
@@ -6485,7 +6837,7 @@ export default function App() {
                   <div className="text-4xl font-bold text-white mb-1">Custom</div>
                   <div className="text-zinc-500 text-sm mb-6">For large organizations with custom needs</div>
                   <ul className="space-y-3 mb-8 flex-1">
-                    {['Everything in Pro', 'Custom integrations', 'SSO & SAML', 'Dedicated account manager', 'SLA guarantee', 'On-premise deployment option', 'Custom AI training', 'Volume discounts', 'White-label option'].map(f => (
+                    {['Everything in Pro', 'SSO / SAML 2.0 (Okta, Azure AD)', 'Role-based access control', 'Immutable audit log (7yr retention)', 'Dedicated account manager', '99.9% SLA + status page', 'On-premise / private cloud option', 'ADP, Gusto, Workday migration', 'Custom AI model training', 'Volume discounts', 'White-label option'].map(f => (
                       <li key={f} className="flex items-start gap-2.5 text-sm text-zinc-300">
                         <svg className="mt-0.5 flex-shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                         {f}
@@ -6494,6 +6846,35 @@ export default function App() {
                   </ul>
                   <button className="w-full py-3 rounded-xl border border-white/20 text-sm font-semibold text-white hover:bg-white/5 transition-colors">Contact sales</button>
                 </div>
+              </div>
+
+              {/* Social proof */}
+              <div className="mt-8 glass rounded-3xl p-6">
+                <div className="text-center text-xs uppercase tracking-[3px] text-zinc-500 mb-6">Trusted by teams replacing legacy HR software</div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {[
+                    { stat: '↓ 68%', label: 'Reduction in time-admin overhead', desc: '23 min saved per employee per week vs. Workday' },
+                    { stat: '3.5×', label: 'Faster timesheet submission', desc: 'From 8-step Workday flow to one tap on SwiftShift' },
+                    { stat: '$2,400', label: 'Saved per employee per year', desc: 'Combined license + productivity savings (avg. customer)' },
+                  ].map(({ stat, label, desc }) => (
+                    <div key={label} className="text-center">
+                      <div className="text-3xl font-black mb-1" style={{ color: 'var(--accent-color)' }}>{stat}</div>
+                      <div className="text-sm font-semibold text-white mb-1">{label}</div>
+                      <div className="text-xs text-zinc-500">{desc}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Enterprise CTA */}
+              <div className="mt-6 rounded-3xl p-6 border flex flex-wrap items-center justify-between gap-4" style={{ background: 'linear-gradient(135deg, rgba(var(--accent-color-rgb),0.08), rgba(var(--accent-color-rgb),0.02))', borderColor: 'var(--accent-color)' }}>
+                <div>
+                  <div className="text-base font-semibold text-white mb-1">Replacing Workday or ADP?</div>
+                  <div className="text-sm text-zinc-400">We'll migrate your data, train your team, and guarantee go-live in 2 weeks — or the first month is free.</div>
+                </div>
+                <button onClick={() => navTo('enterprise')} className="px-5 py-2.5 rounded-xl text-sm font-bold text-black flex-shrink-0 transition-opacity hover:opacity-90" style={{ backgroundColor: 'var(--accent-color)' }}>
+                  See ROI Calculator →
+                </button>
               </div>
 
               {/* FAQ */}
@@ -6505,6 +6886,8 @@ export default function App() {
                     { q: 'Is there a free trial?', a: 'Pro plans come with a 14-day free trial, no credit card required. Starter is free forever.' },
                     { q: 'How does per-employee billing work?', a: 'You\'re billed based on active employees in your workspace each month. Add or remove team members anytime.' },
                     { q: 'What payment methods do you accept?', a: 'We accept all major credit cards, ACH bank transfers, and invoicing for Enterprise customers.' },
+                    { q: 'How long does migration from Workday take?', a: 'Average migration is 2 weeks. We provide a dedicated migration engineer for Enterprise customers and guarantee zero data loss.' },
+                    { q: 'Do you support SSO?', a: 'Yes — SAML 2.0 with Okta, Azure AD, Google Workspace, and any SAML-compatible identity provider. Available on Enterprise plans.' },
                   ].map(({ q, a }) => (
                     <div key={q} className="space-y-1">
                       <div className="text-sm font-semibold text-white">{q}</div>
