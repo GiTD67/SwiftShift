@@ -240,7 +240,7 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
         </div>
 
         {/* Three modules side-by-side */}
-        <div className="grid grid-cols-3 gap-4 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
 
           {/* ── REAL TIME REWARDS ── */}
           <div className="glass rounded-3xl p-6 relative overflow-hidden">
@@ -357,7 +357,7 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
         </div>
 
         {/* ── HOURLY RATE + PTO VAULT — side by side below the 3 modules ── */}
-        <div className="grid grid-cols-2 gap-4 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
 
           {/* HOURLY RATE */}
           <div
@@ -451,7 +451,7 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {achievements.map((ach, i) => (
             <motion.div
               key={ach.id}
@@ -554,7 +554,7 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
       {/* ═══════════════════════════════════════════
           STATS ROW: Streak + Level/XP + Hours
           ═══════════════════════════════════════════ */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
         {/* Work Streak */}
         <div className="glass rounded-3xl p-6 text-center flex flex-col items-center justify-center">

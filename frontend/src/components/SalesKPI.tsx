@@ -650,7 +650,7 @@ export function SalesKPI({ isAdmin = true, accentColor = '#22c55e', addXP }: Sal
           )}
 
           {/* Stage summary */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {STAGES.map(stage => {
               const stageDeals = deals.filter(d => d.stage === stage)
               return (

@@ -1028,12 +1028,12 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
       {/* Achievements */}
       <div className="glass rounded-2xl p-4">
         <div className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">Achievements</div>
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-5 sm:grid-cols-5 gap-2">
           {ACHIEVEMENTS.map(ach => {
             const unlocked = gState.unlockedAchievements.includes(ach.id)
             return (
               <div key={ach.id} title={`${ach.name}: ${ach.desc}`}
-                className={`flex flex-col items-center gap-1 p-2 rounded-xl text-center cursor-default transition-all ${unlocked ? 'bg-white/10' : 'bg-white/3 opacity-40'}`}>
+                className={`flex flex-col items-center gap-1 p-1.5 sm:p-2 rounded-xl text-center cursor-default transition-all ${unlocked ? 'bg-white/10' : 'bg-white/3 opacity-40'}`}>
                 <span className="text-xl">{ach.icon}</span>
                 <span className="text-[9px] text-zinc-400 leading-tight">{ach.name}</span>
               </div>
@@ -3499,8 +3499,8 @@ export default function App() {
                         const sparkGap = circumference - sparkDash
 
                         return (
-                          <div className="relative w-[260px] h-[260px] flex items-center justify-center">
-                            <svg width="260" height="260" className="absolute" overflow="visible" style={isOverdrive ? { filter: 'drop-shadow(0 0 12px #FFAA00) drop-shadow(0 0 24px #FFD700)' } : undefined}>
+                          <div className="relative w-[200px] h-[200px] sm:w-[260px] sm:h-[260px] flex items-center justify-center">
+                            <svg viewBox="0 0 260 260" className="absolute w-full h-full" overflow="visible" style={isOverdrive ? { filter: 'drop-shadow(0 0 12px #FFAA00) drop-shadow(0 0 24px #FFD700)' } : undefined}>
                               {/* Background ring */}
                               <circle cx="130" cy="130" r={radius} fill="none" stroke="#222" strokeWidth="12" />
                               {/* Progress arc */}
@@ -5222,7 +5222,7 @@ export default function App() {
               )}
 
               {/* Read receipt summary */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {[
                   { label: 'Announcements Sent', value: announcements.length },
                   { label: 'Avg Read Rate', value: '—' },
