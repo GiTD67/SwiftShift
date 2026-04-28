@@ -860,9 +860,11 @@ button, [role="button"] {
 
 /* ── Overdrive ring: electric bolt flashes ── */
 @keyframes overdrive-bolt {
-  0%, 100% { opacity: 0; }
-  8%        { opacity: 1; }
-  14%       { opacity: 0; }
+  0%        { opacity: 0; }
+  6%        { opacity: 0.95; }
+  12%       { opacity: 0.6; }
+  18%       { opacity: 0; }
+  100%      { opacity: 0; }
 }
 
 /* ============================================
