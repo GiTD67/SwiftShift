@@ -13,6 +13,7 @@ import { Tour } from './components/Tour'
 import { FeaturePreview } from './components/FeaturePreview'
 import { BreakReminderModal } from './components/BreakReminderModal'
 import { SalesKPI } from './components/SalesKPI'
+import { GravityGridBackground } from './components/GravityGridBackground'
 import { STATE_BREAK_RULES, STATE_CODES } from './data/stateBreakRules'
 
 const API_BASE = ''
@@ -354,6 +355,7 @@ const XP_LEVELS = [
   { level: 8, name: 'Elite', xpNeeded: 1900 },
   { level: 9, name: 'Master', xpNeeded: 2500 },
   { level: 10, name: 'Legend', xpNeeded: 3200 },
+  { level: 11, name: 'Gravity', xpNeeded: 4200 },
 ]
 
 const ACHIEVEMENTS = [
@@ -430,7 +432,7 @@ function useGamification() {
   const nextLevel = useMemo(() => XP_LEVELS.find(l => l.xpNeeded > gState.totalXP) || XP_LEVELS[XP_LEVELS.length - 1], [gState.totalXP])
 
   const xpProgress = useMemo(() => {
-    if (currentLevel.level === 10) return 100
+    if (currentLevel.level === 11) return 100
     const range = nextLevel.xpNeeded - currentLevel.xpNeeded
     const earned = gState.totalXP - currentLevel.xpNeeded
     return Math.min(100, Math.round((earned / range) * 100))
@@ -3224,6 +3226,7 @@ export default function App() {
 
   return (
     <div className="ta-app" data-theme={theme} data-bg={backgroundStyle} data-overdrive={isOvertimeOverdrive ? 'true' : undefined}>
+      {backgroundStyle === 'gravity-grid' && <GravityGridBackground />}
       <nav className="ta-navbar">
         <div className="flex items-center gap-2">
           {/* Hamburger (mobile only) */}
@@ -3424,6 +3427,7 @@ export default function App() {
                     { id: 'stars', label: 'Stars', unlock: 8, preview: 'radial-gradient(circle at 20% 30%,rgba(255,255,255,0.12) 1px,transparent 1px)' },
                     { id: 'wave', label: 'Wave', unlock: 9, preview: 'linear-gradient(60deg,#000 25%,rgba(255,255,255,0.03) 50%,#000 75%)' },
                     { id: 'aurora', label: 'Aurora', unlock: 10, preview: 'linear-gradient(135deg,rgba(100,0,255,0.15),rgba(0,255,200,0.15))' },
+                    { id: 'gravity-grid', label: 'Gravity', unlock: 11, preview: 'radial-gradient(ellipse at 40% 60%,rgba(100,130,255,0.25),rgba(50,0,80,0.4) 60%,#000)' },
                   ].map(bg => {
                     const unlocked = appCurrentLevel.level >= bg.unlock
                     return (
