@@ -17,7 +17,7 @@ import { STATE_BREAK_RULES, STATE_CODES } from './data/stateBreakRules'
 
 const API_BASE = ''
 
-type View = 'clock' | 'timesheet' | 'rewards' | 'xpcenter' | 'admin' | 'profile' | 'insurance' | 'orgchart' | 'taxes' | 'groktax' | 'grokky' | 'applications' | 'jobs' | 'schedules' | 'payroll' | 'reports' | 'leaves' | 'compliance' | 'hiring' | 'kpi'
+type View = 'clock' | 'timesheet' | 'rewards' | 'xpcenter' | 'admin' | 'profile' | 'insurance' | 'orgchart' | 'taxes' | 'groktax' | 'grokky' | 'applications' | 'jobs' | 'schedules' | 'payroll' | 'reports' | 'leaves' | 'compliance' | 'hiring' | 'kpi' | 'teamkpi' | 'announcements'
 
 function formatMs(ms: number): string {
   const totalSec = Math.floor(ms / 1000)
@@ -1821,9 +1821,34 @@ export default function App() {
 
   // Schedules state
   const [shiftSwaps, setShiftSwaps] = useState<any[]>([])
+  const [allShiftSwaps, setAllShiftSwaps] = useState<any[]>([])
   const [timesheetSubs, setTimesheetSubs] = useState<any[]>([])
   const [showSwapForm, setShowSwapForm] = useState(false)
   const [swapForm, setSwapForm] = useState({ shift_date: '', shift_start: '', shift_end: '', reason: '' })
+
+  // Announcements state
+  const [announcements, setAnnouncements] = useState<Array<{ id: number; title: string; body: string; author: string; priority: 'normal' | 'urgent'; created_at: string; read_by: string[] }>>([
+    { id: 1, title: 'Reminder: Timesheets due Friday', body: 'Please submit your timesheets by 5 PM Friday to ensure on-time payroll processing. Late submissions may delay your payment.', author: 'Dana Morales', priority: 'urgent', created_at: '2026-04-25T09:00:00Z', read_by: [] },
+    { id: 2, title: 'Team lunch — Thursday noon', body: 'We are doing a team lunch this Thursday at 12 PM in the main conference room. All hands welcome!', author: 'Alex Rivera', priority: 'normal', created_at: '2026-04-24T14:30:00Z', read_by: [] },
+    { id: 3, title: 'Updated PTO policy effective May 1', body: 'Starting May 1, the PTO accrual rate increases from 1.5 to 2 days per month. See HR portal for details.', author: 'Dana Morales', priority: 'normal', created_at: '2026-04-22T11:00:00Z', read_by: [] },
+  ])
+  const [showAnnouncementForm, setShowAnnouncementForm] = useState(false)
+  const [announcementForm, setAnnouncementForm] = useState({ title: '', body: '', priority: 'normal' as 'normal' | 'urgent' })
+
+  // Onboarding tasks state
+  const [onboardingTasks, setOnboardingTasks] = useState<Record<string, boolean[]>>({
+    'Sam Carter': [true, true, false, false, false, false],
+    'Mia Thompson': [false, false, false, false, false, false],
+    'Leo Kim': [true, true, true, true, false, false],
+  })
+
+  // Payroll sign-off state
+  const [payrollSignoffs, setPayrollSignoffs] = useState<Record<string, boolean>>({
+    'Alex Rivera': true,
+    'Jordan Lee': true,
+    'Dana Morales': false,
+    'Casey Morgan': false,
+  })
 
   const navTo = (view: View) => {
     setActiveView(view)
@@ -1948,7 +1973,7 @@ export default function App() {
   }, [isAdmin])
 
   // Auto-open manager section when navigating to a manager view
-  const managerViews: View[] = ['admin', 'schedules', 'payroll', 'reports', 'leaves', 'compliance', 'hiring']
+  const managerViews: View[] = ['admin', 'schedules', 'payroll', 'reports', 'leaves', 'compliance', 'hiring', 'teamkpi', 'announcements']
   useEffect(() => {
     if (managerViews.includes(activeView)) setManagerSectionOpen(true)
   }, [activeView]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -2027,6 +2052,7 @@ export default function App() {
     if (activeView !== 'schedules' || !user?.id) return
     const uid = user.id
     fetch(`${API_BASE}/api/shift-swaps?user_id=${uid}`).then(r => r.json()).then(r => setShiftSwaps(Array.isArray(r) ? r : [])).catch(() => {})
+    fetch(`${API_BASE}/api/shift-swaps`).then(r => r.json()).then(r => setAllShiftSwaps(Array.isArray(r) ? r : [])).catch(() => {})
     fetch(`${API_BASE}/api/timesheet-submissions?user_id=${uid}`).then(r => r.json()).then(r => setTimesheetSubs(Array.isArray(r) ? r : [])).catch(() => {})
   }, [activeView, user?.id])
 
@@ -3040,6 +3066,24 @@ export default function App() {
                 </svg>
                 Hiring &amp; Onboarding
               </button>
+              <button
+                className={`ta-nav-btn ${activeView === 'teamkpi' ? 'active' : ''}`}
+                onClick={() => navTo('teamkpi')}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+                  <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+                </svg>
+                Team KPI Dashboard
+              </button>
+              <button
+                className={`ta-nav-btn ${activeView === 'announcements' ? 'active' : ''}`}
+                onClick={() => navTo('announcements')}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+                  <path d="M22 17H2a3 3 0 000 6h20a3 3 0 000-6z"/><path d="M17 8V2"/><path d="M12 8V5"/><path d="M7 8V1"/>
+                </svg>
+                Announcements
+              </button>
             </>
           )}
         </nav>
@@ -3699,6 +3743,74 @@ export default function App() {
                 )}
               </div>
 
+              {/* Manager: Shift Swap Approvals */}
+              {allShiftSwaps.length > 0 && (
+                <div className="glass rounded-3xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Manager: Team Swap Requests</h2>
+                      <p className="text-xs text-zinc-400 mt-0.5">Review your team's shift swap requests</p>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400">
+                      {allShiftSwaps.filter(s => s.status === 'pending').length} pending
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    {allShiftSwaps.map(sw => (
+                      <div key={sw.id} className="flex flex-wrap items-center gap-3 bg-white/5 rounded-xl px-4 py-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm">{sw.shift_date}</div>
+                          <div className="text-xs text-zinc-400">{sw.shift_start} – {sw.shift_end}{sw.reason ? ` · "${sw.reason}"` : ''}</div>
+                          <div className="text-xs text-zinc-500 mt-0.5">User #{sw.requester_id}</div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {sw.status === 'pending' ? (
+                            <>
+                              <button
+                                onClick={() => {
+                                  fetch(`${API_BASE}/api/shift-swaps/${sw.id}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ status: 'accepted' }),
+                                  }).then(() => {
+                                    setAllShiftSwaps(prev => prev.map(s => s.id === sw.id ? { ...s, status: 'accepted' } : s))
+                                    setShiftSwaps(prev => prev.map(s => s.id === sw.id ? { ...s, status: 'accepted' } : s))
+                                    toast.success('Shift swap approved')
+                                  }).catch(() => toast.error('Failed to approve'))
+                                }}
+                                className="px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 transition-colors"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => {
+                                  fetch(`${API_BASE}/api/shift-swaps/${sw.id}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ status: 'denied' }),
+                                  }).then(() => {
+                                    setAllShiftSwaps(prev => prev.map(s => s.id === sw.id ? { ...s, status: 'denied' } : s))
+                                    setShiftSwaps(prev => prev.map(s => s.id === sw.id ? { ...s, status: 'denied' } : s))
+                                    toast.success('Shift swap denied')
+                                  }).catch(() => toast.error('Failed to deny'))
+                                }}
+                                className="px-3 py-1 rounded-lg text-xs font-semibold bg-red-500/20 text-red-400 hover:bg-red-500/40 transition-colors"
+                              >
+                                Deny
+                              </button>
+                            </>
+                          ) : (
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${sw.status === 'accepted' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                              {sw.status}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Weekly grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
                 {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
@@ -3850,42 +3962,77 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Employee Payroll Summary (admin view) */}
+              {/* Employee Payroll Summary with One-Click Sign-off */}
               <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Employee Payroll Summary</h2>
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Employee Payroll Summary</h2>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-zinc-400">
+                      {Object.values(payrollSignoffs).filter(Boolean).length}/{Object.keys(payrollSignoffs).length} signed off
+                    </span>
+                    <button
+                      onClick={() => {
+                        const allSigned = Object.keys(payrollSignoffs).every(k => payrollSignoffs[k])
+                        if (allSigned) { toast.success('All employees already signed off'); return }
+                        setPayrollSignoffs(prev => Object.fromEntries(Object.keys(prev).map(k => [k, true])))
+                        toast.success('All payroll signed off! Payroll run initiated.')
+                      }}
+                      className="px-4 py-1.5 rounded-xl text-xs font-semibold transition-colors"
+                      style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
+                    >
+                      Sign Off All
+                    </button>
+                  </div>
+                </div>
                 <div className="overflow-x-auto">
-                <table className="w-full text-sm" style={{ minWidth: '500px' }}>
+                <table className="w-full text-sm" style={{ minWidth: '560px' }}>
                   <thead>
                     <tr className="text-zinc-400 border-b border-white/10 text-left">
-                      <th className="py-2">Employee</th>
-                      <th className="py-2">Role</th>
-                      <th className="py-2">Hours</th>
-                      <th className="py-2">Rate</th>
-                      <th className="py-2">Gross Pay</th>
-                      <th className="py-2">Status</th>
+                      <th className="py-2 pr-4">Employee</th>
+                      <th className="py-2 pr-4">Role</th>
+                      <th className="py-2 pr-4">Hours</th>
+                      <th className="py-2 pr-4">Rate</th>
+                      <th className="py-2 pr-4">Gross Pay</th>
+                      <th className="py-2">Sign-off</th>
                     </tr>
                   </thead>
                   <tbody>
                     {[
-                      ['Alex Rivera', 'Co-Founder', '80h', '$85/hr', '$6,800', 'Processed'],
-                      ['Jordan Lee', 'Engineering Lead', '76h', '$72/hr', '$5,472', 'Processed'],
-                      ['Dana Morales', 'HR Director', '78h', '$65/hr', '$5,070', 'Pending'],
-                      ['Casey Morgan', 'Sales Lead', '82h', '$60/hr', '$4,920', 'Pending'],
-                    ].map(([name, role, hrs, rate, gross, status]) => (
-                      <tr key={name} className="border-b border-white/5 hover:bg-white/5">
-                        <td className="py-2 font-medium">{name}</td>
-                        <td className="py-2 text-zinc-400">{role}</td>
-                        <td className="py-2">{hrs}</td>
-                        <td className="py-2">{rate}</td>
-                        <td className="py-2 font-semibold" style={{ color: 'var(--accent-color)' }}>{gross}</td>
-                        <td className="py-2">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status === 'Processed' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>{status}</span>
-                        </td>
-                      </tr>
-                    ))}
+                      { name: 'Alex Rivera', role: 'Co-Founder', hrs: '80h', rate: '$85/hr', gross: '$6,800' },
+                      { name: 'Jordan Lee', role: 'Engineering Lead', hrs: '76h', rate: '$72/hr', gross: '$5,472' },
+                      { name: 'Dana Morales', role: 'HR Director', hrs: '78h', rate: '$65/hr', gross: '$5,070' },
+                      { name: 'Casey Morgan', role: 'Sales Lead', hrs: '82h', rate: '$60/hr', gross: '$4,920' },
+                    ].map(({ name, role, hrs, rate, gross }) => {
+                      const signed = payrollSignoffs[name] || false
+                      return (
+                        <tr key={name} className="border-b border-white/5 hover:bg-white/5">
+                          <td className="py-2.5 pr-4 font-medium">{name}</td>
+                          <td className="py-2.5 pr-4 text-zinc-400">{role}</td>
+                          <td className="py-2.5 pr-4">{hrs}</td>
+                          <td className="py-2.5 pr-4">{rate}</td>
+                          <td className="py-2.5 pr-4 font-semibold" style={{ color: 'var(--accent-color)' }}>{gross}</td>
+                          <td className="py-2.5">
+                            <button
+                              onClick={() => {
+                                setPayrollSignoffs(prev => ({ ...prev, [name]: !prev[name] }))
+                                toast.success(signed ? `Sign-off removed for ${name}` : `${name} signed off!`)
+                              }}
+                              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${signed ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'bg-white/10 text-zinc-400 hover:bg-white/20'}`}
+                            >
+                              {signed ? '✓ Signed Off' : 'Sign Off'}
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
                 </div>
+                {Object.values(payrollSignoffs).every(Boolean) && (
+                  <div className="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-medium text-center">
+                    All employees signed off — Payroll run ready to submit
+                  </div>
+                )}
               </div>
             </div>
             )
@@ -3933,25 +4080,32 @@ export default function App() {
                 <p className="text-sm text-zinc-400 -mt-3 mb-5">Real-time insights and action items for team managers</p>
               </div>
 
-              {/* Pending Approvals */}
+              {/* Timesheet Approvals with Anomaly Flagging */}
               <div className="glass rounded-3xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Pending Approvals</h2>
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Timesheet Approvals</h2>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-medium">5 pending</span>
                 </div>
+                <p className="text-xs text-zinc-400 mb-4">Anomalies auto-detected from clock records — review before approving</p>
                 <div className="space-y-2">
                   {[
-                    { type: 'Timesheet', name: 'Alex Rivera', detail: 'Week of Apr 21 · 42.5h', urgency: 'High' },
-                    { type: 'PTO Request', name: 'Jordan Lee', detail: 'May 5–9 · 40h vacation', urgency: 'Normal' },
-                    { type: 'Timesheet', name: 'Casey Brooks', detail: 'Week of Apr 21 · 38h', urgency: 'Normal' },
-                    { type: 'PTO Request', name: 'Sam Carter', detail: 'Apr 30 · 8h sick leave', urgency: 'Normal' },
-                    { type: 'Overtime Auth', name: 'Dana Morales', detail: 'Apr 28 · 6h OT requested', urgency: 'High' },
-                  ].map(({ type, name, detail, urgency }) => (
-                    <div key={name + type} className="flex flex-wrap items-center gap-3 bg-white/5 rounded-xl px-4 py-3">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${urgency === 'High' ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/10 text-blue-400'}`}>{type}</span>
+                    { type: 'Timesheet', name: 'Alex Rivera', detail: 'Week of Apr 21 · 42.5h', anomaly: 'Overtime — 2.5h above threshold', urgency: 'High' },
+                    { type: 'PTO Request', name: 'Jordan Lee', detail: 'May 5–9 · 40h vacation', anomaly: null, urgency: 'Normal' },
+                    { type: 'Timesheet', name: 'Casey Brooks', detail: 'Week of Apr 21 · 38h', anomaly: 'Missed clock-out on Apr 23', urgency: 'Normal' },
+                    { type: 'PTO Request', name: 'Sam Carter', detail: 'Apr 30 · 8h sick leave', anomaly: null, urgency: 'Normal' },
+                    { type: 'Overtime Auth', name: 'Dana Morales', detail: 'Apr 28 · 6h OT requested', anomaly: 'No prior OT this period — unusual spike', urgency: 'High' },
+                  ].map(({ type, name, detail, anomaly, urgency }) => (
+                    <div key={name + type} className={`flex flex-wrap items-start gap-3 rounded-xl px-4 py-3 ${anomaly ? 'bg-amber-500/5 border border-amber-500/10' : 'bg-white/5'}`}>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 mt-0.5 ${urgency === 'High' ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/10 text-blue-400'}`}>{type}</span>
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium">{name}</div>
                         <div className="text-xs text-zinc-500">{detail}</div>
+                        {anomaly && (
+                          <div className="flex items-center gap-1 mt-1 text-xs text-amber-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            {anomaly}
+                          </div>
+                        )}
                       </div>
                       <div className="flex gap-2 flex-shrink-0">
                         <button className="px-3 py-1 rounded-lg text-xs font-medium bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors">Approve</button>
@@ -4311,6 +4465,43 @@ export default function App() {
                   </div>
                 </div>
               )}
+
+              {/* Team Leave Calendar */}
+              <div className="glass rounded-3xl p-6">
+                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Team Leave Calendar — May 2026</h2>
+                <p className="text-xs text-zinc-400 mb-4">Visual overview of who's out to prevent coverage conflicts</p>
+                <div className="space-y-2">
+                  {[
+                    { name: 'Jordan Lee', type: 'Vacation', dates: 'May 5–9', days: [5,6,7,8,9], color: '#60A5FA' },
+                    { name: 'Sam Carter', type: 'Sick Leave', dates: 'Apr 30', days: [30], color: '#F59E0B' },
+                    { name: 'Casey Brooks', type: 'Personal', dates: 'May 12–13', days: [12,13], color: '#9B51FE' },
+                    { name: 'Mia Thompson', type: 'Vacation', dates: 'May 19–23', days: [19,20,21,22,23], color: '#60A5FA' },
+                    { name: 'Dana Morales', type: 'Bereavement', dates: 'May 1–2', days: [1,2], color: '#EF4444' },
+                  ].map(({ name, type, dates, color }) => (
+                    <div key={name} className="flex items-center gap-4 bg-white/5 rounded-xl px-4 py-2.5">
+                      <div className="w-32 flex-shrink-0">
+                        <div className="text-sm font-medium truncate">{name}</div>
+                        <div className="text-xs text-zinc-500 capitalize">{type}</div>
+                      </div>
+                      <div className="flex-1 relative h-6">
+                        <div className="h-full rounded-full flex items-center px-3 text-xs font-medium" style={{ backgroundColor: color + '30', border: `1px solid ${color}60`, color }}>
+                          {dates}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 pt-4 border-t border-white/10">
+                  <div className="flex flex-wrap gap-3 text-xs">
+                    {[['#60A5FA', 'Vacation'], ['#F59E0B', 'Sick'], ['#9B51FE', 'Personal'], ['#EF4444', 'Bereavement']].map(([c, l]) => (
+                      <div key={l} className="flex items-center gap-1.5">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: c }} />
+                        <span className="text-zinc-400">{l}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
           {activeView === 'compliance' && (
@@ -4366,6 +4557,37 @@ export default function App() {
                   ))}
                 </div>
               </div>
+
+              {/* Auto-compliance alerts */}
+              <div className="glass rounded-3xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Auto-Compliance Alerts</h2>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-medium">5 active</span>
+                </div>
+                <div className="space-y-3">
+                  {[
+                    { type: 'Break Violation', employee: 'Casey Brooks', detail: 'Worked 11h 20m on Apr 26 — no break recorded', severity: 'high' },
+                    { type: 'Break Violation', employee: 'Sam Carter', detail: 'Worked 10h 45m on Apr 24 — no break recorded', severity: 'high' },
+                    { type: 'Overdue Training', employee: 'Riley Voss', detail: 'Workplace Safety Training due May 1 — not completed', severity: 'medium' },
+                    { type: 'Overdue Training', employee: 'Parker Kim', detail: 'Anti-Harassment Policy due Apr 30 — not completed', severity: 'medium' },
+                    { type: 'Overdue Training', employee: 'Dakota Lane', detail: 'Data Privacy & GDPR due Jun 15 — not started', severity: 'low' },
+                  ].map(({ type, employee, detail, severity }) => (
+                    <div key={employee + type} className={`flex flex-wrap items-center gap-3 rounded-xl px-4 py-3 border ${severity === 'high' ? 'bg-red-500/5 border-red-500/20' : severity === 'medium' ? 'bg-amber-500/5 border-amber-500/20' : 'bg-white/5 border-white/5'}`}>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${severity === 'high' ? 'bg-red-500/20 text-red-400' : severity === 'medium' ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                        {type}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium">{employee}</div>
+                        <div className="text-xs text-zinc-500 mt-0.5">{detail}</div>
+                      </div>
+                      <button className="px-3 py-1 rounded-lg text-xs font-medium bg-white/10 hover:bg-white/20 transition-colors flex-shrink-0">
+                        Resolve
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-zinc-500 mt-4">Auto-detected from clock-in/out records. Break violations are flagged when shifts exceed 10h with no break entry.</p>
+              </div>
             </div>
           )}
           {activeView === 'hiring' && (
@@ -4411,25 +4633,365 @@ export default function App() {
                   <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Onboarding Queue</h2>
                   <div className="space-y-3">
                     {[
-                      { name: 'Sam Carter', role: 'Frontend Engineer', start: 'May 5, 2026', progress: 30 },
-                      { name: 'Mia Thompson', role: 'Product Designer', start: 'May 12, 2026', progress: 0 },
-                      { name: 'Leo Kim', role: 'Account Executive', start: 'Apr 28, 2026', progress: 65 },
-                    ].map(({ name, role, start, progress }) => (
-                      <div key={name} className="bg-white/5 rounded-xl px-4 py-3">
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <div className="font-medium text-sm">{name}</div>
-                            <div className="text-xs text-zinc-400">{role} · Starts {start}</div>
+                      { name: 'Sam Carter', role: 'Frontend Engineer', start: 'May 5, 2026' },
+                      { name: 'Mia Thompson', role: 'Product Designer', start: 'May 12, 2026' },
+                      { name: 'Leo Kim', role: 'Account Executive', start: 'Apr 28, 2026' },
+                    ].map(({ name, role, start }) => {
+                      const tasks = onboardingTasks[name] || []
+                      const done = tasks.filter(Boolean).length
+                      const pct = tasks.length > 0 ? Math.round(done / tasks.length * 100) : 0
+                      return (
+                        <div key={name} className="bg-white/5 rounded-xl px-4 py-3">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <div className="font-medium text-sm">{name}</div>
+                              <div className="text-xs text-zinc-400">{role} · Starts {start}</div>
+                            </div>
+                            <span className="text-xs" style={{ color: 'var(--accent-color)' }}>{pct}%</span>
                           </div>
-                          <span className="text-xs" style={{ color: 'var(--accent-color)' }}>{progress}%</span>
+                          <div className="h-1.5 bg-white/10 rounded-full overflow-hidden mb-2">
+                            <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: 'var(--accent-color)' }} />
+                          </div>
+                          <div className="text-xs text-zinc-500">{done}/{tasks.length} tasks complete</div>
                         </div>
-                        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, backgroundColor: 'var(--accent-color)' }} />
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Onboarding Checklists */}
+              <div className="glass rounded-3xl p-6">
+                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Onboarding Checklists</h2>
+                <div className="space-y-6">
+                  {[
+                    { name: 'Sam Carter', role: 'Frontend Engineer' },
+                    { name: 'Mia Thompson', role: 'Product Designer' },
+                    { name: 'Leo Kim', role: 'Account Executive' },
+                  ].map(({ name, role }) => {
+                    const taskLabels = ['Equipment provisioned', 'Accounts created (email, Slack, GitHub)', 'HR paperwork signed', 'Benefits enrollment', '1:1 with manager scheduled', 'Team introduction done']
+                    const tasks = onboardingTasks[name] || taskLabels.map(() => false)
+                    const done = tasks.filter(Boolean).length
+                    return (
+                      <div key={name}>
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="text-sm font-semibold">{name}</div>
+                          <div className="text-xs text-zinc-400">— {role}</div>
+                          <span className="ml-auto text-xs text-zinc-500">{done}/{tasks.length}</span>
+                        </div>
+                        <div className="space-y-2">
+                          {taskLabels.map((label, i) => (
+                            <div key={label} className="flex items-center gap-3 bg-white/5 rounded-lg px-3 py-2">
+                              <button
+                                onClick={() => setOnboardingTasks(prev => ({
+                                  ...prev,
+                                  [name]: (prev[name] || tasks).map((v, j) => j === i ? !v : v)
+                                }))}
+                                className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${tasks[i] ? 'border-transparent' : 'border-white/30 bg-transparent hover:border-white/60'}`}
+                                style={tasks[i] ? { backgroundColor: 'var(--accent-color)' } : {}}
+                              >
+                                {tasks[i] && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                              </button>
+                              <span className={`text-sm flex-1 ${tasks[i] ? 'line-through text-zinc-500' : ''}`}>{label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+          {activeView === 'teamkpi' && (
+            <div className="max-w-5xl mx-auto space-y-6">
+              <div>
+                <h1 className="text-2xl font-semibold neon-green">Team KPI Dashboard</h1>
+                <p className="text-sm text-zinc-400">Attendance, performance, hours, and overtime at a glance</p>
+              </div>
+
+              {/* Summary stats */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {[
+                  { label: 'Avg Attendance Rate', value: '93.4%', sub: 'This month', color: 'var(--accent-color)' },
+                  { label: 'Avg Hours / Employee', value: '38.2h', sub: 'This week', color: 'var(--accent-color)' },
+                  { label: 'Overtime Employees', value: '4', sub: 'Above 40h threshold', color: '#F59E0B' },
+                  { label: 'On-Time Clock-in', value: '89%', sub: 'Within 5 min of shift', color: 'var(--accent-color)' },
+                ].map(({ label, value, sub, color }) => (
+                  <div key={label} className="glass rounded-2xl p-4 text-center">
+                    <div className="text-2xl font-bold" style={{ color }}>{value}</div>
+                    <div className="text-xs font-medium text-white mt-1">{label}</div>
+                    <div className="text-xs text-zinc-500 mt-0.5">{sub}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Per-employee KPI table */}
+              <div className="glass rounded-3xl p-6">
+                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Employee Performance Overview</h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm" style={{ minWidth: '640px' }}>
+                    <thead>
+                      <tr className="text-zinc-400 border-b border-white/10 text-left">
+                        <th className="py-2 pr-4">Employee</th>
+                        <th className="py-2 pr-4">Hours (Week)</th>
+                        <th className="py-2 pr-4">Attendance</th>
+                        <th className="py-2 pr-4">On-Time</th>
+                        <th className="py-2 pr-4">Streak</th>
+                        <th className="py-2">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { name: 'Alex Rivera', hours: 44, attendance: '98%', onTime: '100%', streak: 12, flag: 'overtime' },
+                        { name: 'Jordan Lee', hours: 38, attendance: '96%', onTime: '95%', streak: 8, flag: '' },
+                        { name: 'Casey Brooks', hours: 42, attendance: '94%', onTime: '88%', streak: 5, flag: 'overtime' },
+                        { name: 'Mia Thompson', hours: 40, attendance: '100%', onTime: '97%', streak: 15, flag: '' },
+                        { name: 'Dana Morales', hours: 35, attendance: '88%', onTime: '80%', streak: 2, flag: 'low-attendance' },
+                        { name: 'Sam Carter', hours: 41, attendance: '92%', onTime: '91%', streak: 6, flag: 'overtime' },
+                        { name: 'Riley Voss', hours: 37, attendance: '90%', onTime: '85%', streak: 3, flag: '' },
+                        { name: 'Parker Kim', hours: 43, attendance: '95%', onTime: '92%', streak: 9, flag: 'overtime' },
+                      ].map(({ name, hours, attendance, onTime, streak, flag }) => (
+                        <tr key={name} className="border-b border-white/5 hover:bg-white/5">
+                          <td className="py-2.5 pr-4 font-medium">{name}</td>
+                          <td className="py-2.5 pr-4">
+                            <span className={hours > 40 ? 'text-amber-400 font-semibold' : ''}>{hours}h</span>
+                          </td>
+                          <td className="py-2.5 pr-4">{attendance}</td>
+                          <td className="py-2.5 pr-4">{onTime}</td>
+                          <td className="py-2.5 pr-4">
+                            <span className="flex items-center gap-1">
+                              <svg viewBox="0 0 20 20" width="12" height="12" fill={streak >= 7 ? '#F97316' : '#6B7280'}><path d="M10 1.5C7 6 4 8.5 4 12a6 6 0 0012 0c0-3.5-3-6-6-10.5z"/></svg>
+                              {streak}d
+                            </span>
+                          </td>
+                          <td className="py-2.5">
+                            {flag === 'overtime' && <span className="px-2 py-0.5 rounded-full text-xs bg-amber-500/20 text-amber-400">OT Flag</span>}
+                            {flag === 'low-attendance' && <span className="px-2 py-0.5 rounded-full text-xs bg-red-500/20 text-red-400">Low Attendance</span>}
+                            {!flag && <span className="px-2 py-0.5 rounded-full text-xs bg-emerald-500/20 text-emerald-400">Good Standing</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Streak leaderboard */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="glass rounded-3xl p-6">
+                  <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Work Streak Leaders</h2>
+                  <div className="space-y-3">
+                    {[
+                      { rank: 1, name: 'Mia Thompson', streak: 15, badge: '🥇' },
+                      { rank: 2, name: 'Alex Rivera', streak: 12, badge: '🥈' },
+                      { rank: 3, name: 'Parker Kim', streak: 9, badge: '🥉' },
+                      { rank: 4, name: 'Jordan Lee', streak: 8, badge: '' },
+                      { rank: 5, name: 'Sam Carter', streak: 6, badge: '' },
+                    ].map(({ rank, name, streak, badge }) => (
+                      <div key={name} className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-2.5">
+                        <span className="w-6 text-center">{badge || <span className="text-xs text-zinc-500">#{rank}</span>}</span>
+                        <span className="flex-1 text-sm font-medium">{name}</span>
+                        <span className="flex items-center gap-1 text-sm">
+                          <svg viewBox="0 0 20 20" width="14" height="14" fill="#F97316"><path d="M10 1.5C7 6 4 8.5 4 12a6 6 0 0012 0c0-3.5-3-6-6-10.5z"/></svg>
+                          <span style={{ color: 'var(--accent-color)' }}>{streak}d</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Overtime flags */}
+                <div className="glass rounded-3xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Overtime Flags</h2>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-medium">4 flagged</span>
+                  </div>
+                  <div className="space-y-3">
+                    {[
+                      { name: 'Alex Rivera', hours: 44, dept: 'Engineering', action: 'Auth needed' },
+                      { name: 'Casey Brooks', hours: 42, dept: 'Infra', action: 'Pre-approved' },
+                      { name: 'Sam Carter', hours: 41, dept: 'Frontend', action: 'Auth needed' },
+                      { name: 'Parker Kim', hours: 43, dept: 'Engineering', action: 'Auth needed' },
+                    ].map(({ name, hours, dept, action }) => (
+                      <div key={name} className="flex items-center gap-3 bg-amber-500/5 border border-amber-500/10 rounded-xl px-4 py-2.5">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium">{name}</div>
+                          <div className="text-xs text-zinc-500">{dept} · {hours}h this week</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-amber-400">{action}</span>
+                          {action === 'Auth needed' && (
+                            <button className="px-2 py-0.5 rounded-lg text-xs font-medium bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 transition-colors">Authorize</button>
+                          )}
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
+              </div>
+
+              {/* Attendance trend */}
+              <div className="glass rounded-3xl p-6">
+                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Department Attendance Rate</h2>
+                <div className="space-y-3">
+                  {[
+                    { dept: 'Engineering', rate: 95 },
+                    { dept: 'Sales', rate: 91 },
+                    { dept: 'HR', rate: 96 },
+                    { dept: 'Marketing', rate: 88 },
+                    { dept: 'Finance', rate: 93 },
+                  ].map(({ dept, rate }) => (
+                    <div key={dept}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span>{dept}</span>
+                        <span className={rate < 90 ? 'text-red-400' : 'text-zinc-400'}>{rate}%</span>
+                      </div>
+                      <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${rate}%`, backgroundColor: rate < 90 ? '#EF4444' : 'var(--accent-color)' }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          {activeView === 'announcements' && (
+            <div className="max-w-5xl mx-auto space-y-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h1 className="text-2xl font-semibold neon-green">Team Announcements</h1>
+                  <p className="text-sm text-zinc-400">Broadcast messages to your team with read-receipt tracking</p>
+                </div>
+                <button
+                  onClick={() => setShowAnnouncementForm(v => !v)}
+                  className="px-4 py-2 rounded-xl text-sm font-medium"
+                  style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
+                >
+                  {showAnnouncementForm ? 'Cancel' : '+ New Announcement'}
+                </button>
+              </div>
+
+              {showAnnouncementForm && (
+                <div className="glass rounded-3xl p-6 space-y-4">
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>New Announcement</h2>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="text-xs text-zinc-400 mb-1">Title</div>
+                      <input
+                        type="text"
+                        value={announcementForm.title}
+                        onChange={e => setAnnouncementForm(f => ({ ...f, title: e.target.value }))}
+                        placeholder="Announcement title..."
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-zinc-400 mb-1">Message</div>
+                      <textarea
+                        value={announcementForm.body}
+                        onChange={e => setAnnouncementForm(f => ({ ...f, body: e.target.value }))}
+                        placeholder="Write your announcement..."
+                        rows={4}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none resize-none"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-zinc-400 mb-1">Priority</div>
+                      <select
+                        value={announcementForm.priority}
+                        onChange={e => setAnnouncementForm(f => ({ ...f, priority: e.target.value as 'normal' | 'urgent' }))}
+                        className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
+                      >
+                        <option value="normal">Normal</option>
+                        <option value="urgent">Urgent</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (!announcementForm.title.trim() || !announcementForm.body.trim()) {
+                        toast.error('Please fill in title and message'); return
+                      }
+                      const newA = {
+                        id: Date.now(),
+                        title: announcementForm.title,
+                        body: announcementForm.body,
+                        author: user?.name || 'Manager',
+                        priority: announcementForm.priority,
+                        created_at: new Date().toISOString(),
+                        read_by: [],
+                      }
+                      setAnnouncements(prev => [newA, ...prev])
+                      setShowAnnouncementForm(false)
+                      setAnnouncementForm({ title: '', body: '', priority: 'normal' })
+                      toast.success('Announcement sent to team!')
+                    }}
+                    className="px-5 py-2 rounded-xl text-sm font-medium"
+                    style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
+                  >
+                    Send to All
+                  </button>
+                </div>
+              )}
+
+              {/* Read receipt summary */}
+              <div className="grid grid-cols-3 gap-4">
+                {[
+                  { label: 'Announcements Sent', value: announcements.length },
+                  { label: 'Avg Read Rate', value: '—' },
+                  { label: 'Urgent Unread', value: announcements.filter(a => a.priority === 'urgent' && a.read_by.length === 0).length },
+                ].map(({ label, value }) => (
+                  <div key={label} className="glass rounded-2xl p-4 text-center">
+                    <div className="text-2xl font-bold" style={{ color: 'var(--accent-color)' }}>{value}</div>
+                    <div className="text-xs text-zinc-400 mt-1">{label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Announcements list */}
+              <div className="space-y-4">
+                {announcements.map(a => (
+                  <div key={a.id} className={`glass rounded-3xl p-6 border ${a.priority === 'urgent' ? 'border-amber-500/30' : 'border-white/5'}`}>
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {a.priority === 'urgent' && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-medium">Urgent</span>
+                        )}
+                        <h3 className="font-semibold text-white">{a.title}</h3>
+                      </div>
+                      <span className="text-xs text-zinc-500 flex-shrink-0">{new Date(a.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <p className="text-sm text-zinc-300 mb-4 leading-relaxed">{a.body}</p>
+                    <div className="flex items-center justify-between flex-wrap gap-3">
+                      <div className="text-xs text-zinc-500">
+                        Sent by <span className="text-zinc-300">{a.author}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5 text-xs text-zinc-400">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                          <span>{a.read_by.length === 0 ? 'No reads yet' : `${a.read_by.length} read`}</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const name = user?.name || 'You'
+                            if (!a.read_by.includes(name)) {
+                              setAnnouncements(prev => prev.map(x => x.id === a.id ? { ...x, read_by: [...x.read_by, name] } : x))
+                            }
+                          }}
+                          className="text-xs px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+                        >
+                          Mark as Read
+                        </button>
+                      </div>
+                    </div>
+                    {a.read_by.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-white/10 text-xs text-zinc-500">
+                        Read by: {a.read_by.join(', ')}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}
