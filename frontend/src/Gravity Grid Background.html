@@ -1,0 +1,927 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Gravity Well — Shader Wallpaper</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  :root {
+    --fg: rgba(230, 236, 255, 0.82);
+    --fg-dim: rgba(200, 212, 240, 0.38);
+    --fg-ghost: rgba(200, 212, 240, 0.18);
+    --accent: #b8c7ff;
+    --mint: #9be4c9;
+  }
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    background: #000;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", system-ui, sans-serif;
+    color: var(--fg);
+    cursor: none;
+  }
+  canvas { display: block; width: 100vw; height: 100vh; }
+
+  /* Custom cursor — tiny liquid-glass dot */
+  .cursor {
+    position: fixed; top: 0; left: 0;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 20;
+    background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.9), rgba(255,255,255,0.2) 60%, transparent 72%);
+    border: 0.5px solid rgba(255,255,255,0.5);
+    box-shadow: 0 0 10px rgba(184, 199, 255, 0.35);
+    transition: width 0.12s ease, height 0.12s ease;
+    will-change: left, top;
+  }
+  .cursor.down { width: 16px; height: 16px; }
+
+  /* Fintech OS chrome */
+  .hud {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 3;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .hud .row { position: absolute; display: flex; align-items: center; gap: 14px; }
+
+  /* top-left: status pill */
+  .hud .tl { top: 28px; left: 32px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 7px 12px 7px 10px;
+    background: rgba(18, 22, 38, 0.38);
+    backdrop-filter: blur(22px) saturate(160%);
+    -webkit-backdrop-filter: blur(22px) saturate(160%);
+    border: 0.5px solid rgba(255,255,255,0.08);
+    border-radius: 100px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 24px rgba(0,0,0,0.35);
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    color: var(--fg);
+  }
+  .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--mint);
+    box-shadow: 0 0 8px var(--mint), 0 0 2px var(--mint);
+    animation: pulse 2.8s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.55; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.15); }
+  }
+  .sep { width: 1px; height: 10px; background: rgba(255,255,255,0.12); }
+  .mono {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+  }
+  .dim { color: var(--fg-dim); }
+
+  /* top-right: ticker */
+  .hud .tr { top: 28px; right: 32px; }
+  .ticker {
+    display: flex; gap: 18px;
+    padding: 8px 14px;
+    background: rgba(18, 22, 38, 0.38);
+    backdrop-filter: blur(22px) saturate(160%);
+    -webkit-backdrop-filter: blur(22px) saturate(160%);
+    border: 0.5px solid rgba(255,255,255,0.08);
+    border-radius: 100px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 24px rgba(0,0,0,0.35);
+  }
+  .tick {
+    display: flex; align-items: baseline; gap: 7px;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+  }
+  .tick .sym { color: var(--fg-dim); font-size: 9.5px; letter-spacing: 0.16em; }
+  .tick .val { color: var(--fg); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10.5px; }
+  .tick .chg { font-size: 9.5px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .tick.up .chg { color: var(--mint); }
+  .tick.down .chg { color: #ff9bb3; }
+
+  /* bottom-left: coords */
+  .hud .bl { bottom: 28px; left: 32px; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .label {
+    font-size: 9px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--fg-ghost);
+  }
+  .big {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 13px;
+    color: var(--fg);
+    letter-spacing: 0.04em;
+  }
+
+  /* bottom-right: live metric */
+  .hud .br { bottom: 28px; right: 32px; flex-direction: column; align-items: flex-end; gap: 6px; }
+
+  /* Signature mark — center bottom */
+  .mark {
+    position: fixed;
+    left: 50%; bottom: 30px;
+    transform: translateX(-50%);
+    display: flex; align-items: center; gap: 10px;
+    font-size: 10px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--fg-ghost);
+    z-index: 3;
+    pointer-events: none;
+  }
+  .mark svg { opacity: 0.5; }
+
+  .hint {
+    position: fixed;
+    left: 50%; top: 50%;
+    transform: translate(-50%, 140px);
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(220, 228, 255, 0.35);
+    z-index: 3;
+    pointer-events: none;
+    transition: opacity 1.2s;
+  }
+  .hint.fade { opacity: 0; }
+
+  /* Tweaks — liquid glass card */
+  .tweaks {
+    position: fixed;
+    right: 24px; bottom: 76px;
+    width: 288px;
+    padding: 18px 20px 20px;
+    background: rgba(18, 22, 38, 0.42);
+    backdrop-filter: blur(36px) saturate(180%);
+    -webkit-backdrop-filter: blur(36px) saturate(180%);
+    border: 0.5px solid rgba(255,255,255,0.08);
+    border-radius: 22px;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      inset 0 0 0 0.5px rgba(255,255,255,0.03),
+      0 24px 60px rgba(0,0,0,0.55);
+    color: var(--fg);
+    z-index: 15;
+    display: none;
+  }
+  .tweaks.open { display: block; }
+  .tweaks h3 {
+    margin: 0 0 16px;
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--fg-dim);
+    display: flex; justify-content: space-between; align-items: center;
+    font-weight: 500;
+  }
+  .tweaks h3 .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 9px; color: var(--mint);
+  }
+  .tweaks h3 .badge::before {
+    content: ''; width: 5px; height: 5px; border-radius: 50%;
+    background: var(--mint); box-shadow: 0 0 6px var(--mint);
+  }
+  .tweak-row {
+    display: grid;
+    grid-template-columns: 60px 1fr 36px;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .tweak-row label {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--fg-dim);
+  }
+  .tweak-row input[type=range] {
+    -webkit-appearance: none; appearance: none;
+    height: 3px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+    outline: none;
+  }
+  .tweak-row input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 0 0.5px rgba(255,255,255,0.3), 0 0 12px rgba(184,199,255,0.6);
+    cursor: pointer;
+  }
+  .tweak-row input[type=range]::-moz-range-thumb {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #fff; border: none;
+    box-shadow: 0 0 0 0.5px rgba(255,255,255,0.3), 0 0 12px rgba(184,199,255,0.6);
+    cursor: pointer;
+  }
+  .tweak-row .val {
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 10px;
+    text-align: right;
+    color: var(--fg);
+  }
+  .divider {
+    height: 1px;
+    background: rgba(255,255,255,0.06);
+    margin: 14px -20px;
+  }
+  .preset-row {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .preset-row button {
+    background: rgba(255,255,255,0.04);
+    border: 0.5px solid rgba(255,255,255,0.08);
+    color: var(--fg);
+    font-family: inherit;
+    font-size: 9.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 8px 0;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .preset-row button:hover {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.2);
+  }
+  .preset-row button.active {
+    background: rgba(255,255,255,0.12);
+    border-color: rgba(255,255,255,0.3);
+    color: #fff;
+    box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.1), 0 0 20px rgba(184,199,255,0.15);
+  }
+</style>
+</head>
+<body>
+
+<canvas id="gl"></canvas>
+<div class="cursor" id="cursor"></div>
+
+<div class="hud">
+  <div class="row tl">
+    <div class="pill">
+      <span class="dot"></span>
+      <span>Aperture</span>
+      <span class="sep"></span>
+      <span class="mono dim">v3.1 · ORBIT</span>
+    </div>
+  </div>
+
+  <div class="row tr">
+    <div class="ticker">
+      <div class="tick up"><span class="sym">NVDA</span><span class="val">1,284.06</span><span class="chg">+2.14%</span></div>
+      <div class="tick down"><span class="sym">BTC</span><span class="val">94,720</span><span class="chg">−0.82%</span></div>
+      <div class="tick up"><span class="sym">ETH</span><span class="val">5,128</span><span class="chg">+1.03%</span></div>
+      <div class="tick"><span class="sym mono dim" id="clock">00:00 UTC</span></div>
+    </div>
+  </div>
+
+  <div class="row bl">
+    <div class="label">Coordinates</div>
+    <div class="big" id="coord">RA +00:00:00 · DEC +00°00′</div>
+    <div class="label" style="margin-top:4px">Field</div>
+    <div class="mono dim" id="field">ORION-β · drift 0.00 mas/s</div>
+  </div>
+
+  <div class="row br">
+    <div class="label">Gravity</div>
+    <div class="big" id="gravity">0.00 G</div>
+    <div class="label" style="margin-top:4px">Session</div>
+    <div class="mono dim" id="session">00:00:00 · 0 events</div>
+  </div>
+</div>
+
+<div class="mark">
+  <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4.5" stroke="currentColor" stroke-width="0.5"/><circle cx="5" cy="5" r="1.5" fill="currentColor"/></svg>
+  <span>Aperture · Orbital Canvas</span>
+</div>
+
+<div class="hint" id="hint">MOVE · LENS &nbsp;·&nbsp; CLICK · PULSE</div>
+
+<div class="tweaks" id="tweaks">
+  <h3><span>Tweaks</span><span class="badge">Live</span></h3>
+  <div class="tweak-row">
+    <label>Depth</label>
+    <input type="range" id="tGravity" min="0" max="2" step="0.01">
+    <span class="val" id="vGravity">1.00</span>
+  </div>
+  <div class="tweak-row">
+    <label>Stars</label>
+    <input type="range" id="tStars" min="0" max="2" step="0.01">
+    <span class="val" id="vStars">1.00</span>
+  </div>
+  <div class="tweak-row">
+    <label>Nebula</label>
+    <input type="range" id="tNebula" min="0" max="1.5" step="0.01">
+    <span class="val" id="vNebula">0.70</span>
+  </div>
+  <div class="tweak-row">
+    <label>Galaxies</label>
+    <input type="range" id="tGalaxies" min="0" max="1.5" step="0.01">
+    <span class="val" id="vGalaxies">0.80</span>
+  </div>
+  <div class="tweak-row">
+    <label>Lens</label>
+    <input type="range" id="tLens" min="0" max="2" step="0.01">
+    <span class="val" id="vLens">1.00</span>
+  </div>
+  <div class="tweak-row">
+    <label>Hue</label>
+    <input type="range" id="tHue" min="0" max="1" step="0.01">
+    <span class="val" id="vHue">0.55</span>
+  </div>
+  <div class="tweak-row">
+    <label>Drift</label>
+    <input type="range" id="tSpeed" min="0" max="2" step="0.01">
+    <span class="val" id="vSpeed">1.00</span>
+  </div>
+  <div class="divider"></div>
+  <div class="preset-row">
+    <button data-preset="obsidian" class="active">Obsidian</button>
+    <button data-preset="aurora">Aurora</button>
+    <button data-preset="ember">Ember</button>
+  </div>
+</div>
+
+<script>
+// ----- tweakable defaults (persisted via Tweaks toggle) --------------
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "gravity": 0,
+  "starDensity": 2,
+  "nebulaIntensity": 1.5,
+  "galaxyIntensity": 0.28,
+  "lensStrength": 0,
+  "hueShift": 0,
+  "speed": 0,
+  "preset": "ember"
+}/*EDITMODE-END*/;
+
+const state = { ...TWEAK_DEFAULTS };
+
+// ----- WebGL ---------------------------------------------------------
+const canvas = document.getElementById('gl');
+const gl = canvas.getContext('webgl', { antialias: false, premultipliedAlpha: false });
+if (!gl) { document.body.innerHTML = '<div style="color:#fff;padding:40px">WebGL not supported.</div>'; throw new Error('no webgl'); }
+gl.getExtension('OES_standard_derivatives');
+
+const VERT = `
+attribute vec2 a_pos;
+void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }
+`;
+
+const FRAG = `
+#extension GL_OES_standard_derivatives : enable
+precision highp float;
+
+uniform vec2  u_res;
+uniform float u_time;
+uniform vec2  u_mouse;         // NDC -1..1
+uniform float u_mouseDown;
+uniform float u_clickPulse;
+
+// up to 6 active click ripples: vec3(px, py, ageSeconds)
+uniform vec3  u_ripples[6];
+uniform int   u_rippleCount;
+
+// up to 8 shooting stars: vec4(sx, sy, dx, dy), separate age 0..1
+uniform vec4  u_shoot[8];
+uniform float u_shootAge[8];
+uniform int   u_shootCount;
+
+uniform float u_gravity;
+uniform float u_starDensity;
+uniform float u_nebula;
+uniform float u_galaxy;
+uniform float u_lens;
+uniform float u_hue;
+uniform float u_speed;
+uniform float u_preset;  // 0 obsidian, 1 aurora, 2 ember
+
+#define PI 3.14159265359
+
+// ---------- hashing / noise ----------
+float hash11(float x) { return fract(sin(x*127.1)*43758.5453); }
+float hash12(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
+vec2  hash22(vec2 p) {
+  p = vec2(dot(p, vec2(127.1,311.7)), dot(p, vec2(269.5,183.3)));
+  return -1.0 + 2.0*fract(sin(p)*43758.5453);
+}
+float vnoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f*f*(3.0-2.0*f);
+  return mix(mix(dot(hash22(i), f),
+                 dot(hash22(i+vec2(1,0)), f-vec2(1,0)), u.x),
+             mix(dot(hash22(i+vec2(0,1)), f-vec2(0,1)),
+                 dot(hash22(i+vec2(1,1)), f-vec2(1,1)), u.x), u.y);
+}
+float fbm(vec2 p) {
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 3; i++) {
+    v += a*vnoise(p);
+    p = p*2.03 + vec2(1.7, 0.3);
+    a *= 0.5;
+  }
+  return v;
+}
+
+// ---------- palette ----------
+vec3 bg() {
+  if (u_preset < 0.5) return vec3(0.004, 0.006, 0.015);       // obsidian
+  if (u_preset < 1.5) return vec3(0.002, 0.010, 0.018);       // aurora
+  return vec3(0.010, 0.005, 0.012);                            // ember
+}
+vec3 tintA() {
+  if (u_preset < 0.5) return vec3(0.10, 0.18, 0.42);
+  if (u_preset < 1.5) return vec3(0.05, 0.35, 0.30);
+  return vec3(0.55, 0.18, 0.12);
+}
+vec3 tintB() {
+  if (u_preset < 0.5) return vec3(0.28, 0.14, 0.48);
+  if (u_preset < 1.5) return vec3(0.18, 0.22, 0.55);
+  return vec3(0.40, 0.08, 0.38);
+}
+vec3 tintC() {
+  if (u_preset < 0.5) return vec3(0.45, 0.55, 0.85);           // blue-white highlights
+  if (u_preset < 1.5) return vec3(0.45, 0.80, 0.70);
+  return vec3(0.95, 0.55, 0.35);
+}
+
+// ---------- stars ----------
+// Soft, faint dots of light — pure radial gaussian falloff, no edges, no spikes.
+vec3 stars(vec2 p, float scale, float density, vec3 baseTint) {
+  vec2 g = p * scale;
+  vec2 id = floor(g);
+  vec2 fr = fract(g) - 0.5;
+  float h = hash12(id);
+  if (h > density) return vec3(0.0);
+  // per-cell centered position (small jitter so stars aren't gridlike)
+  vec2 jitter = (vec2(hash12(id+0.13), hash12(id+0.71)) - 0.5) * 0.6;
+  vec2 f = (fr - jitter);
+  float d2 = dot(f, f);
+  // brightness distribution (heavy tail — most are tiny)
+  float b = hash12(id + 3.7);
+  float bright = pow(b, 5.0);
+  // soft gaussian glow — size varies with brightness
+  float sigma = mix(0.06, 0.14, bright);
+  float s = exp(-d2 / (sigma*sigma));
+  // slow per-star twinkle
+  float phase = hash12(id + 0.27) * 6.28;
+  float tw = 0.7 + 0.3 * sin(u_time * (0.5 + b*1.2) + phase);
+  s *= tw;
+  // tint (subtle)
+  float ch = hash12(id + 0.91);
+  vec3 col = mix(vec3(1.0, 0.92, 0.82), vec3(0.82, 0.90, 1.05), ch);
+  col = mix(col, baseTint, 0.15);
+  return col * s * (0.12 + bright * 0.9);
+}
+
+// ---------- galaxies ----------
+// Tiny distant smudges — barred/elliptical fuzz with a faint halo.
+// Positioned deterministically from a seed; tiny angular size.
+vec3 galaxy(vec2 p, vec2 center, float size, float angle, float flatten, vec3 core, vec3 halo) {
+  vec2 d = p - center;
+  float c = cos(angle), s = sin(angle);
+  d = mat2(c, -s, s, c) * d;
+  d.y /= flatten;
+  float r = length(d);
+  // soft elliptical falloff
+  float body = exp(-pow(r/size, 1.6) * 6.0);
+  // dim spiral hint (very subtle)
+  float a = atan(d.y, d.x);
+  float arm = 0.5 + 0.5 * sin(a*2.0 + log(r + 0.002) * 5.5);
+  float arms = arm * exp(-pow(r/size, 1.4) * 5.0) * 0.25;
+  // very faint outer halo
+  float h = exp(-r/size * 2.5) * 0.12;
+  vec3 col = core * (body + arms) + halo * h;
+  return col;
+}
+
+vec3 allGalaxies(vec2 p, float t) {
+  vec3 c = vec3(0.0);
+  // Anchor positions drift very slowly — barely perceptible parallax
+  // sizes are small (0.025 .. 0.055 of viewport height units)
+  c += galaxy(p, vec2(-0.42 + sin(t*0.006)*0.01,  0.18), 0.032, 0.6, 0.45, tintC()*0.7, tintB()*0.6);
+  c += galaxy(p, vec2( 0.31 + cos(t*0.008)*0.01, -0.22), 0.038, -0.9, 0.40, vec3(1.0, 0.92, 0.82)*0.55, tintA()*0.7);
+  c += galaxy(p, vec2( 0.08 + sin(t*0.005)*0.008, 0.33), 0.022, 2.1, 0.35, vec3(0.85, 0.90, 1.0)*0.55, tintB()*0.5);
+  c += galaxy(p, vec2(-0.18 + cos(t*0.007)*0.008,-0.34), 0.026, 1.4, 0.50, vec3(1.0, 0.80, 0.85)*0.45, tintA()*0.5);
+  c += galaxy(p, vec2( 0.48, 0.10), 0.018, 0.2, 0.55, tintC()*0.4, tintB()*0.4);
+  return c;
+}
+
+// ---------- nebula (very subtle) ----------
+vec3 nebula(vec2 p, float t) {
+  float n1 = fbm(p*0.9 + vec2(t*0.008, 0.0));
+  float d1 = smoothstep(0.35, 0.80, n1);
+  vec3 a = tintA(), b = tintB();
+  float h = u_hue * 6.2831;
+  mat2 rot = mat2(cos(h), -sin(h)*0.3, sin(h)*0.3, cos(h));
+  a.rg = rot * a.rg;
+  b.gb = rot * b.gb;
+  vec3 col = mix(a, b, n1*0.5+0.5) * d1 * 0.7;
+  return col;
+}
+
+// ---------- shooting stars ----------
+vec3 shootingStar(vec2 p, vec4 s, float age) {
+  if (age <= 0.0 || age >= 1.0) return vec3(0.0);
+  vec2 dir = s.zw;
+  vec2 perp = vec2(-dir.y, dir.x);
+  float travel = age * 2.0;
+  vec2 head = s.xy + dir * travel;
+  vec2 rel = p - head;
+  float along = dot(rel, -dir);
+  float across = dot(rel, perp);
+  float trailLen = 0.35;
+  float t = clamp(along / trailLen, 0.0, 1.0);
+  float w = mix(0.0015, 0.0, t);
+  float pxw = fwidth(across) * 0.8;
+  float trail = (1.0 - smoothstep(w, w + pxw, abs(across))) * (1.0 - t);
+  // only behind head
+  trail *= step(0.0, along);
+  float headGlow = exp(-dot(rel, rel) * 8000.0) * 1.0;
+  float fade = (1.0 - age) * (1.0 - age);
+  vec3 col = mix(vec3(1.0, 0.95, 0.85), vec3(0.75, 0.85, 1.0), t);
+  return col * (trail * 0.9 + headGlow * 1.8) * fade;
+}
+
+// ---------- lens warp (liquid glass) ----------
+// Radial displacement + subtle chromatic aberration near cursor.
+// Larger radius when mouse is held.
+vec2 lensWarp(vec2 p, vec2 c, float strength, float radius) {
+  vec2 d = p - c;
+  float r = length(d);
+  // bell-curve displacement — stronger near edge of the lens, zero in center and far away
+  float influence = exp(-pow(r / radius, 2.0) * 1.8);
+  // inner bulge: pull slightly OUT at very center (convex lens), push IN at outer ring
+  float bulge = influence * (r / radius) * (1.0 - r/radius) * 8.0;
+  return p - normalize(d + 1e-5) * bulge * strength * 0.05;
+}
+
+// The scene, sampled at a given uv — used for both normal render and lens refraction.
+vec3 sampleScene(vec2 uv, float t) {
+  vec3 col = bg();
+
+  // faint vertical gradient tint from preset
+  col += tintA() * 0.015 * (0.6 + uv.y);
+
+  // single nebula layer
+  vec3 neb = nebula(uv * 1.6 + vec2(u_mouse.x * 0.01, u_mouse.y * 0.008), t);
+  col += neb * 0.22 * u_nebula;
+
+  // galaxies
+  col += allGalaxies(uv, t) * u_galaxy;
+
+  // stars — 3 parallax layers, sparse and soft
+  vec2 par = u_mouse * 0.012;
+  float sd = u_starDensity;
+  col += stars(uv + par*0.25,  70.0, 0.09 * sd, tintC()) * 0.9;
+  col += stars(uv + par*0.55, 140.0, 0.07 * sd, tintC()) * 0.55;
+  col += stars(uv + par*0.9,  240.0, 0.05 * sd, vec3(1.0)) * 0.30;
+
+  return col;
+}
+
+void main() {
+  vec2 frag = gl_FragCoord.xy;
+  vec2 uv = (frag - 0.5 * u_res) / u_res.y;
+  vec2 mouse = vec2(u_mouse.x * (u_res.x / u_res.y), u_mouse.y) * 0.5;
+
+  float t = u_time * u_speed;
+
+  // Lens radius grows when holding
+  float lensR = mix(0.15, 0.26, u_mouseDown) + u_clickPulse * 0.08;
+  float lensStr = u_lens * u_gravity;
+
+  // Warp the sampling uv around the mouse — this is the "liquid glass" lens
+  vec2 warped = lensWarp(uv, mouse, lensStr, lensR);
+
+  // click ripples (wave distortion, subtle)
+  for (int i = 0; i < 6; i++) {
+    if (i >= u_rippleCount) break;
+    vec2 rp = u_ripples[i].xy;
+    float age = u_ripples[i].z;
+    if (age <= 0.0 || age > 2.0) continue;
+    vec2 rd = uv - rp;
+    float rr = length(rd);
+    float waveR = age * 0.75;
+    float band = exp(-pow((rr - waveR) * 12.0, 2.0));
+    float decay = (1.0 - age * 0.5) * (1.0 - age * 0.5);
+    warped -= normalize(rd + 1e-5) * band * decay * 0.012;
+  }
+
+  // single scene sample — much faster
+  vec3 col = sampleScene(warped, t);
+
+  // lens rim highlight — very soft, only within lens radius
+  float r = length(uv - mouse);
+  float rim = exp(-pow((r - lensR*0.88) * 16.0, 2.0)) * 0.06 * lensStr;
+  col += vec3(0.9, 0.95, 1.0) * rim;
+  // tiny inner sheen
+  float sheen = exp(-r*r * 140.0) * (0.05 + u_mouseDown * 0.08 + u_clickPulse * 0.15);
+  col += vec3(0.75, 0.85, 1.0) * sheen;
+
+  // ripple rings — ultra-faint luminance bump along the wavefront
+  for (int i = 0; i < 6; i++) {
+    if (i >= u_rippleCount) break;
+    vec2 rp = u_ripples[i].xy;
+    float age = u_ripples[i].z;
+    if (age <= 0.0 || age > 2.0) continue;
+    float rr = length(uv - rp);
+    float waveR = age * 0.75;
+    float band = exp(-pow((rr - waveR) * 14.0, 2.0));
+    float decay = (1.0 - age * 0.5);
+    col += vec3(0.7, 0.82, 1.0) * band * decay * 0.06;
+  }
+
+  // shooting stars (on top, unwarped)
+  for (int i = 0; i < 8; i++) {
+    if (i >= u_shootCount) break;
+    col += shootingStar(uv, u_shoot[i], u_shootAge[i]);
+  }
+
+  // soft vignette
+  float v = 1.0 - dot(uv*0.85, uv*0.85);
+  col *= mix(0.55, 1.0, clamp(v, 0.0, 1.0));
+
+  // very subtle grain
+  float grain = hash12(frag + u_time) - 0.5;
+  col += grain * 0.006;
+
+  // gentle tone
+  col = pow(max(col, 0.0), vec3(0.94));
+
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    console.error(gl.getShaderInfoLog(s));
+    throw new Error('compile');
+  }
+  return s;
+}
+const vert = compile(gl.VERTEX_SHADER, VERT);
+const frag = compile(gl.FRAGMENT_SHADER, FRAG);
+const prog = gl.createProgram();
+gl.attachShader(prog, vert); gl.attachShader(prog, frag);
+gl.linkProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { console.error(gl.getProgramInfoLog(prog)); throw new Error('link'); }
+gl.useProgram(prog);
+
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+const aPos = gl.getAttribLocation(prog, 'a_pos');
+gl.enableVertexAttribArray(aPos);
+gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+const U = {};
+['u_res','u_time','u_mouse','u_mouseDown','u_clickPulse',
+ 'u_ripples[0]','u_rippleCount','u_shoot[0]','u_shootAge[0]','u_shootCount',
+ 'u_gravity','u_starDensity','u_nebula','u_galaxy','u_lens','u_hue','u_speed','u_preset'
+].forEach(n => U[n] = gl.getUniformLocation(prog, n));
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.floor(window.innerWidth * dpr);
+  canvas.height = Math.floor(window.innerHeight * dpr);
+  canvas.style.width = window.innerWidth + 'px';
+  canvas.style.height = window.innerHeight + 'px';
+  gl.viewport(0, 0, canvas.width, canvas.height);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ----- interaction -----
+const cursor = document.getElementById('cursor');
+let mx = 0, my = 0, tx = 0, ty = 0;
+let down = 0, tDown = 0;
+let clickPulse = 0;
+let events = 0;
+
+const MAX_R = 6;
+const ripples = []; // {x, y, born}
+const MAX_S = 8;
+const shoots = [];  // {sx, sy, dx, dy, born, life}
+
+function toNDC(e) {
+  return {
+    x: (e.clientX / window.innerWidth) * 2 - 1,
+    y: -((e.clientY / window.innerHeight) * 2 - 1),
+    cx: e.clientX, cy: e.clientY
+  };
+}
+
+document.addEventListener('pointermove', (e) => {
+  const p = toNDC(e);
+  tx = p.x; ty = p.y;
+  cursor.style.left = p.cx + 'px';
+  cursor.style.top = p.cy + 'px';
+  fadeHint();
+});
+document.addEventListener('pointerdown', (e) => {
+  tDown = 1;
+  clickPulse = 1.0;
+  cursor.classList.add('down');
+  spawnRipple(toNDC(e));
+  if (Math.random() < 0.55) spawnShooting();
+  events++;
+  fadeHint();
+});
+document.addEventListener('pointerup', () => { tDown = 0; cursor.classList.remove('down'); });
+document.addEventListener('pointerleave', () => { tDown = 0; });
+
+function spawnRipple(p) {
+  // convert NDC to scene units (matches shader uv space)
+  const aspect = window.innerWidth / window.innerHeight;
+  const sx = p.x * aspect * 0.5;
+  const sy = p.y * 0.5;
+  ripples.push({ x: sx, y: sy, born: performance.now()/1000 });
+  if (ripples.length > MAX_R) ripples.shift();
+}
+
+function spawnShooting() {
+  const aspect = window.innerWidth / window.innerHeight;
+  const angle = Math.random() * Math.PI * 2;
+  const dx = Math.cos(angle), dy = Math.sin(angle);
+  const r = 1.2;
+  const sx = -dx * r * aspect * 0.5;
+  const sy = -dy * r * 0.5;
+  shoots.push({ sx, sy, dx, dy, born: performance.now()/1000, life: 2.2 + Math.random()*1.6 });
+  if (shoots.length > MAX_S) shoots.shift();
+}
+setInterval(() => { if (Math.random() < 0.45) spawnShooting(); }, 4800);
+
+// ----- hint fade -----
+let hintFaded = false;
+function fadeHint() {
+  if (hintFaded) return;
+  hintFaded = true;
+  setTimeout(() => document.getElementById('hint').classList.add('fade'), 2400);
+}
+
+// ----- HUD -----
+const coordEl = document.getElementById('coord');
+const fieldEl = document.getElementById('field');
+const clockEl = document.getElementById('clock');
+const gravEl = document.getElementById('gravity');
+const sessionEl = document.getElementById('session');
+const sessionStart = Date.now();
+function pad(n, l=2) { return String(n).padStart(l, '0'); }
+function hms(ms) {
+  const s = Math.floor(ms/1000);
+  return `${pad(Math.floor(s/3600))}:${pad(Math.floor(s/60)%60)}:${pad(s%60)}`;
+}
+function updateHUD() {
+  // fake astronomical coords derived from mouse
+  const ra = Math.floor((mx*0.5+0.5)*24);
+  const raM = Math.floor(((mx*0.5+0.5)*24 * 60) % 60);
+  const raS = Math.floor(((mx*0.5+0.5)*24 * 3600) % 60);
+  const decSign = my >= 0 ? '+' : '−';
+  const decD = Math.floor(Math.abs(my)*60);
+  const decM = Math.floor((Math.abs(my)*60 * 60) % 60);
+  coordEl.textContent = `RA ${pad(ra)}:${pad(raM)}:${pad(raS)} · DEC ${decSign}${pad(decD)}°${pad(decM)}′`;
+  const drift = (Math.hypot(vx, vy) * 420).toFixed(2);
+  fieldEl.textContent = `ORION-β · drift ${drift} mas/s`;
+  const d = new Date();
+  clockEl.textContent = `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC`;
+  const g = (down*0.7 + clickPulse*1.4 + Math.min(1.5, Math.hypot(vx,vy)*6)) * state.gravity;
+  gravEl.textContent = `${g.toFixed(2)} G`;
+  sessionEl.textContent = `${hms(Date.now()-sessionStart)} · ${events} events`;
+}
+setInterval(updateHUD, 120);
+
+// ----- tweaks wiring -----
+const tweaksEl = document.getElementById('tweaks');
+window.addEventListener('message', (e) => {
+  if (!e.data || typeof e.data !== 'object') return;
+  if (e.data.type === '__activate_edit_mode') tweaksEl.classList.add('open');
+  else if (e.data.type === '__deactivate_edit_mode') tweaksEl.classList.remove('open');
+});
+window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+
+function persist(key, value) {
+  window.parent.postMessage({
+    type: '__edit_mode_set_keys',
+    edits: { [key]: value }
+  }, '*');
+}
+
+function bind(id, key, valId, fmt = v => v.toFixed(2)) {
+  const el = document.getElementById(id);
+  const vEl = document.getElementById(valId);
+  el.value = state[key];
+  vEl.textContent = fmt(state[key]);
+  el.addEventListener('input', () => {
+    state[key] = parseFloat(el.value);
+    vEl.textContent = fmt(state[key]);
+  });
+  el.addEventListener('change', () => persist(key, state[key]));
+}
+bind('tGravity', 'gravity', 'vGravity');
+bind('tStars', 'starDensity', 'vStars');
+bind('tNebula', 'nebulaIntensity', 'vNebula');
+bind('tGalaxies', 'galaxyIntensity', 'vGalaxies');
+bind('tLens', 'lensStrength', 'vLens');
+bind('tHue', 'hueShift', 'vHue');
+bind('tSpeed', 'speed', 'vSpeed');
+
+document.querySelectorAll('.preset-row button').forEach(b => {
+  if (b.dataset.preset === state.preset) b.classList.add('active'); else b.classList.remove('active');
+  b.addEventListener('click', () => {
+    state.preset = b.dataset.preset;
+    document.querySelectorAll('.preset-row button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    persist('preset', state.preset);
+  });
+});
+function presetIdx(p) { return p === 'aurora' ? 1 : p === 'ember' ? 2 : 0; }
+
+// ----- main loop -----
+const t0 = performance.now();
+let last = t0;
+let vx = 0, vy = 0;
+function frame() {
+  const now = performance.now();
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  const t = (now - t0) / 1000;
+
+  const pmx = mx, pmy = my;
+  mx += (tx - mx) * Math.min(1, dt * 22);
+  my += (ty - my) * Math.min(1, dt * 22);
+  vx = (mx - pmx) / Math.max(0.001, dt);
+  vy = (my - pmy) / Math.max(0.001, dt);
+  down += (tDown - down) * Math.min(1, dt * 12);
+  clickPulse *= Math.pow(0.02, dt);
+
+  gl.uniform2f(U.u_res, canvas.width, canvas.height);
+  gl.uniform1f(U.u_time, t);
+  gl.uniform2f(U.u_mouse, mx, my);
+  gl.uniform1f(U.u_mouseDown, down);
+  gl.uniform1f(U.u_clickPulse, clickPulse);
+
+  // ripples
+  const rData = new Float32Array(MAX_R * 3);
+  let rCount = 0;
+  for (let i = 0; i < ripples.length && rCount < MAX_R; i++) {
+    const age = t - ripples[i].born;
+    if (age >= 2.0) continue;
+    rData[rCount*3 + 0] = ripples[i].x;
+    rData[rCount*3 + 1] = ripples[i].y;
+    rData[rCount*3 + 2] = age;
+    rCount++;
+  }
+  for (let i = ripples.length-1; i >= 0; i--) if (t - ripples[i].born >= 2.0) ripples.splice(i,1);
+  gl.uniform3fv(U['u_ripples[0]'], rData);
+  gl.uniform1i(U.u_rippleCount, rCount);
+
+  // shooting stars
+  const sData = new Float32Array(MAX_S * 4);
+  const ages = new Float32Array(MAX_S);
+  let sCount = 0;
+  for (let i = 0; i < shoots.length && sCount < MAX_S; i++) {
+    const age = (t - shoots[i].born) / shoots[i].life;
+    if (age >= 1.0 || age < 0) continue;
+    sData[sCount*4+0] = shoots[i].sx;
+    sData[sCount*4+1] = shoots[i].sy;
+    sData[sCount*4+2] = shoots[i].dx;
+    sData[sCount*4+3] = shoots[i].dy;
+    ages[sCount] = age;
+    sCount++;
+  }
+  for (let i = shoots.length-1; i >= 0; i--) if ((t - shoots[i].born)/shoots[i].life >= 1.0) shoots.splice(i,1);
+  gl.uniform4fv(U['u_shoot[0]'], sData);
+  gl.uniform1fv(U['u_shootAge[0]'], ages);
+  gl.uniform1i(U.u_shootCount, sCount);
+
+  gl.uniform1f(U.u_gravity, state.gravity);
+  gl.uniform1f(U.u_starDensity, state.starDensity);
+  gl.uniform1f(U.u_nebula, state.nebulaIntensity);
+  gl.uniform1f(U.u_galaxy, state.galaxyIntensity);
+  gl.uniform1f(U.u_lens, state.lensStrength);
+  gl.uniform1f(U.u_hue, state.hueShift);
+  gl.uniform1f(U.u_speed, state.speed);
+  gl.uniform1f(U.u_preset, presetIdx(state.preset));
+
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
