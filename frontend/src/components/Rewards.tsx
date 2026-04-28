@@ -14,9 +14,8 @@ const AchievementIcons: Record<string, React.ReactNode> = {
     </svg>
   ),
   flame: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M8.5 14.5A2.5 2.5 0 0011 17h2a2.5 2.5 0 002.5-2.5c0-1.5-.5-2-1-3a6 6 0 011-6.5A6 6 0 018 7c-1 2-1.5 3.5-.5 6 .5 1.5 1 2 1 2z"/>
-      <path d="M12 22c2.5 0 4-1.5 4-4h-8c0 2.5 1.5 4 4 4z"/>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+      <path d="M12 2c0 0-6 6.5-6 11a6 6 0 0012 0C18 8.5 12 2 12 2zm0 3c0 0 3.5 4.5 3.5 8a3.5 3.5 0 01-7 0C8.5 9.5 12 5 12 5zm0 3.5c0 0-2 2.5-2 4.5a2 2 0 004 0C14 11 12 8.5 12 8.5z"/>
     </svg>
   ),
   target: (
@@ -561,9 +560,8 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
         <div className="glass rounded-3xl p-6 text-center flex flex-col items-center justify-center">
           <div className="text-lg font-semibold neon-green uppercase tracking-[2px] mb-2">Work Streak</div>
           <div className="mb-1 select-none flex items-center justify-center" style={{ color: 'var(--accent-color)' }}>
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M8.5 14.5A2.5 2.5 0 0011 17h2a2.5 2.5 0 002.5-2.5c0-1.5-.5-2-1-3a6 6 0 001-6.5A6 6 0 018 7c-1 2-1.5 3.5-.5 6 .5 1.5 1 2 1 2z"/>
-              <path d="M12 22c2.5 0 4-1.5 4-4h-8c0 2.5 1.5 4 4 4z"/>
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+              <path d="M12 2C12 2 5 9 5 14a7 7 0 0014 0C19 9 12 2 12 2zm0 2.5c0 0 4 5 4 9.5a4 4 0 01-8 0C8 9.5 12 4.5 12 4.5zm0 4c0 0-2.5 3-2.5 5.5a2.5 2.5 0 005 0C14.5 11.5 12 8.5 12 8.5z"/>
             </svg>
           </div>
           <div className="text-4xl font-bold neon-green tabular-nums">{streak}</div>
