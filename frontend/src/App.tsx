@@ -17,7 +17,7 @@ import { STATE_BREAK_RULES, STATE_CODES } from './data/stateBreakRules'
 
 const API_BASE = ''
 
-type View = 'clock' | 'timesheet' | 'rewards' | 'xpcenter' | 'admin' | 'profile' | 'insurance' | 'orgchart' | 'taxes' | 'groktax' | 'grokky' | 'applications' | 'jobs' | 'schedules' | 'payroll' | 'reports' | 'leaves' | 'compliance' | 'hiring' | 'kpi' | 'teamkpi' | 'announcements' | 'pricing' | 'auditlog' | 'enterprise'
+type View = 'clock' | 'timesheet' | 'rewards' | 'xpcenter' | 'admin' | 'profile' | 'insurance' | 'orgchart' | 'taxes' | 'groktax' | 'grokky' | 'applications' | 'jobs' | 'schedules' | 'payroll' | 'reports' | 'leaves' | 'compliance' | 'hiring' | 'kpi' | 'teamkpi' | 'announcements' | 'pricing' | 'auditlog' | 'enterprise' | 'alerts'
 
 function formatMs(ms: number): string {
   const totalSec = Math.floor(ms / 1000)
@@ -35,6 +35,15 @@ function greeting(hour: number): string {
   if (hour < 12) return 'Good morning'
   if (hour < 17) return 'Good afternoon'
   return 'Good evening'
+}
+
+function getXPLevelRingColor(level: number): string {
+  const colors: Record<number, string> = {
+    1: '#6B7280', 2: '#22C55E', 3: '#3B82F6', 4: '#EAB308',
+    5: '#F97316', 6: '#A855F7', 7: '#F59E0B', 8: '#EF4444',
+    9: '#EC4899', 10: '#FFD700',
+  }
+  return colors[Math.min(level, 10)] || '#6B7280'
 }
 
 function payPeriodFor(date: Date): { start: Date; end: Date } {
@@ -3272,6 +3281,15 @@ export default function App() {
               )}
             </div>
           </div>
+          {/* Upgrade CTA */}
+          <button
+            onClick={() => navTo('pricing')}
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border transition-all hover:opacity-90"
+            style={{ borderColor: 'var(--accent-color)', color: 'var(--accent-color)' }}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 11 12 6 7 11"/><line x1="12" y1="18" x2="12" y2="6"/></svg>
+            Upgrade
+          </button>
           {/* Daily streak counter */}
           <div className="flex items-center gap-1.5 px-3 py-1 text-sm text-white/60 border border-white/10 rounded-full">
             <span style={{ color: 'var(--accent-color)' }}>
@@ -3291,12 +3309,18 @@ export default function App() {
           <div className="relative group">
             <span className="text-sm text-zinc-400 cursor-pointer flex items-center gap-2">
               {profilePicUrl
-                ? <span className={`w-6 h-6 rounded-full overflow-hidden flex-shrink-0 inline-flex ${avatarFrame === 'glow' ? 'ring-2 ring-[var(--accent-color)] shadow-[0_0_8px_var(--accent-color)]' : avatarFrame === 'gold' ? 'ring-2 ring-yellow-400' : avatarFrame === 'rainbow' ? 'ring-2 ring-purple-400' : 'border border-white/20'}`}>
+                ? <span
+                    className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 inline-flex"
+                    style={{ boxShadow: `0 0 0 2px ${getXPLevelRingColor(appCurrentLevel.level)}${avatarFrame === 'glow' ? `, 0 0 8px ${getXPLevelRingColor(appCurrentLevel.level)}` : ''}` }}
+                  >
                     <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover" style={{ objectPosition: `${profilePicX}% ${profilePicY}%`, transform: `scale(${profilePicZoom})`, transformOrigin: `${profilePicX}% ${profilePicY}%` }} />
                   </span>
-                : <span className={`w-6 h-6 rounded-full bg-white/10 flex-shrink-0 inline-flex items-center justify-center text-xs text-zinc-400 ${avatarFrame === 'glow' ? 'ring-2 ring-[var(--accent-color)] shadow-[0_0_8px_var(--accent-color)]' : avatarFrame === 'gold' ? 'ring-2 ring-yellow-400' : avatarFrame === 'rainbow' ? 'ring-2 ring-purple-400' : 'border border-white/20'}`}>{user.first_name?.[0]?.toUpperCase()}</span>
+                : <span
+                    className="w-6 h-6 rounded-full bg-white/10 flex-shrink-0 inline-flex items-center justify-center text-xs text-zinc-400"
+                    style={{ boxShadow: `0 0 0 2px ${getXPLevelRingColor(appCurrentLevel.level)}${avatarFrame === 'glow' ? `, 0 0 8px ${getXPLevelRingColor(appCurrentLevel.level)}` : ''}` }}
+                  >{user.first_name?.[0]?.toUpperCase()}</span>
               }
-              Hi, {user.first_name} <span className="text-[10px] px-1.5 py-0.5 rounded-full ml-1" style={{ backgroundColor: 'var(--accent-color)', color: '#000', fontWeight: 700 }}>Lv.{appCurrentLevel.level}<span className="ta-level-badge-name"> {appCurrentLevel.name}</span></span> ▾
+              Hi, {user.first_name} <span className="text-[10px] px-1.5 py-0.5 rounded-full ml-1" style={{ backgroundColor: 'var(--accent-color)', color: '#000', fontWeight: 700 }}>Lv.{appCurrentLevel.level}</span> ▾
             </span>
             <div className="absolute right-0 top-full w-56 bg-zinc-900 border border-white/10 rounded-xl shadow-lg hidden group-hover:block z-50 pt-1">
               <button
@@ -3304,6 +3328,13 @@ export default function App() {
                 className="w-full text-left px-4 py-2 text-sm hover:bg-white/5 rounded-t-xl"
               >
                 Profile
+              </button>
+              <button
+                onClick={() => navTo('alerts')}
+                className="w-full text-left px-4 py-2 text-sm hover:bg-white/5 flex items-center justify-between"
+              >
+                <span>Alerts</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500 text-white font-bold">3</span>
               </button>
               <button
                 onClick={() => setShowTour(true)}
@@ -3468,7 +3499,7 @@ export default function App() {
             { id: 'insurance', label: 'Insurance & Benefits', view: 'insurance', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> },
             { id: 'orgchart', label: 'Org Chart', view: 'orgchart', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><rect x="8" y="2" width="8" height="4" rx="1"/><rect x="2" y="14" width="8" height="4" rx="1"/><rect x="14" y="14" width="8" height="4" rx="1"/><line x1="12" y1="6" x2="12" y2="11"/><line x1="6" y1="14" x2="6" y2="11"/><line x1="18" y1="14" x2="18" y2="11"/><line x1="6" y1="11" x2="18" y2="11"/></svg> },
             { id: 'taxes', label: 'Files', view: 'taxes', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg> },
-            { id: 'groktax', label: 'Swifty - AI Tax Filing', view: 'groktax', htmlId: 'nav-groktax', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> },
+            { id: 'groktax', label: 'AI Tax Filing', view: 'groktax', htmlId: 'nav-groktax', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> },
             { id: 'applications', label: 'InstaApply', view: 'applications', htmlId: 'nav-applications', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> },
           ]
 
@@ -3620,13 +3651,6 @@ export default function App() {
               <path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 011 1v3a1 1 0 01-1 1h-1a7 7 0 01-7 7H9a7 7 0 01-7-7H1a1 1 0 01-1-1v-3a1 1 0 011-1h1a7 7 0 017-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 012-2z"/><circle cx="9" cy="14" r="1" fill="currentColor"/><circle cx="15" cy="14" r="1" fill="currentColor"/>
             </svg>
             Swifty - AI Assistant
-          </button>
-          <button
-            className={`ta-nav-btn ${activeView === 'pricing' ? 'active' : ''} text-zinc-500 hover:text-zinc-300`}
-            onClick={() => navTo('pricing')}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
-            Pricing
           </button>
         </div>
       </aside>
@@ -6865,15 +6889,10 @@ export default function App() {
             <div className="max-w-5xl mx-auto">
               {/* Trust badges */}
               <div className="flex flex-wrap items-center justify-center gap-4 mb-8">
-                {[
-                  { label: 'SOC 2 Type II', icon: '🔒' },
-                  { label: 'GDPR Compliant', icon: '🇪🇺' },
-                  { label: 'HIPAA Ready', icon: '🏥' },
-                  { label: 'ISO 27001', icon: '✅' },
-                  { label: '99.9% Uptime SLA', icon: '⚡' },
-                ].map(({ label, icon }) => (
+                {['SOC 2 Type II', 'GDPR Compliant', 'HIPAA Ready', 'ISO 27001', '99.9% Uptime SLA'].map(label => (
                   <div key={label} className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-3 py-1.5 text-xs font-medium text-zinc-300">
-                    <span>{icon}</span><span>{label}</span>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--accent-color)' }}><polyline points="20 6 9 17 4 12"/></svg>
+                    <span>{label}</span>
                   </div>
                 ))}
               </div>
@@ -6904,7 +6923,7 @@ export default function App() {
                   <div className="absolute top-4 right-4 text-[10px] px-2 py-0.5 rounded-full font-bold text-black" style={{ backgroundColor: 'var(--accent-color)' }}>MOST POPULAR</div>
                   <div className="text-sm uppercase tracking-[2px] mb-1" style={{ color: 'var(--accent-color)' }}>Pro</div>
                   <div className="flex items-end gap-1 mb-1">
-                    <span className="text-4xl font-bold text-white">$12</span>
+                    <span className="text-4xl font-bold text-white">$8</span>
                     <span className="text-zinc-400 text-sm mb-1.5">/employee/mo</span>
                   </div>
                   <div className="text-zinc-500 text-sm mb-6">Everything in Starter, plus</div>
@@ -6916,7 +6935,7 @@ export default function App() {
                       </li>
                     ))}
                   </ul>
-                  <button className="w-full py-3 rounded-xl text-sm font-bold text-black transition-opacity hover:opacity-90" style={{ backgroundColor: 'var(--accent-color)' }}>Start 14-day free trial</button>
+                  <button className="w-full py-3 rounded-xl text-sm font-bold text-black transition-opacity hover:opacity-90" style={{ backgroundColor: 'var(--accent-color)' }}>Start 30-day free trial</button>
                 </div>
 
                 {/* Enterprise */}
@@ -6971,7 +6990,7 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {[
                     { q: 'Can I switch plans anytime?', a: 'Yes, you can upgrade or downgrade at any time. Changes take effect at the start of your next billing cycle.' },
-                    { q: 'Is there a free trial?', a: 'Pro plans come with a 14-day free trial, no credit card required. Starter is free forever.' },
+                    { q: 'Is there a free trial?', a: 'Pro plans come with a 30-day free trial, no credit card required. Starter is free forever.' },
                     { q: 'How does per-employee billing work?', a: 'You\'re billed based on active employees in your workspace each month. Add or remove team members anytime.' },
                     { q: 'What payment methods do you accept?', a: 'We accept all major credit cards, ACH bank transfers, and invoicing for Enterprise customers.' },
                     { q: 'How long does migration from Workday take?', a: 'Average migration is 2 weeks. We provide a dedicated migration engineer for Enterprise customers and guarantee zero data loss.' },
@@ -6983,6 +7002,51 @@ export default function App() {
                     </div>
                   ))}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeView === 'alerts' && (
+            <div className="max-w-2xl mx-auto">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h1 className="text-2xl font-semibold neon-green">Alerts</h1>
+                  <p className="text-zinc-400 text-sm mt-1">Your recent notifications and activity</p>
+                </div>
+                <button className="text-xs px-3 py-1.5 rounded-xl border border-white/10 hover:bg-white/5 text-zinc-400 transition-colors">
+                  Mark all read
+                </button>
+              </div>
+              <div className="space-y-3">
+                {[
+                  { type: 'xp', icon: '⬆', title: 'Level Up!', desc: `You reached Lv.${appCurrentLevel.level} ${appCurrentLevel.name}`, time: '2h ago', unread: true },
+                  { type: 'timesheet', icon: '📋', title: 'Timesheet Due', desc: 'Your current pay period timesheet is due in 3 days', time: '5h ago', unread: true },
+                  { type: 'streak', icon: '🔥', title: 'Streak Alert', desc: 'You\'re on a 7-day check-in streak — keep it up!', time: '1d ago', unread: true },
+                  { type: 'leaderboard', icon: '🏆', title: 'Leaderboard Move', desc: 'Alex Rivera overtook your XP ranking — time to earn more!', time: '1d ago', unread: false },
+                  { type: 'hours', icon: '⏱', title: 'Approaching Overtime', desc: 'You\'ve logged 38h this week — 2h until overtime kicks in', time: '2d ago', unread: false },
+                  { type: 'achievement', icon: '◆', title: 'Achievement Unlocked', desc: 'You earned the "Perfect Period" badge', time: '3d ago', unread: false },
+                  { type: 'payroll', icon: '💵', title: 'Payslip Ready', desc: 'Your payslip for the period ending Apr 19 is available', time: '5d ago', unread: false },
+                ].map((alert, i) => (
+                  <div
+                    key={i}
+                    className={`flex items-start gap-4 p-4 rounded-2xl border transition-all ${alert.unread ? 'border-white/15 bg-white/5' : 'border-white/8 bg-white/[0.02]'}`}
+                  >
+                    <div
+                      className="w-9 h-9 rounded-xl flex items-center justify-center text-sm flex-shrink-0 font-bold"
+                      style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
+                    >
+                      {alert.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-sm font-semibold text-white">{alert.title}</span>
+                        {alert.unread && <span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />}
+                      </div>
+                      <p className="text-sm text-zinc-400 leading-snug">{alert.desc}</p>
+                    </div>
+                    <span className="text-[10px] text-zinc-600 flex-shrink-0 pt-0.5">{alert.time}</span>
+                  </div>
+                ))}
               </div>
             </div>
           )}

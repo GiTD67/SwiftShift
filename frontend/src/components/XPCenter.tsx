@@ -40,6 +40,12 @@ const XP_LEVELS_LOCAL = [
   { level: 10, name: 'Legend', xpNeeded: 3200 },
 ]
 
+const LEVEL_RING_COLORS: Record<number, string> = {
+  1: '#6B7280', 2: '#22C55E', 3: '#3B82F6', 4: '#EAB308',
+  5: '#F97316', 6: '#A855F7', 7: '#F59E0B', 8: '#EF4444',
+  9: '#EC4899', 10: '#FFD700',
+}
+
 const BOSS_CHALLENGES = [
   { fromLevel: 3, toLevel: 4, req: 'Complete 2 perfect periods', shortReq: 'perfectPeriods', target: 2 },
   { fromLevel: 6, toLevel: 7, req: 'Submit 3 periods in a row', shortReq: 'streak', target: 3 },
@@ -188,12 +194,25 @@ export function XPCenter({ gState, currentLevel, nextLevel, users, accentColor, 
                   <div className="w-6 text-center text-sm font-bold text-zinc-500">
                     {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`}
                   </div>
-                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-sm font-bold" style={isMe ? { backgroundColor: accentColor, color: '#000' } : {}}>
+                  <div
+                    className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-sm font-bold"
+                    style={{
+                      backgroundColor: isMe ? accentColor : undefined,
+                      color: isMe ? '#000' : undefined,
+                      boxShadow: `0 0 0 2px ${LEVEL_RING_COLORS[Math.min(lvl.level, 10)] || '#6B7280'}${isMe ? `, 0 0 6px ${LEVEL_RING_COLORS[Math.min(lvl.level, 10)] || '#6B7280'}` : ''}`,
+                    }}
+                  >
                     {entry.name[0]}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">{entry.name} {isMe ? '(You)' : ''}</div>
-                    <div className="text-[10px] text-zinc-500">Lv.{lvl.level} {lvl.name}</div>
+                    <div className="flex items-center gap-1 text-[10px] text-zinc-500">
+                      <span
+                        className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: LEVEL_RING_COLORS[Math.min(lvl.level, 10)] || '#6B7280' }}
+                      />
+                      Lv.{lvl.level} {lvl.name}
+                    </div>
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-bold tabular-nums" style={isMe ? { color: accentColor } : { color: 'white' }}>{entry.xp.toLocaleString()} XP</div>
