@@ -522,23 +522,47 @@ function useGamification() {
 // ===== TimesheetView component =====
 function TimesheetView({ user, gamification }: { user: any; gamification: ReturnType<typeof useGamification> }) {
   const [periodOffset, setPeriodOffset] = useState(0)
-  const [entries, setEntries] = useState<Record<string, string>>({})
+  const [entries, setEntries] = useState<Record<string, string>>(() => {
+    try { const s = localStorage.getItem(`swiftshift-ts-entries-${user?.id}`); return s ? JSON.parse(s) : {} } catch { return {} }
+  })
+  const [clockSessionsByDate, setClockSessionsByDate] = useState<Record<string, any[]>>({})
   const [certified, setCertified] = useState(false)
   const [submittedPeriods, setSubmittedPeriods] = useState<Set<string>>(new Set())
   const [nlpInput, setNlpInput] = useState('')
   const [highlightedDay, setHighlightedDay] = useState<number | null>(null)
   const [showHistory, setShowHistory] = useState(false)
   const [historyEntries, setHistoryEntries] = useState<Record<string, Record<string, string>>>({})
+  const [showPaySummary, setShowPaySummary] = useState(false)
+  const [allSubmissions, setAllSubmissions] = useState<any[]>([])
+  const [selectedStubPeriod, setSelectedStubPeriod] = useState<any | null>(null)
+  const [customRangeStart, setCustomRangeStart] = useState('')
+  const [customRangeEnd, setCustomRangeEnd] = useState('')
+  const [swiftyInput, setSwiftyInput] = useState('')
+  const [swiftyMessages, setSwiftyMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
+  const [swiftyLoading, setSwiftyLoading] = useState(false)
+  const [showSwifty, setShowSwifty] = useState(false)
   const nlpRef = useRef<HTMLInputElement>(null)
+  const swiftyRef = useRef<HTMLInputElement>(null)
+  const swiftyBottomRef = useRef<HTMLDivElement>(null)
 
   const { gState, currentLevel, nextLevel, xpProgress, floatingXP, addXP, recordNLPUse, recordSubmit } = gamification
   const { start, end, dayDates, periodId } = usePayPeriodRange(periodOffset)
 
-  // Previous two periods for history view
   const prevPeriod1 = usePayPeriodRange(periodOffset - 1)
   const prevPeriod2 = usePayPeriodRange(periodOffset - 2)
 
+  const hourlyRate = user?.hourly_rate || 20
+
   useEffect(() => { setCertified(false) }, [periodId])
+
+  // Persist entries to localStorage forever
+  useEffect(() => {
+    if (!user?.id) return
+    try { localStorage.setItem(`swiftshift-ts-entries-${user.id}`, JSON.stringify(entries)) } catch {}
+  }, [entries, user?.id])
+
+  // Scroll swifty to bottom on new messages
+  useEffect(() => { swiftyBottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [swiftyMessages])
 
   // Fetch clock sessions for this user
   useEffect(() => {
@@ -547,39 +571,55 @@ function TimesheetView({ user, gamification }: { user: any; gamification: Return
     fetch(`${API_BASE}/api/clock-sessions?employee_id=${uid}`)
       .then(r => (r.ok ? r.json() : []))
       .then((rows: any[]) => {
-        const byDate: Record<string, number> = {}
+        // Store raw sessions by date for clock-in/out display
+        const byDate: Record<string, any[]> = {}
+        const durationByDate: Record<string, number> = {}
         for (const row of rows) {
           if (!row.clock_in) continue
           const d = row.clock_in.slice(0, 10)
-          const mins = Number(row.duration_minutes) || 0
-          byDate[d] = (byDate[d] || 0) + mins
+          if (!byDate[d]) byDate[d] = []
+          byDate[d].push(row)
+          durationByDate[d] = (durationByDate[d] || 0) + (Number(row.duration_minutes) || 0)
         }
-        // Populate current and prior periods
-        const allPeriods = [
-          { id: periodId, dates: dayDates },
-          { id: prevPeriod1.periodId, dates: prevPeriod1.dayDates },
-          { id: prevPeriod2.periodId, dates: prevPeriod2.dayDates },
-        ]
-        const nextEntries: Record<string, string> = {}
-        const nextHistory: Record<string, Record<string, string>> = {}
-        for (const p of allPeriods) {
-          const pMap: Record<string, string> = {}
-          p.dates.forEach((d, i) => {
+        setClockSessionsByDate(byDate)
+
+        // Populate entries from API — only fill blanks, preserve manual edits
+        setEntries(prev => {
+          const next = { ...prev }
+          dayDates.forEach((d, i) => {
             const dateStr = d.toISOString().slice(0, 10)
-            const mins = byDate[dateStr] || 0
-            if (mins > 0) {
-              const val = (mins / 60).toFixed(1)
-              if (p.id === periodId) nextEntries[entryKey(periodId, i)] = val
-              pMap[entryKey(p.id, i)] = val
-            }
+            const mins = durationByDate[dateStr] || 0
+            const key = entryKey(periodId, i)
+            if (!next[key] && mins > 0) next[key] = (mins / 60).toFixed(1)
           })
-          if (p.id !== periodId) nextHistory[p.id] = pMap
+          return next
+        })
+
+        // History for previous periods
+        const nextHistory: Record<string, Record<string, string>> = {}
+        for (const p of [prevPeriod1, prevPeriod2]) {
+          const pMap: Record<string, string> = {}
+          p.dayDates.forEach((d, i) => {
+            const dateStr = d.toISOString().slice(0, 10)
+            const mins = durationByDate[dateStr] || 0
+            if (mins > 0) pMap[entryKey(p.periodId, i)] = (mins / 60).toFixed(1)
+          })
+          nextHistory[p.periodId] = pMap
         }
-        setEntries(nextEntries)
         setHistoryEntries(nextHistory)
       })
       .catch(() => {})
   }, [user?.id, periodId])
+
+  // Fetch all submitted pay periods
+  useEffect(() => {
+    const uid = user?.id
+    if (!uid) return
+    fetch(`${API_BASE}/api/timesheet-submissions?user_id=${uid}`)
+      .then(r => (r.ok ? r.json() : []))
+      .then((rows: any[]) => setAllSubmissions(Array.isArray(rows) ? rows : []))
+      .catch(() => {})
+  }, [user?.id])
 
   const dayHours = dayDates.map((_, i) => parseHours(entries[entryKey(periodId, i)] || ''))
   const totalHours = dayHours.reduce((a, b) => a + b, 0)
@@ -592,6 +632,89 @@ function TimesheetView({ user, gamification }: { user: any; gamification: Return
 
   const setDayHours = (i: number, val: string) => {
     setEntries(prev => ({ ...prev, [entryKey(periodId, i)]: val }))
+  }
+
+  // Pay calculation: gross, deductions, net
+  const calcPay = (hours: number) => {
+    const regularH = Math.min(hours, 80)
+    const overtimeH = Math.max(0, hours - 80) * 1.5
+    const gross = (regularH + overtimeH) * hourlyRate
+    const federalWithholding = gross * 0.12
+    const stateWithholding = gross * 0.05
+    const fica = gross * 0.0765
+    const deductions = federalWithholding + stateWithholding + fica
+    return { gross, federalWithholding, stateWithholding, fica, deductions, net: gross - deductions }
+  }
+
+  const currentPay = calcPay(totalHours)
+
+  const filteredSubmissions = useMemo(() => {
+    if (!customRangeStart && !customRangeEnd) return allSubmissions
+    return allSubmissions.filter(s => {
+      if (customRangeStart && s.period_start < customRangeStart) return false
+      if (customRangeEnd && s.period_end > customRangeEnd) return false
+      return true
+    })
+  }, [allSubmissions, customRangeStart, customRangeEnd])
+
+  const handlePrintStub = (sub: any) => {
+    const p = calcPay(sub.total_hours)
+    const win = window.open('', '_blank')
+    if (!win) return
+    win.document.write(`<!DOCTYPE html><html><head><title>Pay Stub ${sub.period_start}</title>
+<style>body{font-family:Arial,sans-serif;max-width:600px;margin:40px auto;padding:20px}h1{font-size:22px;border-bottom:2px solid #333;padding-bottom:10px}.row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee}.bold{font-weight:bold}.section{margin:20px 0}@media print{.no-print{display:none}}</style>
+</head><body>
+<h1>SwiftShift Pay Stub</h1>
+<div class="section">
+<div class="row"><span>Employee</span><span>${user?.first_name} ${user?.last_name}</span></div>
+<div class="row"><span>Role</span><span>${user?.job_role || 'N/A'}</span></div>
+<div class="row"><span>Pay Period</span><span>${sub.period_start} to ${sub.period_end}</span></div>
+<div class="row"><span>Submitted</span><span>${sub.submitted_at ? new Date(sub.submitted_at).toLocaleDateString() : 'N/A'}</span></div>
+</div>
+<div class="section"><h2 style="font-size:16px">Earnings</h2>
+<div class="row"><span>Hourly Rate</span><span>$${hourlyRate.toFixed(2)}/hr</span></div>
+<div class="row"><span>Regular Hours (${Math.min(sub.total_hours,80).toFixed(1)}h)</span><span>$${(Math.min(sub.total_hours,80)*hourlyRate).toFixed(2)}</span></div>
+${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).toFixed(1)}h × 1.5)</span><span>$${((sub.total_hours-80)*1.5*hourlyRate).toFixed(2)}</span></div>`:''}
+<div class="row bold"><span>Gross Pay</span><span>$${p.gross.toFixed(2)}</span></div>
+</div>
+<div class="section"><h2 style="font-size:16px">Deductions</h2>
+<div class="row"><span>Federal Income Tax (12%)</span><span>-$${p.federalWithholding.toFixed(2)}</span></div>
+<div class="row"><span>State Income Tax (5%)</span><span>-$${p.stateWithholding.toFixed(2)}</span></div>
+<div class="row"><span>FICA/SS (6.2%)</span><span>-$${(p.gross*0.062).toFixed(2)}</span></div>
+<div class="row"><span>Medicare (1.45%)</span><span>-$${(p.gross*0.0145).toFixed(2)}</span></div>
+<div class="row bold"><span>Total Deductions</span><span>-$${p.deductions.toFixed(2)}</span></div>
+</div>
+<div class="section"><div class="row bold" style="font-size:18px;border-top:2px solid #333;padding-top:10px"><span>Net Pay</span><span>$${p.net.toFixed(2)}</span></div></div>
+<button class="no-print" onclick="window.print()" style="margin-top:20px;padding:10px 20px;background:#333;color:#fff;border:none;cursor:pointer;border-radius:4px">Print</button>
+</body></html>`)
+    win.document.close()
+    win.focus()
+  }
+
+  const handleSwiftySubmit = async () => {
+    if (!swiftyInput.trim() || swiftyLoading) return
+    const question = swiftyInput.trim()
+    setSwiftyInput('')
+    setSwiftyMessages(prev => [...prev, { role: 'user', content: question }])
+    setSwiftyLoading(true)
+    const payContext = allSubmissions.length > 0
+      ? `Employee: ${user?.first_name} ${user?.last_name}, Role: ${user?.job_role||'N/A'}, Hourly Rate: $${hourlyRate}/hr.\nPay history:\n` +
+        allSubmissions.slice(0, 12).map(s => {
+          const p = calcPay(s.total_hours)
+          return `Period ${s.period_start}–${s.period_end}: ${s.total_hours.toFixed(1)}h, Gross $${p.gross.toFixed(2)}, Deductions $${p.deductions.toFixed(2)}, Net $${p.net.toFixed(2)}`
+        }).join('\n')
+      : `Employee: ${user?.first_name} ${user?.last_name}, Hourly Rate: $${hourlyRate}/hr. No submitted periods yet.`
+    try {
+      const res = await fetch(`${API_BASE}/api/grok/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: `[PAY DATA]\n${payContext}\n\n[QUESTION]\n${question}`, user_id: user?.id }),
+      })
+      const data = await res.json()
+      setSwiftyMessages(prev => [...prev, { role: 'assistant', content: data.response || data.error || 'No response.' }])
+    } catch {
+      setSwiftyMessages(prev => [...prev, { role: 'assistant', content: 'Could not reach Swifty. Check your connection.' }])
+    } finally { setSwiftyLoading(false) }
   }
 
   const handleNLPSubmit = () => {
@@ -634,15 +757,22 @@ function TimesheetView({ user, gamification }: { user: any; gamification: Return
           period_end: end.toISOString().slice(0, 10),
           total_hours: totalHours,
         }),
+      }).then(r => r.ok ? r.json() : null).then(row => {
+        if (row) setAllSubmissions(prev => {
+          const exists = prev.find(s => s.period_start === row.period_start)
+          return exists ? prev.map(s => s.period_start === row.period_start ? row : s) : [row, ...prev]
+        })
       }).catch(() => {})
     }
   }
 
   const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-  // History grid renderer
+  // History grid renderer — shows hours + clock in/out times
   const HistoryGrid = ({ period, pDates, pId }: { period: string; pDates: Date[]; pId: string }) => {
-    const pHours = pDates.map((_, i) => parseHours(historyEntries[pId]?.[entryKey(pId, i)] || ''))
+    const pHours = pDates.map((_, i) =>
+      parseHours(historyEntries[pId]?.[entryKey(pId, i)] || '') || parseHours(entries[entryKey(pId, i)] || '')
+    )
     const pTotal = pHours.reduce((a, b) => a + b, 0)
     const submitted = submittedPeriods.has(pId)
     return (
@@ -651,6 +781,7 @@ function TimesheetView({ user, gamification }: { user: any; gamification: Return
           <span className="text-sm font-medium text-zinc-300">{period}</span>
           <div className="flex items-center gap-3">
             <span className="text-xs text-zinc-500 font-mono">{pTotal.toFixed(1)} h total</span>
+            {pTotal > 0 && <span className="text-xs text-zinc-500 font-mono">≈ ${calcPay(pTotal).net.toFixed(2)} net</span>}
             {submitted && <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white">✓ Submitted</span>}
           </div>
         </div>
@@ -660,20 +791,27 @@ function TimesheetView({ user, gamification }: { user: any; gamification: Return
               const h = pHours[i]
               const isOT = h > 8
               const isWeekend = d.getDay() === 0 || d.getDay() === 6
+              const dateStr = d.toISOString().slice(0, 10)
+              const sessions = clockSessionsByDate[dateStr] || []
               return (
                 <div key={i} className="flex-1 text-center min-w-[36px]">
                   <div className="text-[9px] text-zinc-500 mb-0.5">{d.toLocaleDateString([], { weekday: 'narrow' })}</div>
                   <div className="text-[9px] text-zinc-600 mb-1">{d.toLocaleDateString([], { month: 'numeric', day: 'numeric' })}</div>
-                  <div
-                    className={`text-xs font-mono py-1 rounded-lg text-center ${
-                      isWeekend && h === 0 ? 'bg-white/3 text-zinc-700' :
-                      isOT ? 'bg-amber-400/20 text-amber-400' :
-                      h > 0 ? 'bg-white/10 text-white' :
-                      'bg-white/5 text-zinc-600'
-                    }`}
-                  >
+                  <div className={`text-xs font-mono py-1 rounded-lg text-center ${
+                    isWeekend && h === 0 ? 'bg-white/3 text-zinc-700' :
+                    isOT ? 'bg-amber-400/20 text-amber-400' :
+                    h > 0 ? 'bg-white/10 text-white' : 'bg-white/5 text-zinc-600'
+                  }`}>
                     {h > 0 ? h.toFixed(1) : '—'}
                   </div>
+                  {sessions.length > 0 && sessions.map((s: any, si: number) => (
+                    <div key={si} className="text-[8px] text-zinc-600 mt-0.5 leading-tight">
+                      <span style={{ color: 'var(--accent-color)', opacity: 0.7 }}>
+                        {new Date(s.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      {s.clock_out && <span>–{new Date(s.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+                    </div>
+                  ))}
                 </div>
               )
             })}
@@ -795,13 +933,12 @@ function TimesheetView({ user, gamification }: { user: any; gamification: Return
 
       {/* Period picker */}
       <div className="glass rounded-2xl p-3 flex items-center justify-between">
-        <button onClick={() => setPeriodOffset(o => o - 1)} className="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5 text-sm">
-          ← Prev
-        </button>
-        <div className="text-base font-medium">{fmtRange(start, end)}</div>
-        <button onClick={() => setPeriodOffset(o => o + 1)} className="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5 text-sm">
-          Next →
-        </button>
+        <button onClick={() => setPeriodOffset(o => o - 1)} className="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5 text-sm">← Prev</button>
+        <div className="text-center">
+          <div className="text-base font-medium">{fmtRange(start, end)}</div>
+          <div className="text-[10px] text-zinc-500">{periodOffset === 0 ? 'Current Pay Period' : periodOffset > 0 ? `+${periodOffset} period${periodOffset > 1 ? 's' : ''}` : `${periodOffset} period${periodOffset < -1 ? 's' : ''}`}</div>
+        </div>
+        <button onClick={() => setPeriodOffset(o => o + 1)} className="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5 text-sm">Next →</button>
       </div>
 
       {/* Summary stats */}
@@ -818,17 +955,10 @@ function TimesheetView({ user, gamification }: { user: any; gamification: Return
         </div>
         <div>
           <div className="flex flex-wrap gap-2">
-            <div className="px-2.5 py-1 rounded-full text-xs border border-white/10">
-              Total: <span className="font-mono font-semibold">{totalHours.toFixed(1)}</span> h
-            </div>
-            <div className="px-2.5 py-1 rounded-full text-xs border border-white/10">
-              Regular: <span className="font-mono">{regularHours.toFixed(1)}</span> h
-            </div>
-            <div className="px-2.5 py-1 rounded-full text-xs border border-white/10">
-              OT×1.5: <span className="font-mono">{overtimeHours.toFixed(1)}</span> h
-            </div>
+            <div className="px-2.5 py-1 rounded-full text-xs border border-white/10">Total: <span className="font-mono font-semibold">{totalHours.toFixed(1)}</span> h</div>
+            <div className="px-2.5 py-1 rounded-full text-xs border border-white/10">Regular: <span className="font-mono">{regularHours.toFixed(1)}</span> h</div>
+            <div className="px-2.5 py-1 rounded-full text-xs border border-white/10">OT×1.5: <span className="font-mono">{overtimeHours.toFixed(1)}</span> h</div>
           </div>
-          {/* Period progress bar */}
           <div className="mt-2">
             <div className="flex justify-between text-[10px] text-zinc-500 mb-1">
               <span>Period progress</span><span>{Math.min(100, Math.round((totalHours / 80) * 100))}% of 80h</span>
@@ -837,16 +967,15 @@ function TimesheetView({ user, gamification }: { user: any; gamification: Return
               <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (totalHours / 80) * 100)}%`, backgroundColor: totalHours >= 80 ? '#f59e0b' : 'var(--accent-color)' }} />
             </div>
           </div>
+          <div className="mt-1.5 text-xs text-zinc-400">Est. Gross: <span className="font-mono" style={{ color: 'var(--accent-color)' }}>${currentPay.gross.toFixed(2)}</span> · Net: <span className="font-mono text-white">${currentPay.net.toFixed(2)}</span></div>
         </div>
       </div>
 
-      {/* Timecards grid */}
+      {/* Timecards grid — shows hours + clock in/out times */}
       <div className="glass rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <div className="px-5 py-2.5 border-b border-white/10 flex gap-2 text-xs uppercase tracking-wider text-zinc-500" style={{ minWidth: '640px' }}>
-            {dayNames.map((n, i) => (
-              <div key={i} className="flex-1 text-center">{n}</div>
-            ))}
+            {dayNames.map((n, i) => <div key={i} className="flex-1 text-center">{n}</div>)}
           </div>
           <div className="px-5 py-4 flex gap-2" style={{ minWidth: '640px' }}>
             {dayDates.map((d, i) => {
@@ -857,19 +986,14 @@ function TimesheetView({ user, gamification }: { user: any; gamification: Return
               const isToday = i === todayIndex
               const isHighlighted = i === highlightedDay
               const isWeekend = d.getDay() === 0 || d.getDay() === 6
+              const dateStr = d.toISOString().slice(0, 10)
+              const daySessions = clockSessionsByDate[dateStr] || []
               return (
-                <div
-                  key={i}
-                  className="flex-1 text-center"
-                  style={isHighlighted ? { animation: 'flashCell 0.6s ease-in-out' } : undefined}
-                >
+                <div key={i} className="flex-1 text-center" style={isHighlighted ? { animation: 'flashCell 0.6s ease-in-out' } : undefined}>
                   <div className="text-[9px] text-zinc-500 mb-0.5" style={isToday ? { color: 'var(--accent-color)' } : undefined}>
                     {d.toLocaleDateString([], { month: 'short', day: 'numeric' })}
                   </div>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={val}
+                  <input type="text" inputMode="decimal" value={val}
                     onChange={e => {
                       setDayHours(i, e.target.value)
                       const hrs = parseHours(e.target.value)
@@ -881,10 +1005,19 @@ function TimesheetView({ user, gamification }: { user: any; gamification: Return
                       isWeekend ? 'border-white/5 opacity-60' :
                       'border-white/10 focus:border-white/30'
                     }`}
-                    placeholder="0"
-                    disabled={isSubmitted}
+                    placeholder="0" disabled={isSubmitted}
                   />
                   <div className="text-[9px] text-zinc-600 mt-0.5">{h > 0 ? `${h.toFixed(1)}h` : ''}</div>
+                  {daySessions.map((s: any, si: number) => (
+                    <div key={si} className="mt-0.5 text-[8px] bg-white/5 rounded px-0.5 leading-tight">
+                      <span style={{ color: 'var(--accent-color)', opacity: 0.8 }}>
+                        {new Date(s.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      {s.clock_out
+                        ? <span className="text-zinc-600">–{new Date(s.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        : <span className="text-amber-400"> •</span>}
+                    </div>
+                  ))}
                 </div>
               )
             })}
@@ -899,13 +1032,8 @@ function TimesheetView({ user, gamification }: { user: any; gamification: Return
           {ACHIEVEMENTS.map(ach => {
             const unlocked = gState.unlockedAchievements.includes(ach.id)
             return (
-              <div
-                key={ach.id}
-                title={`${ach.name}: ${ach.desc}`}
-                className={`flex flex-col items-center gap-1 p-2 rounded-xl text-center cursor-default transition-all ${
-                  unlocked ? 'bg-white/10' : 'bg-white/3 opacity-40'
-                }`}
-              >
+              <div key={ach.id} title={`${ach.name}: ${ach.desc}`}
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl text-center cursor-default transition-all ${unlocked ? 'bg-white/10' : 'bg-white/3 opacity-40'}`}>
                 <span className="text-xl">{ach.icon}</span>
                 <span className="text-[9px] text-zinc-400 leading-tight">{ach.name}</span>
               </div>
@@ -914,30 +1042,205 @@ function TimesheetView({ user, gamification }: { user: any; gamification: Return
         </div>
       </div>
 
-      {/* Weekly history view */}
+      {/* Previous pay periods (history) */}
       <div className="glass rounded-2xl overflow-hidden">
-        <button
-          onClick={() => setShowHistory(h => !h)}
-          className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors text-left"
-        >
+        <button onClick={() => setShowHistory(h => !h)}
+          className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors text-left">
           <div>
-            <div className="text-sm font-medium">Weekly History</div>
-            <div className="text-xs text-zinc-500">View your time records for the previous 2 pay periods</div>
+            <div className="text-sm font-medium">Previous Pay Periods</div>
+            <div className="text-xs text-zinc-500">Clock in/out times and daily hours for recent periods</div>
           </div>
           <span className="text-zinc-400 text-lg">{showHistory ? '▲' : '▼'}</span>
         </button>
         {showHistory && (
           <div className="px-4 pb-4 border-t border-white/10 pt-3">
-            <HistoryGrid
-              period={fmtRange(prevPeriod1.start, prevPeriod1.end)}
-              pDates={prevPeriod1.dayDates}
-              pId={prevPeriod1.periodId}
-            />
-            <HistoryGrid
-              period={fmtRange(prevPeriod2.start, prevPeriod2.end)}
-              pDates={prevPeriod2.dayDates}
-              pId={prevPeriod2.periodId}
-            />
+            <HistoryGrid period={fmtRange(prevPeriod1.start, prevPeriod1.end)} pDates={prevPeriod1.dayDates} pId={prevPeriod1.periodId} />
+            <HistoryGrid period={fmtRange(prevPeriod2.start, prevPeriod2.end)} pDates={prevPeriod2.dayDates} pId={prevPeriod2.periodId} />
+          </div>
+        )}
+      </div>
+
+      {/* Pay Summary — all submitted periods */}
+      <div className="glass rounded-2xl overflow-hidden">
+        <button onClick={() => setShowPaySummary(v => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors text-left">
+          <div>
+            <div className="text-sm font-medium">Pay Summary — All Periods</div>
+            <div className="text-xs text-zinc-500">Gross, deductions &amp; net pay · click a row to expand · print pay stub</div>
+          </div>
+          <span className="text-zinc-400 text-lg">{showPaySummary ? '▲' : '▼'}</span>
+        </button>
+        {showPaySummary && (
+          <div className="border-t border-white/10">
+            {/* Custom date range filter */}
+            <div className="px-4 pt-3 pb-2 flex flex-wrap items-center gap-3 border-b border-white/5">
+              <span className="text-xs text-zinc-400 font-medium">Filter:</span>
+              <input type="date" value={customRangeStart} onChange={e => setCustomRangeStart(e.target.value)}
+                className="bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-xs text-zinc-300 focus:outline-none" />
+              <span className="text-zinc-600 text-xs">to</span>
+              <input type="date" value={customRangeEnd} onChange={e => setCustomRangeEnd(e.target.value)}
+                className="bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-xs text-zinc-300 focus:outline-none" />
+              {(customRangeStart || customRangeEnd) && (
+                <button onClick={() => { setCustomRangeStart(''); setCustomRangeEnd('') }}
+                  className="text-xs text-zinc-500 hover:text-zinc-300 px-2 py-1 rounded-lg border border-white/10 hover:bg-white/5">Clear</button>
+              )}
+              {filteredSubmissions.length > 0 && (customRangeStart || customRangeEnd) && (
+                <span className="text-xs text-zinc-500">{filteredSubmissions.length} period{filteredSubmissions.length !== 1 ? 's' : ''} · Gross <span className="font-mono" style={{ color: 'var(--accent-color)' }}>${filteredSubmissions.reduce((s, r) => s + calcPay(r.total_hours).gross, 0).toFixed(2)}</span> · Net <span className="font-mono text-white">${filteredSubmissions.reduce((s, r) => s + calcPay(r.total_hours).net, 0).toFixed(2)}</span></span>
+              )}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs" style={{ minWidth: '560px' }}>
+                <thead>
+                  <tr className="text-zinc-500 border-b border-white/10">
+                    <th className="px-4 py-2 text-left font-medium">Pay Period</th>
+                    <th className="px-3 py-2 text-right font-medium">Hours</th>
+                    <th className="px-3 py-2 text-right font-medium">Gross Pay</th>
+                    <th className="px-3 py-2 text-right font-medium">Deductions</th>
+                    <th className="px-3 py-2 text-right font-medium">Net Pay</th>
+                    <th className="px-3 py-2 text-center font-medium">Stub</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredSubmissions.length === 0 ? (
+                    <tr><td colSpan={6} className="px-4 py-8 text-center text-zinc-500">No submitted pay periods yet. Submit your first timesheet above.</td></tr>
+                  ) : filteredSubmissions.map((sub, idx) => {
+                    const p = calcPay(sub.total_hours)
+                    const isSelected = selectedStubPeriod?.period_start === sub.period_start
+                    return (
+                      <tr key={sub.id || idx}>
+                        <td colSpan={6} className="p-0">
+                          <div>
+                            <button onClick={() => setSelectedStubPeriod(isSelected ? null : sub)}
+                              className={`w-full text-left flex items-center border-b border-white/5 transition-colors ${isSelected ? 'bg-white/5' : 'hover:bg-white/3'}`}>
+                              <span className="px-4 py-2.5 flex-1">
+                                <span className="font-medium text-zinc-200">{sub.period_start} – {sub.period_end}</span>
+                                <span className="text-zinc-600 text-[10px] ml-2">submitted {sub.submitted_at ? new Date(sub.submitted_at).toLocaleDateString() : '–'}</span>
+                              </span>
+                              <span className="px-3 py-2.5 font-mono text-zinc-300 text-right w-16">{sub.total_hours.toFixed(1)}h</span>
+                              <span className="px-3 py-2.5 font-mono text-right w-24" style={{ color: 'var(--accent-color)' }}>${p.gross.toFixed(2)}</span>
+                              <span className="px-3 py-2.5 font-mono text-red-400 text-right w-24">-${p.deductions.toFixed(2)}</span>
+                              <span className="px-3 py-2.5 font-mono text-white font-semibold text-right w-24">${p.net.toFixed(2)}</span>
+                              <span className="px-3 py-2.5 text-center w-16">
+                                <button onClick={e => { e.stopPropagation(); handlePrintStub(sub) }}
+                                  className="text-[10px] px-2 py-1 rounded-lg border border-white/10 hover:bg-white/10 text-zinc-400 hover:text-white">Print</button>
+                              </span>
+                            </button>
+                            {isSelected && (
+                              <div className="bg-black/20 px-4 py-4 border-b border-white/10">
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs mb-3">
+                                  <div className="bg-black/30 rounded-xl p-3">
+                                    <div className="text-zinc-500 mb-1">Regular Pay</div>
+                                    <div className="font-mono text-white">${(Math.min(sub.total_hours, 80) * hourlyRate).toFixed(2)}</div>
+                                    <div className="text-zinc-600 text-[10px]">{Math.min(sub.total_hours, 80).toFixed(1)}h × ${hourlyRate}/hr</div>
+                                  </div>
+                                  {sub.total_hours > 80 && (
+                                    <div className="bg-amber-400/10 rounded-xl p-3">
+                                      <div className="text-amber-500 mb-1">Overtime</div>
+                                      <div className="font-mono text-amber-300">${((sub.total_hours - 80) * 1.5 * hourlyRate).toFixed(2)}</div>
+                                      <div className="text-zinc-600 text-[10px]">{(sub.total_hours - 80).toFixed(1)}h × 1.5×</div>
+                                    </div>
+                                  )}
+                                  <div className="bg-black/30 rounded-xl p-3">
+                                    <div className="text-zinc-500 mb-1">Federal Tax (12%)</div>
+                                    <div className="font-mono text-red-400">-${p.federalWithholding.toFixed(2)}</div>
+                                  </div>
+                                  <div className="bg-black/30 rounded-xl p-3">
+                                    <div className="text-zinc-500 mb-1">State Tax (5%)</div>
+                                    <div className="font-mono text-red-400">-${p.stateWithholding.toFixed(2)}</div>
+                                  </div>
+                                  <div className="bg-black/30 rounded-xl p-3">
+                                    <div className="text-zinc-500 mb-1">FICA (7.65%)</div>
+                                    <div className="font-mono text-red-400">-${p.fica.toFixed(2)}</div>
+                                    <div className="text-zinc-600 text-[10px]">SS 6.2% + Medicare 1.45%</div>
+                                  </div>
+                                  <div className="bg-white/5 rounded-xl p-3">
+                                    <div className="text-zinc-400 mb-1 font-medium">Net Pay</div>
+                                    <div className="font-mono text-white text-base font-bold">${p.net.toFixed(2)}</div>
+                                  </div>
+                                </div>
+                                <button onClick={() => handlePrintStub(sub)}
+                                  className="text-xs px-3 py-1.5 rounded-xl border border-white/10 hover:bg-white/10 text-zinc-300 transition-colors">
+                                  Print Pay Stub
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                {filteredSubmissions.length > 1 && (
+                  <tfoot>
+                    <tr className="border-t border-white/20">
+                      <td className="px-4 py-2.5 text-zinc-400 font-medium">Totals ({filteredSubmissions.length} periods)</td>
+                      <td className="px-3 py-2.5 text-right font-mono text-zinc-300">{filteredSubmissions.reduce((s, r) => s + r.total_hours, 0).toFixed(1)}h</td>
+                      <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--accent-color)' }}>${filteredSubmissions.reduce((s, r) => s + calcPay(r.total_hours).gross, 0).toFixed(2)}</td>
+                      <td className="px-3 py-2.5 text-right font-mono text-red-400">-${filteredSubmissions.reduce((s, r) => s + calcPay(r.total_hours).deductions, 0).toFixed(2)}</td>
+                      <td className="px-3 py-2.5 text-right font-mono text-white font-bold">${filteredSubmissions.reduce((s, r) => s + calcPay(r.total_hours).net, 0).toFixed(2)}</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Swifty Pay Assistant */}
+      <div className="glass rounded-2xl overflow-hidden">
+        <button onClick={() => setShowSwifty(v => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors text-left">
+          <div>
+            <div className="text-sm font-medium flex items-center gap-2">
+              <span style={{ color: 'var(--accent-color)' }}>⚡</span> Ask Swifty About Your Pay
+            </div>
+            <div className="text-xs text-zinc-500">Ask about earnings, deductions, overtime, or anything about your pay history</div>
+          </div>
+          <span className="text-zinc-400 text-lg">{showSwifty ? '▲' : '▼'}</span>
+        </button>
+        {showSwifty && (
+          <div className="border-t border-white/10">
+            {swiftyMessages.length > 0 && (
+              <div className="px-4 py-3 max-h-72 overflow-y-auto space-y-3">
+                {swiftyMessages.map((msg, idx) => (
+                  <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[82%] rounded-2xl px-3 py-2 text-sm ${msg.role === 'user' ? 'bg-white/10 text-white' : 'bg-black/40 border border-white/10 text-zinc-300'}`}>
+                      {msg.role === 'assistant' ? <ReactMarkdown>{msg.content}</ReactMarkdown> : msg.content}
+                    </div>
+                  </div>
+                ))}
+                {swiftyLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-black/40 border border-white/10 rounded-2xl px-3 py-2 text-sm text-zinc-500 italic">Swifty is thinking…</div>
+                  </div>
+                )}
+                <div ref={swiftyBottomRef} />
+              </div>
+            )}
+            <div className="px-4 py-3 border-t border-white/5 flex gap-2">
+              <input ref={swiftyRef} type="text" value={swiftyInput}
+                onChange={e => setSwiftyInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleSwiftySubmit() }}
+                placeholder="e.g. What was my highest earning period? How much OT did I work?"
+                className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white/30 placeholder-zinc-600"
+                disabled={swiftyLoading}
+              />
+              <button onClick={handleSwiftySubmit} disabled={swiftyLoading || !swiftyInput.trim()}
+                className="px-5 py-2.5 rounded-xl font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ backgroundColor: 'var(--accent-color)', color: 'black' }}>
+                Ask
+              </button>
+            </div>
+            <div className="px-4 pb-3 flex flex-wrap gap-2">
+              {['What was my highest earning period?', 'How much did I earn this year?', 'What are my total deductions?', 'How much overtime did I log?'].map(q => (
+                <button key={q} onClick={() => { setSwiftyInput(q); swiftyRef.current?.focus() }}
+                  className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 hover:bg-white/10 text-zinc-500 hover:text-zinc-300 transition-colors" disabled={swiftyLoading}>
+                  {q}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -945,29 +1248,16 @@ function TimesheetView({ user, gamification }: { user: any; gamification: Return
       {/* Footer actions */}
       <div className="glass rounded-2xl p-4">
         <label className="flex items-center gap-3 mb-4">
-          <input
-            type="checkbox"
-            checked={certified}
-            onChange={e => setCertified(e.target.checked)}
-            disabled={isSubmitted}
-            className="w-4 h-4 accent-white"
-          />
+          <input type="checkbox" checked={certified} onChange={e => setCertified(e.target.checked)} disabled={isSubmitted} className="w-4 h-4 accent-white" />
           <span className="text-sm">I certify this timesheet is accurate and complete.</span>
         </label>
-
         <div className="flex flex-wrap gap-3">
-          <button onClick={handleSaveDraft} className="px-5 py-2.5 rounded-xl border border-white/20 hover:bg-white/5 text-sm">
-            Save draft (+15 XP)
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={!certified || isSubmitted}
-            className="glass-btn-green px-5 py-2.5 rounded-xl font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-          >
+          <button onClick={handleSaveDraft} className="px-5 py-2.5 rounded-xl border border-white/20 hover:bg-white/5 text-sm">Save draft (+15 XP)</button>
+          <button onClick={handleSubmit} disabled={!certified || isSubmitted}
+            className="glass-btn-green px-5 py-2.5 rounded-xl font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed">
             Submit timesheet
           </button>
         </div>
-
         <p className="text-[11px] text-zinc-500 mt-4">Once submitted, this period is locked until approval or rejection.</p>
       </div>
     </div>
