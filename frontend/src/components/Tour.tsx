@@ -107,7 +107,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     icon: <DocumentIcon />,
     title: 'Timesheet',
-    desc: 'All your time entries in one place. Add, edit, and submit your weekly timesheet with ease. You can even use natural language — just type "I worked 8 hours Monday" or "add 7.5 hours today" and it figures out the rest.',
+    desc: 'All your time entries in one place. Add, edit, and submit your weekly timesheet with ease. You can even use natural language: just type "I worked 8 hours Monday" or "add 7.5 hours today" and it figures out the rest.',
     why: 'A clean, accurate timesheet means no surprises on payday and a permanent record you can always reference.',
     targetId: 'nav-timesheet',
     viewId: 'timesheet',
@@ -116,7 +116,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     icon: <TrophyIcon />,
     title: 'Rewards',
-    desc: "Stay consistent and earn streak rewards. Watch your real-time earnings climb on the Odometer — it's a live earnings counter that ticks up every second while you're clocked in, so you can literally see money being made.",
+    desc: "Stay consistent and earn streak rewards. Watch your real-time earnings climb on the Odometer, a live earnings counter that ticks up every second while you're clocked in, so you can literally see money being made.",
     why: 'This gives you instant gratification and helps connect the work to the reward - motivation you can actually see.',
     targetId: 'nav-rewards',
     viewId: 'rewards',
@@ -134,7 +134,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     icon: <DollarIcon />,
     title: 'AI Tax Filing - Swifty',
-    desc: "Upload your W-2 or 1099 and Swifty fills out your Form 1040 instantly. No accountant needed. It's completely free — and frankly it'll do a better job than a human accountant, with zero errors and zero waiting.",
+    desc: "Upload your W-2 or 1099 and Swifty fills out your Form 1040 instantly. No accountant needed. It's completely free, and frankly it'll do a better job than a human accountant, with zero errors and zero waiting.",
     why: 'Tax prep can cost hundreds of dollars and hours of stress. Swifty handles it in seconds so you can file with confidence.',
     targetId: 'nav-groktax',
     viewId: 'groktax',
@@ -152,7 +152,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     icon: <LightningIcon />,
     title: 'InstaApply',
-    desc: "Upload your resume once. SwiftShift matches you to the perfect jobs for your skills and experience, then applies for you automatically — so you don't have to retype your info 1000x. No more making a new account for every job app. No more filling out your employment history over and over. Just one upload and you're done.",
+    desc: "Upload your resume once. SwiftShift matches you to the perfect jobs for your skills and experience, then applies for you automatically so you don't have to retype your info 1000x. No more making a new account for every job app. No more filling out your employment history over and over. Just one upload and you're done.",
     why: 'The best opportunities move fast. InstaApply makes sure you never miss a role that fits - with zero extra effort.',
     targetId: 'nav-applications',
     viewId: 'applications',

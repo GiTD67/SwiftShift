@@ -197,7 +197,7 @@ export function SalesKPI({ isAdmin = true, accentColor = '#22c55e', addXP }: Sal
     prizes.forEach(prize => {
       if (!milestoneHit(repBefore, prize) && milestoneHit(repAfter, prize)) {
         toast.success(`🔔 ${repAfter.name} just hit ${prize.milestone} ${prize.milestoneType}!`, {
-          description: `${prize.icon} ${prize.title} — prize unlocked!`,
+          description: `${prize.icon} ${prize.title}: prize unlocked!`,
           duration: 6000,
         })
       }
@@ -466,7 +466,7 @@ export function SalesKPI({ isAdmin = true, accentColor = '#22c55e', addXP }: Sal
         <motion.div className="space-y-4" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <div className="glass rounded-3xl p-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Team Leaderboard — {PERIOD_LABELS[period]}</h2>
+              <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Team Leaderboard: {PERIOD_LABELS[period]}</h2>
               <span className="text-xs text-zinc-500">{reps.length} reps</span>
             </div>
             <div className="space-y-2">

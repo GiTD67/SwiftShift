@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback, Fragment } from 'react'
 import ReactMarkdown from 'react-markdown'
 import './App.css'
 import './index.css'
@@ -193,14 +193,19 @@ function parseHours(s: string): number {
 
 function fmtRange(start: Date, end: Date): string {
   const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
-  return `${start.toLocaleDateString(undefined, opts)} – ${end.toLocaleDateString(undefined, opts)}`
+  return `${start.toLocaleDateString(undefined, opts)} to ${end.toLocaleDateString(undefined, opts)}`
 }
 
 function usePayPeriodRange(periodOffset: number) {
   return useMemo(() => {
     const anchor = new Date(2026, 2, 22)
     const msPerDay = 86400000
-    const periodStart = new Date(anchor.getTime() + periodOffset * 14 * msPerDay)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const daysSinceAnchor = Math.floor((today.getTime() - anchor.getTime()) / msPerDay)
+    const currentPeriodIndex = Math.max(0, Math.floor(daysSinceAnchor / 14))
+    const targetPeriodIndex = currentPeriodIndex + periodOffset
+    const periodStart = new Date(anchor.getTime() + targetPeriodIndex * 14 * msPerDay)
     periodStart.setHours(0, 0, 0, 0)
     const periodEnd = new Date(periodStart.getTime() + 13 * msPerDay)
     const dayDates = Array.from({ length: 14 }, (_, i) => new Date(periodStart.getTime() + i * msPerDay))
@@ -541,11 +546,13 @@ function TimesheetView({ user, gamification }: { user: any; gamification: Return
   const [swiftyMessages, setSwiftyMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
   const [swiftyLoading, setSwiftyLoading] = useState(false)
   const [showSwifty, setShowSwifty] = useState(false)
+  const [showCertModal, setShowCertModal] = useState(false)
+  const [tookLunches, setTookLunches] = useState<null | boolean>(null)
   const nlpRef = useRef<HTMLInputElement>(null)
   const swiftyRef = useRef<HTMLInputElement>(null)
   const swiftyBottomRef = useRef<HTMLDivElement>(null)
 
-  const { gState, currentLevel, nextLevel, xpProgress, floatingXP, addXP, recordNLPUse, recordSubmit } = gamification
+  const { gState, currentLevel, xpProgress, floatingXP, addXP, recordNLPUse, recordSubmit } = gamification
   const { start, end, dayDates, periodId } = usePayPeriodRange(periodOffset)
 
   const prevPeriod1 = usePayPeriodRange(periodOffset - 1)
@@ -701,7 +708,7 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
       ? `Employee: ${user?.first_name} ${user?.last_name}, Role: ${user?.job_role||'N/A'}, Hourly Rate: $${hourlyRate}/hr.\nPay history:\n` +
         allSubmissions.slice(0, 12).map(s => {
           const p = calcPay(s.total_hours)
-          return `Period ${s.period_start}–${s.period_end}: ${s.total_hours.toFixed(1)}h, Gross $${p.gross.toFixed(2)}, Deductions $${p.deductions.toFixed(2)}, Net $${p.net.toFixed(2)}`
+          return `Period ${s.period_start} to ${s.period_end}: ${s.total_hours.toFixed(1)}h, Gross $${p.gross.toFixed(2)}, Deductions $${p.deductions.toFixed(2)}, Net $${p.net.toFixed(2)}`
         }).join('\n')
       : `Employee: ${user?.first_name} ${user?.last_name}, Hourly Rate: $${hourlyRate}/hr. No submitted periods yet.`
     try {
@@ -802,14 +809,14 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
                     isOT ? 'bg-amber-400/20 text-amber-400' :
                     h > 0 ? 'bg-white/10 text-white' : 'bg-white/5 text-zinc-600'
                   }`}>
-                    {h > 0 ? h.toFixed(1) : '—'}
+                    {h > 0 ? h.toFixed(1) : '-'}
                   </div>
                   {sessions.length > 0 && sessions.map((s: any, si: number) => (
                     <div key={si} className="text-[8px] text-zinc-600 mt-0.5 leading-tight">
                       <span style={{ color: 'var(--accent-color)', opacity: 0.7 }}>
                         {new Date(s.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
-                      {s.clock_out && <span>–{new Date(s.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+                      {s.clock_out && <span>-{new Date(s.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
                     </div>
                   ))}
                 </div>
@@ -850,46 +857,40 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
         }
       `}</style>
 
-      <div>
-        <h1 className="text-2xl font-semibold mb-1 neon-green">Timesheet</h1>
-        <p className="text-zinc-400 text-sm">Log hours for the 2-week pay period. Type naturally or enter hours directly.</p>
-      </div>
-
-      {/* Gamification bar */}
-      <div className="glass rounded-2xl px-4 py-3 flex items-center gap-4">
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2" style={{ borderColor: 'var(--accent-color)', color: 'var(--accent-color)' }}>
-            {currentLevel.level}
-          </div>
-          <div>
-            <div className="text-xs font-semibold" style={{ color: 'var(--accent-color)' }}>{currentLevel.name}</div>
-            <div className="text-[10px] text-zinc-500">{gState.totalXP} XP</div>
-          </div>
+      <div className="flex items-start gap-4 justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold mb-1 neon-green">Timesheet</h1>
+          <p className="text-zinc-400 text-sm">Log hours for the 2-week pay period. Type naturally or enter hours directly.</p>
         </div>
-        <div className="flex-1">
-          <div className="flex items-center justify-between text-[10px] text-zinc-500 mb-1">
-            <span>→ {nextLevel.name}</span>
-            <span>{xpProgress}%</span>
+        {/* Gamification tracker - compact, right-aligned */}
+        <div className="glass rounded-2xl px-3 py-2 flex items-center gap-3 flex-shrink-0">
+          <div className="flex items-center gap-1.5">
+            <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2" style={{ borderColor: 'var(--accent-color)', color: 'var(--accent-color)' }}>
+              {currentLevel.level}
+            </div>
+            <div>
+              <div className="text-[10px] font-semibold" style={{ color: 'var(--accent-color)' }}>{currentLevel.name}</div>
+              <div className="text-[9px] text-zinc-500">{gState.totalXP} XP</div>
+            </div>
           </div>
-          <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${xpProgress}%`, backgroundColor: 'var(--accent-color)' }} />
+          <div className="w-20">
+            <div className="flex items-center justify-between text-[9px] text-zinc-500 mb-0.5">
+              <span>{xpProgress}%</span>
+            </div>
+            <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-full rounded-full transition-all duration-700" style={{ width: `${xpProgress}%`, backgroundColor: 'var(--accent-color)' }} />
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-3 text-xs text-zinc-400 flex-shrink-0">
-          <span className="flex items-center gap-1">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0011 17h2a2.5 2.5 0 002.5-2.5c0-1.5-.5-2-1-3a6 6 0 001-6.5A6 6 0 018 7c-1 2-1.5 3.5-.5 6 .5 1.5 1 2 1 2z"/><path d="M12 22c2.5 0 4-1.5 4-4h-8c0 2.5 1.5 4 4 4z"/></svg>
-            {gState.streak} streak
-          </span>
-          <span className="flex items-center gap-1">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            {gState.submits} submitted
-          </span>
+          <div className="flex items-center gap-2 text-[10px] text-zinc-400 hidden sm:flex">
+            <span>{gState.streak} streak</span>
+            <span>{gState.submits} submitted</span>
+          </div>
         </div>
       </div>
 
       {/* NLP input bar */}
       <div className="glass rounded-2xl p-4">
-        <div className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Tell me your hours in plain English</div>
+        <div className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--accent-color)' }}>Tell me your hours in plain English</div>
         <div className="flex gap-2">
           <input
             ref={nlpRef}
@@ -924,55 +925,114 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
         </div>
       </div>
 
+      {/* Ask Swifty - moved near top */}
+      <div className="glass rounded-2xl overflow-hidden">
+        <button onClick={() => setShowSwifty(v => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors text-left">
+          <div>
+            <div className="text-sm font-medium flex items-center gap-2" style={{ color: 'var(--accent-color)' }}>
+              <span>⚡</span> Ask Swifty About Your Pay
+            </div>
+            <div className="text-xs text-zinc-500">Ask about earnings, deductions, overtime, or anything about your pay history</div>
+          </div>
+          <span className="text-zinc-400 text-lg">{showSwifty ? '▲' : '▼'}</span>
+        </button>
+        {showSwifty && (
+          <div className="border-t border-white/10">
+            {swiftyMessages.length > 0 && (
+              <div className="px-4 py-3 max-h-72 overflow-y-auto space-y-3">
+                {swiftyMessages.map((msg, idx) => (
+                  <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[82%] rounded-2xl px-3 py-2 text-sm ${msg.role === 'user' ? 'bg-white/10 text-white' : 'bg-black/40 border border-white/10 text-zinc-300'}`}>
+                      {msg.role === 'assistant' ? <ReactMarkdown>{msg.content}</ReactMarkdown> : msg.content}
+                    </div>
+                  </div>
+                ))}
+                {swiftyLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-black/40 border border-white/10 rounded-2xl px-3 py-2 text-sm text-zinc-500 italic">Swifty is thinking...</div>
+                  </div>
+                )}
+                <div ref={swiftyBottomRef} />
+              </div>
+            )}
+            <div className="px-4 py-3 border-t border-white/5 flex gap-2">
+              <input ref={swiftyRef} type="text" value={swiftyInput}
+                onChange={e => setSwiftyInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleSwiftySubmit() }}
+                placeholder="e.g. What was my highest earning period? How much OT did I work?"
+                className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white/30 placeholder-zinc-600"
+                disabled={swiftyLoading}
+              />
+              <button onClick={handleSwiftySubmit} disabled={swiftyLoading || !swiftyInput.trim()}
+                className="px-5 py-2.5 rounded-xl font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ backgroundColor: 'var(--accent-color)', color: 'black' }}>
+                Ask
+              </button>
+            </div>
+            <div className="px-4 pb-3 flex flex-wrap gap-2">
+              {['What was my highest earning period?', 'How much did I earn this year?', 'What are my total deductions?', 'How much overtime did I log?'].map(q => (
+                <button key={q} onClick={() => { setSwiftyInput(q); swiftyRef.current?.focus() }}
+                  className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 hover:bg-white/10 text-zinc-500 hover:text-zinc-300 transition-colors" disabled={swiftyLoading}>
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Submitted banner */}
       {isSubmitted && (
         <div className="glass rounded-2xl px-4 py-3 text-white flex items-center gap-2">
-          ✓ Submitted for approval
+          Submitted for approval
         </div>
       )}
 
-      {/* Period picker */}
-      <div className="glass rounded-2xl p-3 flex items-center justify-between">
-        <button onClick={() => setPeriodOffset(o => o - 1)} className="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5 text-sm">← Prev</button>
-        <div className="text-center">
-          <div className="text-base font-medium">{fmtRange(start, end)}</div>
-          <div className="text-[10px] text-zinc-500">{periodOffset === 0 ? 'Current Pay Period' : periodOffset > 0 ? `+${periodOffset} period${periodOffset > 1 ? 's' : ''}` : `${periodOffset} period${periodOffset < -1 ? 's' : ''}`}</div>
-        </div>
-        <button onClick={() => setPeriodOffset(o => o + 1)} className="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5 text-sm">Next →</button>
-      </div>
-
-      {/* Summary stats */}
-      <div className="glass rounded-2xl p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <div className="text-xs text-zinc-400">Employee</div>
-          <div className="font-medium text-sm">{user.first_name} {user.last_name}</div>
-          <div className="text-xs text-zinc-500">{user.job_role || ''}</div>
-        </div>
-        <div>
-          <div className="text-xs text-zinc-400">Approver</div>
-          <div className="font-medium text-sm">Taylor Brooks</div>
-          <div className="text-xs text-zinc-500">Engineering Manager</div>
-        </div>
-        <div>
-          <div className="flex flex-wrap gap-2">
-            <div className="px-2.5 py-1 rounded-full text-xs border border-white/10">Total: <span className="font-mono font-semibold">{totalHours.toFixed(1)}</span> h</div>
-            <div className="px-2.5 py-1 rounded-full text-xs border border-white/10">Regular: <span className="font-mono">{regularHours.toFixed(1)}</span> h</div>
-            <div className="px-2.5 py-1 rounded-full text-xs border border-white/10">OT×1.5: <span className="font-mono">{overtimeHours.toFixed(1)}</span> h</div>
-          </div>
-          <div className="mt-2">
-            <div className="flex justify-between text-[10px] text-zinc-500 mb-1">
-              <span>Period progress</span><span>{Math.min(100, Math.round((totalHours / 80) * 100))}% of 80h</span>
-            </div>
-            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-              <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (totalHours / 80) * 100)}%`, backgroundColor: totalHours >= 80 ? '#f59e0b' : 'var(--accent-color)' }} />
-            </div>
-          </div>
-          <div className="mt-1.5 text-xs text-zinc-400">Est. Gross: <span className="font-mono" style={{ color: 'var(--accent-color)' }}>${currentPay.gross.toFixed(2)}</span> · Net: <span className="font-mono text-white">${currentPay.net.toFixed(2)}</span></div>
-        </div>
-      </div>
-
-      {/* Timecards grid — shows hours + clock in/out times */}
+      {/* Combined: Pay Period + Employee Info + Day Grid */}
       <div className="glass rounded-2xl overflow-hidden">
+        <div className="px-4 pt-4 pb-3 border-b border-white/10">
+          <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--accent-color)' }}>Pay Period</div>
+          {/* Period picker */}
+          <div className="flex items-center justify-between mb-4">
+            <button onClick={() => setPeriodOffset(o => o - 1)} className="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5 text-sm">Prev</button>
+            <div className="text-center">
+              <div className="text-base font-medium">{fmtRange(start, end)}</div>
+              <div className="text-[10px] text-zinc-500">{periodOffset === 0 ? 'Current Pay Period' : periodOffset > 0 ? `+${periodOffset} period${periodOffset > 1 ? 's' : ''}` : `${periodOffset} period${periodOffset < -1 ? 's' : ''}`}</div>
+            </div>
+            <button onClick={() => setPeriodOffset(o => o + 1)} className="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5 text-sm">Next</button>
+          </div>
+          {/* Employee + approver + stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <div className="text-xs text-zinc-400">Employee</div>
+              <div className="font-medium text-sm">{user.first_name} {user.last_name}</div>
+              <div className="text-xs text-zinc-500">{user.job_role || ''}</div>
+            </div>
+            <div>
+              <div className="text-xs text-zinc-400">Approver</div>
+              <div className="font-medium text-sm">Taylor Brooks</div>
+              <div className="text-xs text-zinc-500">Engineering Manager</div>
+            </div>
+            <div>
+              <div className="flex flex-wrap gap-2">
+                <div className="px-2.5 py-1 rounded-full text-xs border border-white/10">Total: <span className="font-mono font-semibold">{totalHours.toFixed(1)}</span> h</div>
+                <div className="px-2.5 py-1 rounded-full text-xs border border-white/10">Regular: <span className="font-mono">{regularHours.toFixed(1)}</span> h</div>
+                <div className="px-2.5 py-1 rounded-full text-xs border border-white/10">OT x1.5: <span className="font-mono">{overtimeHours.toFixed(1)}</span> h</div>
+              </div>
+              <div className="mt-2">
+                <div className="flex justify-between text-[10px] text-zinc-500 mb-1">
+                  <span>Period progress</span><span>{Math.min(100, Math.round((totalHours / 80) * 100))}% of 80h</span>
+                </div>
+                <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (totalHours / 80) * 100)}%`, backgroundColor: totalHours >= 80 ? '#f59e0b' : 'var(--accent-color)' }} />
+                </div>
+              </div>
+              <div className="mt-1.5 text-xs text-zinc-400">Est. Gross: <span className="font-mono" style={{ color: 'var(--accent-color)' }}>${currentPay.gross.toFixed(2)}</span> · Net: <span className="font-mono text-white">${currentPay.net.toFixed(2)}</span></div>
+            </div>
+          </div>
+        </div>
+        {/* Day grid */}
         <div className="overflow-x-auto">
           <div className="px-5 py-2.5 border-b border-white/10 flex gap-2 text-xs uppercase tracking-wider text-zinc-500" style={{ minWidth: '640px' }}>
             {dayNames.map((n, i) => <div key={i} className="flex-1 text-center">{n}</div>)}
@@ -1014,7 +1074,7 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
                         {new Date(s.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                       {s.clock_out
-                        ? <span className="text-zinc-600">–{new Date(s.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        ? <span className="text-zinc-600">-{new Date(s.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         : <span className="text-amber-400"> •</span>}
                     </div>
                   ))}
@@ -1027,7 +1087,7 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
 
       {/* Achievements */}
       <div className="glass rounded-2xl p-4">
-        <div className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">Achievements</div>
+        <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--accent-color)' }}>Achievements</div>
         <div className="grid grid-cols-5 sm:grid-cols-5 gap-2">
           {ACHIEVEMENTS.map(ach => {
             const unlocked = gState.unlockedAchievements.includes(ach.id)
@@ -1047,7 +1107,7 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
         <button onClick={() => setShowHistory(h => !h)}
           className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors text-left">
           <div>
-            <div className="text-sm font-medium">Previous Pay Periods</div>
+            <div className="text-sm font-medium" style={{ color: 'var(--accent-color)' }}>Previous Pay Periods</div>
             <div className="text-xs text-zinc-500">Clock in/out times and daily hours for recent periods</div>
           </div>
           <span className="text-zinc-400 text-lg">{showHistory ? '▲' : '▼'}</span>
@@ -1060,13 +1120,13 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
         )}
       </div>
 
-      {/* Pay Summary — all submitted periods */}
+      {/* Pay Summary: All Periods */}
       <div className="glass rounded-2xl overflow-hidden">
         <button onClick={() => setShowPaySummary(v => !v)}
           className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors text-left">
           <div>
-            <div className="text-sm font-medium">Pay Summary — All Periods</div>
-            <div className="text-xs text-zinc-500">Gross, deductions &amp; net pay · click a row to expand · print pay stub</div>
+            <div className="text-sm font-medium" style={{ color: 'var(--accent-color)' }}>Pay Summary: All Periods</div>
+            <div className="text-xs text-zinc-500">Gross, deductions and net pay. Click a row to expand. Print pay stub.</div>
           </div>
           <span className="text-zinc-400 text-lg">{showPaySummary ? '▲' : '▼'}</span>
         </button>
@@ -1089,7 +1149,15 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
               )}
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-xs" style={{ minWidth: '560px' }}>
+              <table className="w-full text-xs" style={{ minWidth: '580px', tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col style={{ width: '35%' }} />
+                  <col style={{ width: '13%' }} />
+                  <col style={{ width: '17%' }} />
+                  <col style={{ width: '17%' }} />
+                  <col style={{ width: '13%' }} />
+                  <col style={{ width: '5%' }} />
+                </colgroup>
                 <thead>
                   <tr className="text-zinc-500 border-b border-white/10">
                     <th className="px-4 py-2 text-left font-medium">Pay Period</th>
@@ -1107,37 +1175,39 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
                     const p = calcPay(sub.total_hours)
                     const isSelected = selectedStubPeriod?.period_start === sub.period_start
                     return (
-                      <tr key={sub.id || idx}>
-                        <td colSpan={6} className="p-0">
-                          <div>
-                            <button onClick={() => setSelectedStubPeriod(isSelected ? null : sub)}
-                              className={`w-full text-left flex items-center border-b border-white/5 transition-colors ${isSelected ? 'bg-white/5' : 'hover:bg-white/3'}`}>
-                              <span className="px-4 py-2.5 flex-1">
-                                <span className="font-medium text-zinc-200">{sub.period_start} – {sub.period_end}</span>
-                                <span className="text-zinc-600 text-[10px] ml-2">submitted {sub.submitted_at ? new Date(sub.submitted_at).toLocaleDateString() : '–'}</span>
-                              </span>
-                              <span className="px-3 py-2.5 font-mono text-zinc-300 text-right w-16">{sub.total_hours.toFixed(1)}h</span>
-                              <span className="px-3 py-2.5 font-mono text-right w-24" style={{ color: 'var(--accent-color)' }}>${p.gross.toFixed(2)}</span>
-                              <span className="px-3 py-2.5 font-mono text-red-400 text-right w-24">-${p.deductions.toFixed(2)}</span>
-                              <span className="px-3 py-2.5 font-mono text-white font-semibold text-right w-24">${p.net.toFixed(2)}</span>
-                              <span className="px-3 py-2.5 text-center w-16">
-                                <button onClick={e => { e.stopPropagation(); handlePrintStub(sub) }}
-                                  className="text-[10px] px-2 py-1 rounded-lg border border-white/10 hover:bg-white/10 text-zinc-400 hover:text-white">Print</button>
-                              </span>
-                            </button>
-                            {isSelected && (
+                      <Fragment key={sub.id || idx}>
+                        <tr
+                          onClick={() => setSelectedStubPeriod(isSelected ? null : sub)}
+                          className={`border-b border-white/5 cursor-pointer transition-colors ${isSelected ? 'bg-white/5' : 'hover:bg-white/3'}`}
+                        >
+                          <td className="px-4 py-2.5">
+                            <div className="font-medium text-zinc-200 truncate">{sub.period_start} to {sub.period_end}</div>
+                            <div className="text-zinc-600 text-[10px]">submitted {sub.submitted_at ? new Date(sub.submitted_at).toLocaleDateString() : 'N/A'}</div>
+                          </td>
+                          <td className="px-3 py-2.5 font-mono text-zinc-300 text-right">{sub.total_hours.toFixed(1)}h</td>
+                          <td className="px-3 py-2.5 font-mono text-right" style={{ color: 'var(--accent-color)' }}>${p.gross.toFixed(2)}</td>
+                          <td className="px-3 py-2.5 font-mono text-red-400 text-right">-${p.deductions.toFixed(2)}</td>
+                          <td className="px-3 py-2.5 font-mono text-white font-semibold text-right">${p.net.toFixed(2)}</td>
+                          <td className="px-3 py-2.5 text-center">
+                            <button onClick={e => { e.stopPropagation(); handlePrintStub(sub) }}
+                              className="text-[10px] px-2 py-1 rounded-lg border border-white/10 hover:bg-white/10 text-zinc-400 hover:text-white">Print</button>
+                          </td>
+                        </tr>
+                        {isSelected && (
+                          <tr>
+                            <td colSpan={6} className="p-0">
                               <div className="bg-black/20 px-4 py-4 border-b border-white/10">
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs mb-3">
                                   <div className="bg-black/30 rounded-xl p-3">
                                     <div className="text-zinc-500 mb-1">Regular Pay</div>
                                     <div className="font-mono text-white">${(Math.min(sub.total_hours, 80) * hourlyRate).toFixed(2)}</div>
-                                    <div className="text-zinc-600 text-[10px]">{Math.min(sub.total_hours, 80).toFixed(1)}h × ${hourlyRate}/hr</div>
+                                    <div className="text-zinc-600 text-[10px]">{Math.min(sub.total_hours, 80).toFixed(1)}h x ${hourlyRate}/hr</div>
                                   </div>
                                   {sub.total_hours > 80 && (
                                     <div className="bg-amber-400/10 rounded-xl p-3">
                                       <div className="text-amber-500 mb-1">Overtime</div>
                                       <div className="font-mono text-amber-300">${((sub.total_hours - 80) * 1.5 * hourlyRate).toFixed(2)}</div>
-                                      <div className="text-zinc-600 text-[10px]">{(sub.total_hours - 80).toFixed(1)}h × 1.5×</div>
+                                      <div className="text-zinc-600 text-[10px]">{(sub.total_hours - 80).toFixed(1)}h x 1.5x</div>
                                     </div>
                                   )}
                                   <div className="bg-black/30 rounded-xl p-3">
@@ -1163,10 +1233,10 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
                                   Print Pay Stub
                                 </button>
                               </div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     )
                   })}
                 </tbody>
@@ -1188,78 +1258,96 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
         )}
       </div>
 
-      {/* Swifty Pay Assistant */}
-      <div className="glass rounded-2xl overflow-hidden">
-        <button onClick={() => setShowSwifty(v => !v)}
-          className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors text-left">
-          <div>
-            <div className="text-sm font-medium flex items-center gap-2">
-              <span style={{ color: 'var(--accent-color)' }}>⚡</span> Ask Swifty About Your Pay
-            </div>
-            <div className="text-xs text-zinc-500">Ask about earnings, deductions, overtime, or anything about your pay history</div>
-          </div>
-          <span className="text-zinc-400 text-lg">{showSwifty ? '▲' : '▼'}</span>
-        </button>
-        {showSwifty && (
-          <div className="border-t border-white/10">
-            {swiftyMessages.length > 0 && (
-              <div className="px-4 py-3 max-h-72 overflow-y-auto space-y-3">
-                {swiftyMessages.map((msg, idx) => (
-                  <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[82%] rounded-2xl px-3 py-2 text-sm ${msg.role === 'user' ? 'bg-white/10 text-white' : 'bg-black/40 border border-white/10 text-zinc-300'}`}>
-                      {msg.role === 'assistant' ? <ReactMarkdown>{msg.content}</ReactMarkdown> : msg.content}
-                    </div>
-                  </div>
-                ))}
-                {swiftyLoading && (
-                  <div className="flex justify-start">
-                    <div className="bg-black/40 border border-white/10 rounded-2xl px-3 py-2 text-sm text-zinc-500 italic">Swifty is thinking…</div>
-                  </div>
-                )}
-                <div ref={swiftyBottomRef} />
-              </div>
-            )}
-            <div className="px-4 py-3 border-t border-white/5 flex gap-2">
-              <input ref={swiftyRef} type="text" value={swiftyInput}
-                onChange={e => setSwiftyInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleSwiftySubmit() }}
-                placeholder="e.g. What was my highest earning period? How much OT did I work?"
-                className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white/30 placeholder-zinc-600"
-                disabled={swiftyLoading}
-              />
-              <button onClick={handleSwiftySubmit} disabled={swiftyLoading || !swiftyInput.trim()}
-                className="px-5 py-2.5 rounded-xl font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ backgroundColor: 'var(--accent-color)', color: 'black' }}>
-                Ask
-              </button>
-            </div>
-            <div className="px-4 pb-3 flex flex-wrap gap-2">
-              {['What was my highest earning period?', 'How much did I earn this year?', 'What are my total deductions?', 'How much overtime did I log?'].map(q => (
-                <button key={q} onClick={() => { setSwiftyInput(q); swiftyRef.current?.focus() }}
-                  className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 hover:bg-white/10 text-zinc-500 hover:text-zinc-300 transition-colors" disabled={swiftyLoading}>
-                  {q}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Footer actions */}
       <div className="glass rounded-2xl p-4">
-        <label className="flex items-center gap-3 mb-4">
-          <input type="checkbox" checked={certified} onChange={e => setCertified(e.target.checked)} disabled={isSubmitted} className="w-4 h-4 accent-white" />
-          <span className="text-sm">I certify this timesheet is accurate and complete.</span>
-        </label>
-        <div className="flex flex-wrap gap-3">
-          <button onClick={handleSaveDraft} className="px-5 py-2.5 rounded-xl border border-white/20 hover:bg-white/5 text-sm">Save draft (+15 XP)</button>
-          <button onClick={handleSubmit} disabled={!certified || isSubmitted}
-            className="glass-btn-green px-5 py-2.5 rounded-xl font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed">
-            Submit timesheet
-          </button>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <div className="text-sm font-medium" style={{ color: 'var(--accent-color)' }}>Ready to submit?</div>
+            <div className="text-xs text-zinc-500 mt-0.5">
+              Submit by: <span className="text-zinc-300 font-medium">{(() => { const d = new Date(end); d.setDate(d.getDate() + 3); return d.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) })()}</span>
+            </div>
+          </div>
+          <button onClick={handleSaveDraft} className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/5 text-sm">Save draft (+15 XP)</button>
         </div>
-        <p className="text-[11px] text-zinc-500 mt-4">Once submitted, this period is locked until approval or rejection.</p>
+        <button
+          onClick={() => { if (!isSubmitted) setShowCertModal(true) }}
+          disabled={isSubmitted}
+          className="glass-btn-green w-full px-5 py-3 rounded-xl font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {isSubmitted ? 'Submitted for Approval' : 'Submit Timesheet'}
+        </button>
+        <p className="text-[11px] text-zinc-500 mt-3">Once submitted, this period is locked until approval or rejection.</p>
       </div>
+
+      {/* Certification popup modal */}
+      {showCertModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowCertModal(false)}>
+          <div className="glass rounded-2xl p-6 w-full max-w-lg mx-4 border border-white/20" onClick={e => e.stopPropagation()} style={{ boxShadow: '0 0 80px -20px rgba(var(--accent-color-rgb), 0.25), 0 28px 72px -14px rgba(0,0,0,0.85)' }}>
+            <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--accent-color)' }}>Timesheet Certification</h2>
+            <p className="text-xs text-zinc-500 mb-4">Pay period: {fmtRange(start, end)}</p>
+
+            <div className="mb-5">
+              <p className="text-sm text-zinc-300 mb-3">Did you take all required meal periods and rest breaks during this pay period?</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setTookLunches(true)}
+                  className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-colors ${tookLunches === true ? 'border-[var(--accent-color)] text-white' : 'border-white/10 text-zinc-400 hover:bg-white/5'}`}
+                  style={tookLunches === true ? { backgroundColor: 'var(--accent-color)', color: 'black' } : undefined}
+                >
+                  Yes, I did
+                </button>
+                <button
+                  onClick={() => setTookLunches(false)}
+                  className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-colors ${tookLunches === false ? 'border-amber-400 bg-amber-400/20 text-amber-300' : 'border-white/10 text-zinc-400 hover:bg-white/5'}`}
+                >
+                  No / Not all
+                </button>
+              </div>
+            </div>
+
+            {tookLunches !== null && (
+              <div className="bg-black/30 border border-white/10 rounded-xl p-4 mb-5 text-xs text-zinc-300 leading-relaxed">
+                {tookLunches ? (
+                  <p>
+                    I hereby certify that the information recorded on this timesheet is true and accurate. I certify that I was provided all required meal periods and rest breaks, that I took them as required by law, and that I have accurately recorded all time worked during this pay period. I understand that falsification of this timesheet may result in disciplinary action.
+                  </p>
+                ) : (
+                  <p>
+                    I hereby certify that the information recorded on this timesheet is true and accurate. I acknowledge that I was not provided all required meal periods and/or rest breaks during this pay period as required by law, or that I was unable to take them in full. I have accurately recorded all time worked. I understand that any missed breaks should be reported to my manager and HR, and that this certification is required for payroll compliance.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <label className="flex items-start gap-3 mb-5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={certified}
+                onChange={e => setCertified(e.target.checked)}
+                disabled={tookLunches === null}
+                className="w-4 h-4 mt-0.5 accent-white flex-shrink-0"
+              />
+              <span className={`text-sm ${tookLunches === null ? 'text-zinc-600' : 'text-zinc-300'}`}>
+                I have read and agree to the certification statement above.
+              </span>
+            </label>
+
+            <div className="flex gap-3">
+              <button onClick={() => setShowCertModal(false)} className="flex-1 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-sm text-zinc-400">
+                Cancel
+              </button>
+              <button
+                onClick={() => { handleSubmit(); setShowCertModal(false) }}
+                disabled={!certified || tookLunches === null}
+                className="flex-1 py-2.5 rounded-xl font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ backgroundColor: 'var(--accent-color)', color: 'black' }}
+              >
+                Submit Timesheet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1601,7 +1689,7 @@ function LoginPage() {
               {[
                 { icon: '⏱', title: 'One-tap Clock In', desc: 'Punch in instantly. Stay logged in.' },
                 { icon: '📈', title: 'Real-Time Earnings', desc: 'Watch your pay grow live as you work.' },
-                { icon: '🤖', title: 'AI Tax Filing', desc: 'Swifty auto-fills your 1040 from your W-2 — free.' },
+                { icon: '🤖', title: 'AI Tax Filing', desc: 'Swifty auto-fills your 1040 from your W-2, free.' },
                 { icon: '🏆', title: 'Rewards & XP', desc: 'Level up and unlock perks just for showing up.' },
                 { icon: '💼', title: 'InstaApply', desc: 'AI job matching with one-click applications.' },
               ].map(({ icon, title, desc }) => (
@@ -1650,7 +1738,7 @@ function LoginPage() {
             <div className="text-sm text-zinc-400 space-y-1.5 mb-4">
               <div>⚡ Frictionless one-tap clock in</div>
               <div>📈 Real-time visualized earnings</div>
-              <div>🤖 AI tax filing — free &amp; instant</div>
+              <div>🤖 AI tax filing, free and instant</div>
               <div>💼 Auto job matching &amp; InstaApply</div>
               <div>🔥 Streak rewards &amp; achievements</div>
             </div>
@@ -1748,7 +1836,7 @@ function LoginPage() {
             {/* Links */}
             <div className="flex justify-between text-sm pt-1">
               <button type="button" onClick={() => setShowForgotPassword(true)} className="text-zinc-500 hover:text-white transition-colors">Forgot password?</button>
-              <a href="signup" className="text-zinc-400 hover:text-white underline underline-offset-4">Create account — it's free</a>
+              <a href="signup" className="text-zinc-400 hover:text-white underline underline-offset-4">Create account, it's free</a>
             </div>
 
             {/* Tour button */}
@@ -1899,7 +1987,7 @@ function SignupPage() {
             <div className="text-sm text-zinc-400 space-y-1.5 mb-4">
               <div>⚡ Frictionless one-tap clock in</div>
               <div>📈 Real-time visualized earnings</div>
-              <div>🤖 AI tax filing — free &amp; instant</div>
+              <div>🤖 AI tax filing, free and instant</div>
               <div>💼 Auto job matching &amp; InstaApply</div>
               <div>🔥 Streak rewards &amp; achievements</div>
             </div>
@@ -2186,7 +2274,7 @@ export default function App() {
   // Announcements state
   const [announcements, setAnnouncements] = useState<Array<{ id: number; title: string; body: string; author: string; priority: 'normal' | 'urgent'; created_at: string; read_by: string[] }>>([
     { id: 1, title: 'Reminder: Timesheets due Friday', body: 'Please submit your timesheets by 5 PM Friday to ensure on-time payroll processing. Late submissions may delay your payment.', author: 'Dana Morales', priority: 'urgent', created_at: '2026-04-25T09:00:00Z', read_by: [] },
-    { id: 2, title: 'Team lunch — Thursday noon', body: 'We are doing a team lunch this Thursday at 12 PM in the main conference room. All hands welcome!', author: 'Alex Rivera', priority: 'normal', created_at: '2026-04-24T14:30:00Z', read_by: [] },
+    { id: 2, title: 'Team Lunch: Thursday Noon', body: 'We are doing a team lunch this Thursday at 12 PM in the main conference room. All hands welcome!', author: 'Alex Rivera', priority: 'normal', created_at: '2026-04-24T14:30:00Z', read_by: [] },
     { id: 3, title: 'Updated PTO policy effective May 1', body: 'Starting May 1, the PTO accrual rate increases from 1.5 to 2 days per month. See HR portal for details.', author: 'Dana Morales', priority: 'normal', created_at: '2026-04-22T11:00:00Z', read_by: [] },
   ])
   const [showAnnouncementForm, setShowAnnouncementForm] = useState(false)
@@ -2214,17 +2302,17 @@ export default function App() {
   // Enterprise: Audit log state
   const [auditLogFilter, setAuditLogFilter] = useState<'all' | 'admin' | 'timesheet' | 'payroll' | 'user'>('all')
   const AUDIT_LOG_ENTRIES = [
-    { id: 1, ts: '2026-04-28T17:32:00Z', actor: 'Dana Morales', action: 'Approved timesheet', target: 'Alex Rivera — Week of Apr 21', category: 'timesheet', ip: '10.0.1.14' },
-    { id: 2, ts: '2026-04-28T16:55:00Z', actor: 'Dana Morales', action: 'Rejected overtime request', target: 'Casey Brooks — 6h OT Apr 28', category: 'timesheet', ip: '10.0.1.14' },
-    { id: 3, ts: '2026-04-28T15:10:00Z', actor: 'System', action: 'Payroll run initiated', target: 'Pay period Apr 14–27', category: 'payroll', ip: 'system' },
-    { id: 4, ts: '2026-04-28T14:48:00Z', actor: 'Admin', action: 'Updated user pay rate', target: 'Jordan Lee — $52/hr', category: 'user', ip: '10.0.1.2' },
+    { id: 1, ts: '2026-04-28T17:32:00Z', actor: 'Dana Morales', action: 'Approved timesheet', target: 'Alex Rivera, Week of Apr 21', category: 'timesheet', ip: '10.0.1.14' },
+    { id: 2, ts: '2026-04-28T16:55:00Z', actor: 'Dana Morales', action: 'Rejected overtime request', target: 'Casey Brooks, 6h OT Apr 28', category: 'timesheet', ip: '10.0.1.14' },
+    { id: 3, ts: '2026-04-28T15:10:00Z', actor: 'System', action: 'Payroll run initiated', target: 'Pay period Apr 14-27', category: 'payroll', ip: 'system' },
+    { id: 4, ts: '2026-04-28T14:48:00Z', actor: 'Admin', action: 'Updated user pay rate', target: 'Jordan Lee ($52/hr)', category: 'user', ip: '10.0.1.2' },
     { id: 5, ts: '2026-04-28T13:22:00Z', actor: 'Admin', action: 'Created new user', target: 'Mia Thompson', category: 'admin', ip: '10.0.1.2' },
     { id: 6, ts: '2026-04-27T17:00:00Z', actor: 'System', action: 'Timesheet deadline reminder sent', target: 'All 42 employees', category: 'admin', ip: 'system' },
-    { id: 7, ts: '2026-04-27T11:30:00Z', actor: 'Casey Morgan', action: 'Approved PTO request', target: 'Jordan Lee — May 5–9', category: 'timesheet', ip: '10.0.1.8' },
-    { id: 8, ts: '2026-04-27T09:05:00Z', actor: 'Admin', action: 'Changed role permissions', target: 'Sam Carter — Manager → Employee', category: 'admin', ip: '10.0.1.2' },
-    { id: 9, ts: '2026-04-26T16:40:00Z', actor: 'System', action: 'Payroll disbursed', target: '$94,600 — 42 employees', category: 'payroll', ip: 'system' },
+    { id: 7, ts: '2026-04-27T11:30:00Z', actor: 'Casey Morgan', action: 'Approved PTO request', target: 'Jordan Lee (May 5-9)', category: 'timesheet', ip: '10.0.1.8' },
+    { id: 8, ts: '2026-04-27T09:05:00Z', actor: 'Admin', action: 'Changed role permissions', target: 'Sam Carter: Manager to Employee', category: 'admin', ip: '10.0.1.2' },
+    { id: 9, ts: '2026-04-26T16:40:00Z', actor: 'System', action: 'Payroll disbursed', target: '$94,600, 42 employees', category: 'payroll', ip: 'system' },
     { id: 10, ts: '2026-04-26T10:15:00Z', actor: 'Dana Morales', action: 'Exported compliance report', target: 'Q1 2026 Labor Compliance', category: 'admin', ip: '10.0.1.14' },
-    { id: 11, ts: '2026-04-25T14:22:00Z', actor: 'Admin', action: 'SSO configuration updated', target: 'Okta — SAML endpoint refreshed', category: 'admin', ip: '10.0.1.2' },
+    { id: 11, ts: '2026-04-25T14:22:00Z', actor: 'Admin', action: 'SSO configuration updated', target: 'Okta: SAML endpoint refreshed', category: 'admin', ip: '10.0.1.2' },
     { id: 12, ts: '2026-04-25T09:00:00Z', actor: 'Dana Morales', action: 'Published announcement', target: 'Timesheet deadline reminder', category: 'admin', ip: '10.0.1.14' },
   ]
 
@@ -2778,7 +2866,7 @@ export default function App() {
 
   // Pay period
   const period = useMemo(() => payPeriodFor(now), [now])
-  const periodLabel = `${period.start.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })} – ${period.end.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })}`
+  const periodLabel = `${period.start.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })} to ${period.end.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })}`
 
   // Overtime 1.5× earnings calculation for pay period sidebar
   const periodEarnings = useMemo(() => {
@@ -4153,7 +4241,7 @@ export default function App() {
                       <div key={sw.id} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
                         <div>
                           <div className="font-medium">{sw.shift_date}</div>
-                          <div className="text-xs text-zinc-400">{sw.shift_start} – {sw.shift_end}{sw.reason ? ` · ${sw.reason}` : ''}</div>
+                          <div className="text-xs text-zinc-400">{sw.shift_start} - {sw.shift_end}{sw.reason ? ` · ${sw.reason}` : ''}</div>
                         </div>
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${sw.status === 'accepted' ? 'bg-emerald-500/20 text-emerald-400' : sw.status === 'denied' ? 'bg-red-500/20 text-red-400' : sw.status === 'cancelled' ? 'bg-zinc-500/20 text-zinc-400' : 'bg-amber-500/20 text-amber-400'}`}>
                           {sw.status}
@@ -4174,7 +4262,7 @@ export default function App() {
                     {timesheetSubs.map(sub => (
                       <div key={sub.id} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3 text-sm">
                         <div>
-                          <div className="font-medium">{sub.period_start} – {sub.period_end}</div>
+                          <div className="font-medium">{sub.period_start} to {sub.period_end}</div>
                           <div className="text-xs text-zinc-400">Submitted {sub.submitted_at?.slice(0, 10)}</div>
                         </div>
                         <span className="font-mono neon-green">{sub.total_hours}h</span>
@@ -4201,7 +4289,7 @@ export default function App() {
                       <div key={sw.id} className="flex flex-wrap items-center gap-3 bg-white/5 rounded-xl px-4 py-3">
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-sm">{sw.shift_date}</div>
-                          <div className="text-xs text-zinc-400">{sw.shift_start} – {sw.shift_end}{sw.reason ? ` · "${sw.reason}"` : ''}</div>
+                          <div className="text-xs text-zinc-400">{sw.shift_start} - {sw.shift_end}{sw.reason ? ` · "${sw.reason}"` : ''}</div>
                           <div className="text-xs text-zinc-500 mt-0.5">User #{sw.requester_id}</div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
@@ -4257,7 +4345,7 @@ export default function App() {
                 {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
                   <div key={day} className="glass rounded-2xl p-3">
                     <div className="text-xs font-semibold text-zinc-400 mb-2 uppercase">{day}</div>
-                    {['Morning 6–2', 'Afternoon 2–10'].map((shift, i) => (
+                    {['Morning 6-2', 'Afternoon 2-10'].map((shift, i) => (
                       <div key={i} className="text-xs rounded-lg px-2 py-1.5 mb-1.5 cursor-pointer hover:opacity-80 transition-opacity"
                         style={{ backgroundColor: 'var(--accent-color-dim)', borderLeft: '3px solid var(--accent-color)', color: 'var(--accent-color)' }}>
                         {shift}
@@ -4471,7 +4559,7 @@ export default function App() {
                 </div>
                 {Object.values(payrollSignoffs).every(Boolean) && (
                   <div className="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-medium text-center">
-                    All employees signed off — Payroll run ready to submit
+                    All employees signed off. Payroll run ready to submit.
                   </div>
                 )}
               </div>
@@ -4527,14 +4615,14 @@ export default function App() {
                   <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Timesheet Approvals</h2>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-medium">5 pending</span>
                 </div>
-                <p className="text-xs text-zinc-400 mb-4">Anomalies auto-detected from clock records — review before approving</p>
+                <p className="text-xs text-zinc-400 mb-4">Anomalies auto-detected from clock records. Review before approving.</p>
                 <div className="space-y-2">
                   {[
-                    { type: 'Timesheet', name: 'Alex Rivera', detail: 'Week of Apr 21 · 42.5h', anomaly: 'Overtime — 2.5h above threshold', urgency: 'High' },
-                    { type: 'PTO Request', name: 'Jordan Lee', detail: 'May 5–9 · 40h vacation', anomaly: null, urgency: 'Normal' },
+                    { type: 'Timesheet', name: 'Alex Rivera', detail: 'Week of Apr 21 · 42.5h', anomaly: 'Overtime: 2.5h above threshold', urgency: 'High' },
+                    { type: 'PTO Request', name: 'Jordan Lee', detail: 'May 5-9 · 40h vacation', anomaly: null, urgency: 'Normal' },
                     { type: 'Timesheet', name: 'Casey Brooks', detail: 'Week of Apr 21 · 38h', anomaly: 'Missed clock-out on Apr 23', urgency: 'Normal' },
                     { type: 'PTO Request', name: 'Sam Carter', detail: 'Apr 30 · 8h sick leave', anomaly: null, urgency: 'Normal' },
-                    { type: 'Overtime Auth', name: 'Dana Morales', detail: 'Apr 28 · 6h OT requested', anomaly: 'No prior OT this period — unusual spike', urgency: 'High' },
+                    { type: 'Overtime Auth', name: 'Dana Morales', detail: 'Apr 28 · 6h OT requested', anomaly: 'No prior OT this period, unusual spike', urgency: 'High' },
                   ].map(({ type, name, detail, anomaly, urgency }) => (
                     <div key={name + type} className={`flex flex-wrap items-start gap-3 rounded-xl px-4 py-3 ${anomaly ? 'bg-amber-500/5 border border-amber-500/10' : 'bg-white/5'}`}>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 mt-0.5 ${urgency === 'High' ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/10 text-blue-400'}`}>{type}</span>
@@ -4566,9 +4654,9 @@ export default function App() {
                       { name: 'Alex Rivera', role: 'Engineer', status: 'clocked-in', since: '8:02 AM' },
                       { name: 'Jordan Lee', role: 'Designer', status: 'clocked-in', since: '9:15 AM' },
                       { name: 'Casey Brooks', role: 'Infra Lead', status: 'on-break', since: '10:30 AM' },
-                      { name: 'Dana Morales', role: 'Finance', status: 'clocked-out', since: '—' },
+                      { name: 'Dana Morales', role: 'Finance', status: 'clocked-out', since: '-' },
                       { name: 'Mia Thompson', role: 'Designer', status: 'clocked-in', since: '8:45 AM' },
-                      { name: 'Sam Carter', role: 'Frontend Eng', status: 'clocked-out', since: '—' },
+                      { name: 'Sam Carter', role: 'Frontend Eng', status: 'clocked-out', since: '-' },
                     ].map(({ name, role, status, since }) => (
                       <div key={name} className="flex items-center gap-3 bg-white/5 rounded-xl px-3 py-2.5">
                         <span className={`w-2 h-2 rounded-full flex-shrink-0 ${status === 'clocked-in' ? 'bg-emerald-400' : status === 'on-break' ? 'bg-amber-400' : 'bg-zinc-600'}`} />
@@ -4666,8 +4754,8 @@ export default function App() {
                 </div>
                 <div className="space-y-2">
                   {[
-                    { shift: 'Wed Apr 30 · Morning (8AM–12PM)', dept: 'Engineering', needed: 4, scheduled: 2, gap: 2 },
-                    { shift: 'Thu May 1 · Afternoon (1PM–5PM)', dept: 'Sales', needed: 3, scheduled: 1, gap: 2 },
+                    { shift: 'Wed Apr 30 · Morning (8AM-12PM)', dept: 'Engineering', needed: 4, scheduled: 2, gap: 2 },
+                    { shift: 'Thu May 1 · Afternoon (1PM-5PM)', dept: 'Sales', needed: 3, scheduled: 1, gap: 2 },
                     { shift: 'Fri May 2 · All-Day', dept: 'HR', needed: 2, scheduled: 0, gap: 2 },
                   ].map(({ shift, dept, needed, scheduled, gap }) => (
                     <div key={shift} className="flex flex-wrap items-center gap-3 bg-red-500/5 border border-red-500/10 rounded-xl px-4 py-3">
@@ -4722,9 +4810,9 @@ export default function App() {
               {/* PTO Balance */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {[
-                  ['Available PTO', ptoBalance ? `${parseFloat(ptoBalance.hours_available || 0).toFixed(1)} hrs` : '—'],
-                  ['Used PTO', ptoBalance ? `${parseFloat(ptoBalance.hours_used || 0).toFixed(1)} hrs` : '—'],
-                  ['Payout Value', ptoBalance ? `$${(parseFloat(ptoBalance.hours_available || 0) * clockHourlyRate).toFixed(0)}` : '—'],
+                  ['Available PTO', ptoBalance ? `${parseFloat(ptoBalance.hours_available || 0).toFixed(1)} hrs` : '-'],
+                  ['Used PTO', ptoBalance ? `${parseFloat(ptoBalance.hours_used || 0).toFixed(1)} hrs` : '-'],
+                  ['Payout Value', ptoBalance ? `$${(parseFloat(ptoBalance.hours_available || 0) * clockHourlyRate).toFixed(0)}` : '-'],
                   ['Pending Requests', String(ptoRequests.filter(r => r.status === 'pending').length)],
                 ].map(([label, val]) => (
                   <div key={label} className="glass rounded-2xl p-4 text-center">
@@ -4909,15 +4997,15 @@ export default function App() {
 
               {/* Team Leave Calendar */}
               <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Team Leave Calendar — May 2026</h2>
+                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Team Leave Calendar: May 2026</h2>
                 <p className="text-xs text-zinc-400 mb-4">Visual overview of who's out to prevent coverage conflicts</p>
                 <div className="space-y-2">
                   {[
-                    { name: 'Jordan Lee', type: 'Vacation', dates: 'May 5–9', days: [5,6,7,8,9], color: '#60A5FA' },
+                    { name: 'Jordan Lee', type: 'Vacation', dates: 'May 5-9', days: [5,6,7,8,9], color: '#60A5FA' },
                     { name: 'Sam Carter', type: 'Sick Leave', dates: 'Apr 30', days: [30], color: '#F59E0B' },
-                    { name: 'Casey Brooks', type: 'Personal', dates: 'May 12–13', days: [12,13], color: '#9B51FE' },
-                    { name: 'Mia Thompson', type: 'Vacation', dates: 'May 19–23', days: [19,20,21,22,23], color: '#60A5FA' },
-                    { name: 'Dana Morales', type: 'Bereavement', dates: 'May 1–2', days: [1,2], color: '#EF4444' },
+                    { name: 'Casey Brooks', type: 'Personal', dates: 'May 12-13', days: [12,13], color: '#9B51FE' },
+                    { name: 'Mia Thompson', type: 'Vacation', dates: 'May 19-23', days: [19,20,21,22,23], color: '#60A5FA' },
+                    { name: 'Dana Morales', type: 'Bereavement', dates: 'May 1-2', days: [1,2], color: '#EF4444' },
                   ].map(({ name, type, dates, color }) => (
                     <div key={name} className="flex items-center gap-4 bg-white/5 rounded-xl px-4 py-2.5">
                       <div className="w-32 flex-shrink-0">
@@ -5007,11 +5095,11 @@ export default function App() {
                 </div>
                 <div className="space-y-3">
                   {[
-                    { type: 'Break Violation', employee: 'Casey Brooks', detail: 'Worked 11h 20m on Apr 26 — no break recorded', severity: 'high' },
-                    { type: 'Break Violation', employee: 'Sam Carter', detail: 'Worked 10h 45m on Apr 24 — no break recorded', severity: 'high' },
-                    { type: 'Overdue Training', employee: 'Riley Voss', detail: 'Workplace Safety Training due May 1 — not completed', severity: 'medium' },
-                    { type: 'Overdue Training', employee: 'Parker Kim', detail: 'Anti-Harassment Policy due Apr 30 — not completed', severity: 'medium' },
-                    { type: 'Overdue Training', employee: 'Dakota Lane', detail: 'Data Privacy & GDPR due Jun 15 — not started', severity: 'low' },
+                    { type: 'Break Violation', employee: 'Casey Brooks', detail: 'Worked 11h 20m on Apr 26, no break recorded', severity: 'high' },
+                    { type: 'Break Violation', employee: 'Sam Carter', detail: 'Worked 10h 45m on Apr 24, no break recorded', severity: 'high' },
+                    { type: 'Overdue Training', employee: 'Riley Voss', detail: 'Workplace Safety Training due May 1, not completed', severity: 'medium' },
+                    { type: 'Overdue Training', employee: 'Parker Kim', detail: 'Anti-Harassment Policy due Apr 30, not completed', severity: 'medium' },
+                    { type: 'Overdue Training', employee: 'Dakota Lane', detail: 'Data Privacy & GDPR due Jun 15, not started', severity: 'low' },
                   ].map(({ type, employee, detail, severity }) => (
                     <div key={employee + type} className={`flex flex-wrap items-center gap-3 rounded-xl px-4 py-3 border ${severity === 'high' ? 'bg-red-500/5 border-red-500/20' : severity === 'medium' ? 'bg-amber-500/5 border-amber-500/20' : 'bg-white/5 border-white/5'}`}>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${severity === 'high' ? 'bg-red-500/20 text-red-400' : severity === 'medium' ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'}`}>
@@ -5117,7 +5205,7 @@ export default function App() {
                       <div key={name}>
                         <div className="flex items-center gap-2 mb-3">
                           <div className="text-sm font-semibold">{name}</div>
-                          <div className="text-xs text-zinc-400">— {role}</div>
+                          <div className="text-xs text-zinc-400">{role}</div>
                           <span className="ml-auto text-xs text-zinc-500">{done}/{tasks.length}</span>
                         </div>
                         <div className="space-y-2">
@@ -5380,7 +5468,7 @@ export default function App() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {[
                   { label: 'Announcements Sent', value: announcements.length },
-                  { label: 'Avg Read Rate', value: '—' },
+                  { label: 'Avg Read Rate', value: '-' },
                   { label: 'Urgent Unread', value: announcements.filter(a => a.priority === 'urgent' && a.read_by.length === 0).length },
                 ].map(({ label, value }) => (
                   <div key={label} className="glass rounded-2xl p-4 text-center">
@@ -5446,7 +5534,7 @@ export default function App() {
                 </div>
                 <div className="text-right text-sm">
                   <div className="text-zinc-400">Open Enrollment</div>
-                  <div className="neon-green font-medium">Nov 1 – Nov 15</div>
+                  <div className="neon-green font-medium">Nov 1 to Nov 15</div>
                 </div>
               </div>
 
@@ -5728,7 +5816,7 @@ export default function App() {
                       key={i}
                       onClick={() => {
                         const contents: Record<string, string> = {
-                          'Latest Paystub': 'Pay Period: Oct 1–15, 2025\n\nGross Pay: $4,250.00\nDeductions:\n  Federal Tax: $680.00\n  Social Security: $263.50\n  Medicare: $61.63\n  401(k): $255.00\nNet Pay: $2,989.87\n\nEmployer: Acme Corp',
+                          'Latest Paystub': 'Pay Period: Oct 1-15, 2025\n\nGross Pay: $4,250.00\nDeductions:\n  Federal Tax: $680.00\n  Social Security: $263.50\n  Medicare: $61.63\n  401(k): $255.00\nNet Pay: $2,989.87\n\nEmployer: Acme Corp',
                           'W-2 (2024)': 'Form W-2 Wage and Tax Statement\nTax Year: 2024\n\nEmployer: Acme Corp\nEIN: 12-3456789\n\nWages, tips: $98,500.00\nFederal income tax withheld: $14,200.00\nSocial Security wages: $98,500.00\nMedicare wages: $98,500.00\nState wages: $98,500.00',
                           '1099-MISC': 'Form 1099-MISC\nTax Year: 2024\n\nPayer: Freelance Design LLC\n\nNonemployee compensation: $12,450.00\nPrizes/awards: $0.00\nOther income: $0.00\n\nNote: Report on Schedule C',
                           'Benefits Summary': 'Benefits Enrollment: Current Year\n\nMedical: Anthem PPO (Employee + Family)\nDental: Delta Dental\nVision: VSP\nLife Insurance: 2× salary\nDisability: Short-term + Long-term\n\n401(k) Match: 4% of eligible compensation\nHSA Contribution: $1,650 (employer)',
@@ -6135,7 +6223,7 @@ export default function App() {
                 <div className="glass rounded-3xl p-6">
                   <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Personal Information</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[['Email', user.email], ['Manager', user.manager_name || '—'], ['User ID', String(user.id)], ['Role', user.job_role || '—'], ['Pay Type', user.salary ? 'Salaried' : 'Hourly'], ['Rate', user.salary ? `$${user.salary.toLocaleString()}/yr` : user.pay ? `$${user.pay}/hr` : '—']].map(([label, val]) => (
+                    {[['Email', user.email], ['Manager', user.manager_name || '-'], ['User ID', String(user.id)], ['Role', user.job_role || '-'], ['Pay Type', user.salary ? 'Salaried' : 'Hourly'], ['Rate', user.salary ? `$${user.salary.toLocaleString()}/yr` : user.pay ? `$${user.pay}/hr` : '-']].map(([label, val]) => (
                       <div key={label} className="bg-white/5 rounded-2xl p-4">
                         <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-1">{label}</div>
                         <div className="text-base font-mono">{val}</div>
@@ -6317,13 +6405,13 @@ export default function App() {
                       const res = await fetch(`${API_BASE}/api/grok/tax/upload`, { method: 'POST', body: form });
                       if (res.ok) {
                         const jobsPayload = [
-                          { id: 1, title: 'Member of Technical Staff, Grok', company: 'xAI', location: 'San Francisco, CA', salary: '$320k–$420k', desc: 'Grok ML infrastructure' },
-                          { id: 2, title: 'Software Engineer, X (Platform)', company: 'xAI', location: 'Palo Alto, CA', salary: '$280k–$360k', desc: 'X platform infra' },
-                          { id: 3, title: 'Research Engineer, Grok Safety', company: 'xAI', location: 'San Francisco, CA', salary: '$310k–$400k', desc: 'AI safety research' },
-                          { id: 4, title: 'Software Engineer, X Search', company: 'xAI', location: 'Remote (US)', salary: '$260k–$340k', desc: 'Search infra' },
-                          { id: 5, title: 'Member of Technical Staff, Grok Voice', company: 'xAI', location: 'San Francisco, CA', salary: '$300k–$390k', desc: 'Voice AI' },
-                          { id: 6, title: 'Software Engineer, X Infra', company: 'xAI', location: 'Austin, TX', salary: '$250k–$330k', desc: 'Infra' },
-                          { id: 7, title: 'Research Scientist, Grok', company: 'xAI', location: 'San Francisco, CA', salary: '$340k–$450k', desc: 'LLM research' },
+                          { id: 1, title: 'Member of Technical Staff, Grok', company: 'xAI', location: 'San Francisco, CA', salary: '$320k-$420k', desc: 'Grok ML infrastructure' },
+                          { id: 2, title: 'Software Engineer, X (Platform)', company: 'xAI', location: 'Palo Alto, CA', salary: '$280k-$360k', desc: 'X platform infra' },
+                          { id: 3, title: 'Research Engineer, Grok Safety', company: 'xAI', location: 'San Francisco, CA', salary: '$310k-$400k', desc: 'AI safety research' },
+                          { id: 4, title: 'Software Engineer, X Search', company: 'xAI', location: 'Remote (US)', salary: '$260k-$340k', desc: 'Search infra' },
+                          { id: 5, title: 'Member of Technical Staff, Grok Voice', company: 'xAI', location: 'San Francisco, CA', salary: '$300k-$390k', desc: 'Voice AI' },
+                          { id: 6, title: 'Software Engineer, X Infra', company: 'xAI', location: 'Austin, TX', salary: '$250k-$330k', desc: 'Infra' },
+                          { id: 7, title: 'Research Scientist, Grok', company: 'xAI', location: 'San Francisco, CA', salary: '$340k-$450k', desc: 'LLM research' },
                         ];
                         const mres = await fetch(`${API_BASE}/api/grok/match-jobs`, {
                           method: 'POST',
@@ -6348,12 +6436,12 @@ export default function App() {
                 <h2 className="text-lg font-medium mb-4">Open Positions</h2>
                 <div className="grid grid-cols-1 gap-4">
                   {(instaJobs.length ? instaJobs : [
-                    { id: 2, title: 'Software Engineer, X (Platform)', company: 'xAI', location: 'Palo Alto, CA', salary: '$280k–$360k', desc: 'X platform infra' },
-                    { id: 3, title: 'Research Engineer, Grok Safety', company: 'xAI', location: 'San Francisco, CA', salary: '$310k–$400k', desc: 'AI safety research' },
-                    { id: 4, title: 'Software Engineer, X Search', company: 'xAI', location: 'Remote (US)', salary: '$260k–$340k', desc: 'Search infra' },
-                    { id: 5, title: 'Member of Technical Staff, Grok Voice', company: 'xAI', location: 'San Francisco, CA', salary: '$300k–$390k', desc: 'Voice AI' },
-                    { id: 6, title: 'Software Engineer, X Infra', company: 'xAI', location: 'Austin, TX', salary: '$250k–$330k', desc: 'Infra' },
-                    { id: 7, title: 'Research Scientist, Grok', company: 'xAI', location: 'San Francisco, CA', salary: '$340k–$450k', desc: 'LLM research' },
+                    { id: 2, title: 'Software Engineer, X (Platform)', company: 'xAI', location: 'Palo Alto, CA', salary: '$280k-$360k', desc: 'X platform infra' },
+                    { id: 3, title: 'Research Engineer, Grok Safety', company: 'xAI', location: 'San Francisco, CA', salary: '$310k-$400k', desc: 'AI safety research' },
+                    { id: 4, title: 'Software Engineer, X Search', company: 'xAI', location: 'Remote (US)', salary: '$260k-$340k', desc: 'Search infra' },
+                    { id: 5, title: 'Member of Technical Staff, Grok Voice', company: 'xAI', location: 'San Francisco, CA', salary: '$300k-$390k', desc: 'Voice AI' },
+                    { id: 6, title: 'Software Engineer, X Infra', company: 'xAI', location: 'Austin, TX', salary: '$250k-$330k', desc: 'Infra' },
+                    { id: 7, title: 'Research Scientist, Grok', company: 'xAI', location: 'San Francisco, CA', salary: '$340k-$450k', desc: 'LLM research' },
                   ]).map((job: any) => {
                     const isExpanded = expandedJobs.has(job.id)
                     const truncated = job.desc.length > 200 ? job.desc.slice(0, 200) + '…' : job.desc
@@ -6411,7 +6499,7 @@ export default function App() {
                   <li>Tailor your resume keywords to each job posting before applying</li>
                   <li>Follow up within 5 days if you haven't heard back</li>
                   <li>Schedule interviews in the morning; hiring managers are fresher</li>
-                  <li>Prepare 3–5 questions to ask at the end of every interview</li>
+                  <li>Prepare 3-5 questions to ask at the end of every interview</li>
                 </ul>
               </div>
             </div>
@@ -6481,7 +6569,7 @@ export default function App() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h1 className="text-2xl font-semibold neon-green">Audit Log</h1>
-                    <p className="text-sm text-zinc-400">Immutable record of all system actions — SOC2 & GDPR compliant</p>
+                    <p className="text-sm text-zinc-400">Immutable record of all system actions. SOC2 and GDPR compliant.</p>
                   </div>
                   <div className="flex gap-2 flex-wrap">
                     <button className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 hover:bg-white/20 transition-colors text-zinc-300">
@@ -6678,7 +6766,7 @@ export default function App() {
                 {/* RBAC */}
                 <div className="glass rounded-3xl p-6">
                   <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--accent-color)' }}>Role-Based Access Control</h2>
-                  <p className="text-xs text-zinc-400 mb-5">Granular permission matrix — control exactly what each role can see and do</p>
+                  <p className="text-xs text-zinc-400 mb-5">Granular permission matrix: control exactly what each role can see and do</p>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm" style={{ minWidth: '580px' }}>
                       <thead>
@@ -6734,7 +6822,7 @@ export default function App() {
                       { name: 'BambooHR', category: 'HRIS', status: 'Available', icon: '🌿' },
                       { name: 'Workday', category: 'Migration', status: 'Import data', icon: '📁' },
                       { name: 'QuickBooks', category: 'Accounting', status: 'Available', icon: '📒' },
-                      { name: 'REST API', category: 'Custom', status: 'Active — 4 keys', icon: '⚡' },
+                      { name: 'REST API', category: 'Custom', status: 'Active, 4 keys', icon: '⚡' },
                     ].map(({ name, category, status, icon }) => (
                       <div key={name} className="flex items-center gap-3 bg-white/5 rounded-2xl px-4 py-3">
                         <div className="text-xl w-8 text-center flex-shrink-0">{icon}</div>
@@ -6755,7 +6843,7 @@ export default function App() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
                     {[
                       { step: '01', title: 'Export your data', desc: 'Download your employee roster, historical timesheets, and payroll records from Workday in CSV format.' },
-                      { step: '02', title: 'Bulk import', desc: 'Upload to SwiftShift — our importer maps Workday fields automatically. Review & confirm in minutes.' },
+                      { step: '02', title: 'Bulk import', desc: 'Upload to SwiftShift. Our importer maps Workday fields automatically. Review & confirm in minutes.' },
                       { step: '03', title: 'Go live', desc: 'Flip the switch. Employees clock in through SwiftShift on day one. Your manager hub is pre-configured.' },
                     ].map(({ step, title, desc }) => (
                       <div key={step} className="bg-black/30 rounded-2xl p-4">
@@ -6870,7 +6958,7 @@ export default function App() {
               <div className="mt-6 rounded-3xl p-6 border flex flex-wrap items-center justify-between gap-4" style={{ background: 'linear-gradient(135deg, rgba(var(--accent-color-rgb),0.08), rgba(var(--accent-color-rgb),0.02))', borderColor: 'var(--accent-color)' }}>
                 <div>
                   <div className="text-base font-semibold text-white mb-1">Replacing Workday or ADP?</div>
-                  <div className="text-sm text-zinc-400">We'll migrate your data, train your team, and guarantee go-live in 2 weeks — or the first month is free.</div>
+                  <div className="text-sm text-zinc-400">We'll migrate your data, train your team, and guarantee go-live in 2 weeks, or the first month is free.</div>
                 </div>
                 <button onClick={() => navTo('enterprise')} className="px-5 py-2.5 rounded-xl text-sm font-bold text-black flex-shrink-0 transition-opacity hover:opacity-90" style={{ backgroundColor: 'var(--accent-color)' }}>
                   See ROI Calculator →
@@ -6887,7 +6975,7 @@ export default function App() {
                     { q: 'How does per-employee billing work?', a: 'You\'re billed based on active employees in your workspace each month. Add or remove team members anytime.' },
                     { q: 'What payment methods do you accept?', a: 'We accept all major credit cards, ACH bank transfers, and invoicing for Enterprise customers.' },
                     { q: 'How long does migration from Workday take?', a: 'Average migration is 2 weeks. We provide a dedicated migration engineer for Enterprise customers and guarantee zero data loss.' },
-                    { q: 'Do you support SSO?', a: 'Yes — SAML 2.0 with Okta, Azure AD, Google Workspace, and any SAML-compatible identity provider. Available on Enterprise plans.' },
+                    { q: 'Do you support SSO?', a: 'Yes. SAML 2.0 with Okta, Azure AD, Google Workspace, and any SAML-compatible identity provider. Available on Enterprise plans.' },
                   ].map(({ q, a }) => (
                     <div key={q} className="space-y-1">
                       <div className="text-sm font-semibold text-white">{q}</div>

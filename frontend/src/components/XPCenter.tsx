@@ -130,7 +130,7 @@ export function XPCenter({ gState, currentLevel, nextLevel, users, accentColor, 
                 ? `Unlock at Level 5 (${nextLevel.xpNeeded - gState.totalXP} XP to go)`
                 : gState.weekSubmitStreak < 2
                 ? `Submit 2 weeks in a row to activate (${gState.weekSubmitStreak}/2)`
-                : '🔥 Active — submit weekly to keep it!'}
+                : '🔥 Active: submit weekly to keep it!'}
             </div>
             <div className="text-[10px] text-zinc-600">Level 5+ · 2 consecutive weekly submits</div>
           </div>
@@ -170,7 +170,7 @@ export function XPCenter({ gState, currentLevel, nextLevel, users, accentColor, 
           <div className="text-xs text-zinc-500">All-time XP ranking</div>
         </div>
         {leaderboard.length === 0 ? (
-          <div className="text-sm text-zinc-500 text-center py-6">No team data yet — team members appear here as they join.</div>
+          <div className="text-sm text-zinc-500 text-center py-6">No team data yet. Team members appear here as they join.</div>
         ) : (
           <div className="space-y-2">
             {leaderboard.map((entry, i) => {
@@ -214,7 +214,7 @@ export function XPCenter({ gState, currentLevel, nextLevel, users, accentColor, 
       <div className="glass rounded-3xl p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="text-lg font-semibold" style={{ color: accentColor }}>Department Challenges</div>
-          <div className="text-xs text-zinc-500">Weekly collective goals — resets Monday</div>
+          <div className="text-xs text-zinc-500">Weekly collective goals, resets Monday</div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {deptProgress.map(dept => {
@@ -267,7 +267,7 @@ export function XPCenter({ gState, currentLevel, nextLevel, users, accentColor, 
                     style={canAfford ? { backgroundColor: accentColor, color: '#000' } : { backgroundColor: 'rgba(255,255,255,0.1)', color: '#666' }}
                     onClick={() => {
                       if (canAfford) {
-                        toast.success(`${item.icon} Redemption submitted!`, { description: `${item.name} — HR will process within 2 business days` })
+                        toast.success(`${item.icon} Redemption submitted!`, { description: `${item.name}. HR will process within 2 business days.` })
                       }
                     }}
                   >

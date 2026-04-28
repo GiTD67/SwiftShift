@@ -284,7 +284,7 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
               </div>
             ) : (
               <div>
-                <div className="text-3xl font-light text-zinc-700 tracking-widest mb-1 font-mono">— — —</div>
+                <div className="text-3xl font-light text-zinc-700 tracking-widest mb-1 font-mono">- - -</div>
                 <div className="text-xs text-zinc-600">Clock in to start earning</div>
               </div>
             )}
@@ -330,7 +330,7 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
               </div>
             ) : (
               <div>
-                <div className="text-3xl font-light text-zinc-700 tracking-widest mb-1 font-mono">— — —</div>
+                <div className="text-3xl font-light text-zinc-700 tracking-widest mb-1 font-mono">- - -</div>
                 <div className="text-xs text-zinc-600">Clock in to start accruing</div>
               </div>
             )}
