@@ -1233,6 +1233,7 @@ function LoginPage() {
   const [shockwaveActive] = useState(false)
   const [showFeaturePreview, setShowFeaturePreview] = useState(false)
   const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [showLoginTour, setShowLoginTour] = useState(false)
 
   const isReturningUser = !!localStorage.getItem('lastEmail')
   const loginAccentHex = getThemeAccentHex(localStorage.getItem('theme') || 'green')
@@ -1285,31 +1286,62 @@ function LoginPage() {
       {/* Left: Brand + System Identity */}
       <div className="hidden lg:flex w-5/12 flex-col justify-between p-10 relative z-10">
         <div>
-          <div className="flex items-center gap-3 mb-10">
+          <div className="flex items-center gap-3 mb-8">
             <LogoSVG className="h-9 w-auto" />
             <span className="font-semibold text-2xl tracking-[1px]">SWIFTSHIFT</span>
           </div>
-          <div className="max-w-[380px]">
+          <div className="max-w-[400px]">
             <div className="uppercase tracking-[4px] text-xs text-zinc-500 mb-3"><span style={{ color: loginAccentHex }}>AI POWERED</span> HR ENTERPRISE PLATFORM</div>
-            <h1 className="text-[60px] leading-[1.05] font-semibold tracking-tighter mb-5">
+            <h1 className="text-[52px] leading-[1.05] font-semibold tracking-tighter mb-5">
               Time is money.
             </h1>
-            <div className="text-base text-zinc-400 space-y-2">
-              <div>- Log in one time, and STAY logged in.</div>
-              <div>- Effortless navigation.</div>
-              <div>- Frictionless clock in.</div>
-              <div>- Real time visualized earnings.</div>
-              <div>- Find the best-matched jobs.</div>
-              <div>- Taxes filed instantly with AI.</div>
-              <div>- AI assisted HR support with Swifty.</div>
+
+            {/* Stats row */}
+            <div className="flex gap-6 mb-7">
+              {[['10k+', 'Employees'], ['99.9%', 'Uptime'], ['4.9★', 'Rated']].map(([val, label]) => (
+                <div key={label}>
+                  <div className="text-xl font-bold" style={{ color: loginAccentHex }}>{val}</div>
+                  <div className="text-xs text-zinc-600 mt-0.5">{label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Feature cards */}
+            <div className="space-y-2.5">
+              {[
+                { icon: '⏱', title: 'One-tap Clock In', desc: 'Punch in instantly. Stay logged in.' },
+                { icon: '📈', title: 'Real-Time Earnings', desc: 'Watch your pay grow live as you work.' },
+                { icon: '🤖', title: 'AI Tax Filing', desc: 'Swifty auto-fills your 1040 from your W-2 — free.' },
+                { icon: '🏆', title: 'Rewards & XP', desc: 'Level up and unlock perks just for showing up.' },
+                { icon: '💼', title: 'InstaApply', desc: 'AI job matching with one-click applications.' },
+              ].map(({ icon, title, desc }) => (
+                <div key={title} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-base" style={{ background: `${loginAccentHex}18` }}>
+                    {icon}
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-white leading-tight">{title}</div>
+                    <div className="text-xs text-zinc-500 leading-tight mt-0.5">{desc}</div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Signature: System Status */}
-        <div className="flex items-center gap-3 text-sm">
-          <div className="w-2 h-2 rounded-full bg-[#D7FE51] animate-pulse" />
-          <span className="text-white/60 tracking-wide">System Status: Online</span>
+        {/* Bottom: Testimonial + Status */}
+        <div className="space-y-4 max-w-[380px]">
+          <div className="p-4 rounded-2xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <p className="text-sm text-zinc-300 italic leading-relaxed mb-2">"SwiftShift cut our payroll processing time in half. The real-time earnings view alone boosted team morale."</p>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-semibold text-white">JM</div>
+              <span className="text-xs text-zinc-500">Jamie M. · HR Director</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 text-sm">
+            <div className="w-2 h-2 rounded-full bg-[#D7FE51] animate-pulse" />
+            <span className="text-white/60 tracking-wide">System Status: Online</span>
+          </div>
         </div>
       </div>
 
@@ -1433,7 +1465,7 @@ function LoginPage() {
             <div className="text-center mt-1">
               <button
                 type="button"
-                onClick={() => setShowFeaturePreview(true)}
+                onClick={() => setShowLoginTour(true)}
                 className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
               >
                 Explore features →
@@ -1466,6 +1498,14 @@ function LoginPage() {
           accentHex={loginAccentHex}
         />
       )}
+      {showLoginTour && (
+        <Tour
+          onClose={() => setShowLoginTour(false)}
+          onNavigate={() => setShowLoginTour(false)}
+          onComplete={() => setShowLoginTour(false)}
+          accentHex={loginAccentHex}
+        />
+      )}
     </div>
   )
 }
@@ -1481,6 +1521,7 @@ function SignupPage() {
   const [focusedField, setFocusedField] = useState<string | null>(null)
   const [shockwaveActive] = useState(false)
   const [showFeaturePreview, setShowFeaturePreview] = useState(false)
+  const [showSignupTour, setShowSignupTour] = useState(false)
   const signupAccentHex = getThemeAccentHex(localStorage.getItem('theme') || 'green')
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -1696,7 +1737,7 @@ function SignupPage() {
             <div className="text-center mt-1">
               <button
                 type="button"
-                onClick={() => setShowFeaturePreview(true)}
+                onClick={() => setShowSignupTour(true)}
                 className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
               >
                 Explore features →
@@ -1719,6 +1760,14 @@ function SignupPage() {
       {showFeaturePreview && (
         <FeaturePreview
           onClose={() => setShowFeaturePreview(false)}
+          accentHex={signupAccentHex}
+        />
+      )}
+      {showSignupTour && (
+        <Tour
+          onClose={() => setShowSignupTour(false)}
+          onNavigate={() => setShowSignupTour(false)}
+          onComplete={() => setShowSignupTour(false)}
           accentHex={signupAccentHex}
         />
       )}
@@ -1804,6 +1853,18 @@ export default function App() {
   const [profilePicZoom, setProfilePicZoom] = useState<number>(() => parseFloat(localStorage.getItem('swiftshift-profile-pic-zoom') || '1'))
   const [profilePicX, setProfilePicX] = useState<number>(() => parseFloat(localStorage.getItem('swiftshift-profile-pic-x') || '50'))
   const [profilePicY, setProfilePicY] = useState<number>(() => parseFloat(localStorage.getItem('swiftshift-profile-pic-y') || '50'))
+  const [showCropModal, setShowCropModal] = useState(false)
+
+  // Sidebar customization
+  const DEFAULT_SIDEBAR_ORDER = ['clock','timesheet','rewards','kpi','insurance','orgchart','taxes','groktax','applications']
+  const [sidebarOrder, setSidebarOrder] = useState<string[]>(() => {
+    try { const s = localStorage.getItem('swiftshift-sidebar-order'); return s ? JSON.parse(s) : DEFAULT_SIDEBAR_ORDER } catch { return DEFAULT_SIDEBAR_ORDER }
+  })
+  const [favoriteTabs, setFavoriteTabs] = useState<string[]>(() => {
+    try { const s = localStorage.getItem('swiftshift-favorite-tabs'); return s ? JSON.parse(s) : [] } catch { return [] }
+  })
+  const [draggedNavId, setDraggedNavId] = useState<string | null>(null)
+  const [dragOverNavId, setDragOverNavId] = useState<string | null>(null)
   const [, setWorkSchedule] = useState<any>(null)
   const [directDeposit, setDirectDeposit] = useState<any>(null)
   const [, setWorkAvailability] = useState<any>(null)
@@ -1853,6 +1914,30 @@ export default function App() {
   const navTo = (view: View) => {
     setActiveView(view)
     setMobileMenuOpen(false)
+  }
+
+  const toggleFavorite = (id: string) => {
+    setFavoriteTabs(prev => {
+      const next = prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]
+      localStorage.setItem('swiftshift-favorite-tabs', JSON.stringify(next))
+      return next
+    })
+  }
+
+  const handleNavDrop = (targetId: string) => {
+    if (!draggedNavId || draggedNavId === targetId) { setDraggedNavId(null); setDragOverNavId(null); return }
+    setSidebarOrder(prev => {
+      const arr = [...prev]
+      const fromIdx = arr.indexOf(draggedNavId)
+      const toIdx = arr.indexOf(targetId)
+      if (fromIdx < 0 || toIdx < 0) return prev
+      arr.splice(fromIdx, 1)
+      arr.splice(toIdx, 0, draggedNavId)
+      localStorage.setItem('swiftshift-sidebar-order', JSON.stringify(arr))
+      return arr
+    })
+    setDraggedNavId(null)
+    setDragOverNavId(null)
   }
 
   const navToRewardsWithHighlight = () => {
@@ -2873,220 +2958,131 @@ export default function App() {
       />
 
       <aside className={`ta-sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
-        <nav className="ta-nav">
-          <button
-            id="nav-clock"
-            className={`ta-nav-btn ${activeView === 'clock' ? 'active' : ''}`}
-            onClick={() => navTo('clock')}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
-              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-            </svg>
-            Time Clock
-          </button>
-          <button
-            id="nav-timesheet"
-            className={`ta-nav-btn ${activeView === 'timesheet' ? 'active' : ''}`}
-            onClick={() => navTo('timesheet')}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
-            </svg>
-            Timesheet
-          </button>
-          <button
-            id="nav-rewards"
-            className={`ta-nav-btn ${activeView === 'rewards' ? 'active' : ''}`}
-            onClick={() => navTo('rewards')}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
-              <circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
-            </svg>
-            Rewards
-          </button>
-          <button
-            className={`ta-nav-btn ${activeView === 'xpcenter' ? 'active' : ''}`}
-            onClick={() => navTo('xpcenter')}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-            </svg>
-            XP Center
-          </button>
-          <button
-            className={`ta-nav-btn ${activeView === 'kpi' ? 'active' : ''}`}
-            onClick={() => navTo('kpi')}
-            style={{ paddingLeft: '2rem', fontSize: '0.8rem', opacity: 0.85 }}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-            </svg>
-            My KPIs
-          </button>
-          <button
-            className={`ta-nav-btn ${activeView === 'insurance' ? 'active' : ''}`}
-            onClick={() => navTo('insurance')}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
-            Insurance &amp; Benefits
-          </button>
-          <button
-            className={`ta-nav-btn ${activeView === 'orgchart' ? 'active' : ''}`}
-            onClick={() => navTo('orgchart')}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
-              <rect x="8" y="2" width="8" height="4" rx="1"/><rect x="2" y="14" width="8" height="4" rx="1"/><rect x="14" y="14" width="8" height="4" rx="1"/><line x1="12" y1="6" x2="12" y2="11"/><line x1="6" y1="14" x2="6" y2="11"/><line x1="18" y1="14" x2="18" y2="11"/><line x1="6" y1="11" x2="18" y2="11"/>
-            </svg>
-            Org Chart
-          </button>
-          <button
-            className={`ta-nav-btn ${activeView === 'taxes' ? 'active' : ''}`}
-            onClick={() => navTo('taxes')}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
-              <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
-            </svg>
-            Files
-          </button>
-          <button
-            id="nav-groktax"
-            className={`ta-nav-btn mb-2 ${activeView === 'groktax' ? 'active' : ''}`}
-            onClick={() => navTo('groktax')}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
-              <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
-            </svg>
-            Swifty - AI Tax Filing
-          </button>
-          <div className="ta-nav-section">Job Applications</div>
-          <button
-            id="nav-applications"
-            className={`ta-nav-btn mb-2 ${activeView === 'applications' ? 'active' : ''}`}
-            onClick={() => navTo('applications')}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
-              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-            </svg>
-            InstaApply
-          </button>
-          {/* ── Manager collapsible section ── */}
-          <button
-            className="ta-nav-section-btn w-full flex items-center justify-between px-3 py-2 mt-1 rounded-lg text-xs font-semibold uppercase tracking-wider text-zinc-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer select-none"
-            onClick={() => setManagerSectionOpen(v => !v)}
-          >
-            <span className="flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
-              </svg>
-              Manager
-            </span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-              style={{ transform: managerSectionOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+        {(() => {
+          const NAV_ITEMS: Array<{ id: string; label: string; view: View; htmlId?: string; icon: React.ReactElement }> = [
+            { id: 'clock', label: 'Time Clock', view: 'clock', htmlId: 'nav-clock', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
+            { id: 'timesheet', label: 'Timesheet', view: 'timesheet', htmlId: 'nav-timesheet', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> },
+            { id: 'rewards', label: 'Rewards', view: 'rewards', htmlId: 'nav-rewards', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg> },
+            { id: 'kpi', label: 'My KPIs', view: 'kpi', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> },
+            { id: 'insurance', label: 'Insurance & Benefits', view: 'insurance', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> },
+            { id: 'orgchart', label: 'Org Chart', view: 'orgchart', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><rect x="8" y="2" width="8" height="4" rx="1"/><rect x="2" y="14" width="8" height="4" rx="1"/><rect x="14" y="14" width="8" height="4" rx="1"/><line x1="12" y1="6" x2="12" y2="11"/><line x1="6" y1="14" x2="6" y2="11"/><line x1="18" y1="14" x2="18" y2="11"/><line x1="6" y1="11" x2="18" y2="11"/></svg> },
+            { id: 'taxes', label: 'Files', view: 'taxes', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg> },
+            { id: 'groktax', label: 'Swifty - AI Tax Filing', view: 'groktax', htmlId: 'nav-groktax', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> },
+            { id: 'applications', label: 'InstaApply', view: 'applications', htmlId: 'nav-applications', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> },
+          ]
+
+          const sortedItems = [...NAV_ITEMS].sort((a, b) => {
+            const ai = sidebarOrder.indexOf(a.id); const bi = sidebarOrder.indexOf(b.id)
+            return (ai >= 0 ? ai : 999) - (bi >= 0 ? bi : 999)
+          })
+          const favoriteItems = favoriteTabs.map(fid => NAV_ITEMS.find(n => n.id === fid)).filter(Boolean) as typeof NAV_ITEMS
+          const mainItems = sortedItems.filter(item => !favoriteTabs.includes(item.id))
+
+          const renderNavBtn = (item: typeof NAV_ITEMS[0], isDraggable = false) => (
+            <button
+              key={isDraggable ? item.id : `fav-${item.id}`}
+              id={item.htmlId}
+              className={`ta-nav-btn group ${activeView === item.view ? 'active' : ''}`}
+              onClick={() => navTo(item.view)}
+              draggable={isDraggable}
+              onDragStart={isDraggable ? () => setDraggedNavId(item.id) : undefined}
+              onDragOver={isDraggable ? (e) => { e.preventDefault(); setDragOverNavId(item.id) } : undefined}
+              onDrop={isDraggable ? () => handleNavDrop(item.id) : undefined}
+              onDragEnd={isDraggable ? () => { setDraggedNavId(null); setDragOverNavId(null) } : undefined}
+              style={{
+                opacity: draggedNavId === item.id ? 0.4 : undefined,
+                outline: dragOverNavId === item.id ? '2px solid var(--accent-color)' : undefined,
+                outlineOffset: '-2px',
+              }}
             >
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
-          </button>
-          {managerSectionOpen && (
-            <>
+              {item.icon}
+              <span className="flex-1 text-left truncate">{item.label}</span>
               <button
-                className={`ta-nav-btn ${activeView === 'admin' ? 'active' : ''}`}
-                onClick={() => navTo('admin')}
+                onClick={(e) => { e.stopPropagation(); toggleFavorite(item.id) }}
+                className={`shrink-0 text-[13px] transition-colors opacity-0 group-hover:opacity-100 ${favoriteTabs.includes(item.id) ? 'text-yellow-400 opacity-100' : 'text-zinc-600 hover:text-zinc-400'}`}
+                title={favoriteTabs.includes(item.id) ? 'Remove from favorites' : 'Add to favorites'}
+                style={{ padding: '0 2px', lineHeight: 1 }}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
-                  <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
-                </svg>
-                Manage Users
+                {favoriteTabs.includes(item.id) ? '★' : '☆'}
               </button>
+            </button>
+          )
+
+          return (
+            <nav className="ta-nav">
+              {favoriteItems.length > 0 && (
+                <>
+                  <div className="ta-nav-section" style={{ color: 'rgba(255,255,255,0.35)' }}>Favorites</div>
+                  {favoriteItems.map(item => renderNavBtn(item, false))}
+                  <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '6px 14px 4px' }} />
+                </>
+              )}
+              {mainItems.map(item => renderNavBtn(item, true))}
+
+              {/* ── Manager collapsible section ── */}
               <button
-                className={`ta-nav-btn ${activeView === 'schedules' ? 'active' : ''}`}
-                onClick={() => navTo('schedules')}
+                className="ta-nav-section-btn w-full flex items-center justify-between px-3 py-2 mt-1 rounded-lg text-xs font-semibold uppercase tracking-wider text-zinc-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer select-none"
+                onClick={() => setManagerSectionOpen(v => !v)}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                <span className="flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
+                  </svg>
+                  Manager
+                </span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ transform: managerSectionOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                  <polyline points="6 9 12 15 18 9"/>
                 </svg>
-                Schedule Management
               </button>
-              <button
-                id="nav-payroll"
-                className={`ta-nav-btn ${activeView === 'payroll' ? 'active' : ''}`}
-                onClick={() => navTo('payroll')}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
-                  <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
-                </svg>
-                Payroll
-              </button>
-              <button
-                className={`ta-nav-btn ${activeView === 'reports' ? 'active' : ''}`}
-                onClick={() => navTo('reports')}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
-                  <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
-                </svg>
-                Reports &amp; Analytics
-              </button>
-              <button
-                id="nav-kpi-manager"
-                className={`ta-nav-btn ${activeView === 'kpi' ? 'active' : ''}`}
-                onClick={() => navTo('kpi')}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
-                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-                </svg>
-                Sales KPIs
-              </button>
-              <button
-                className={`ta-nav-btn ${activeView === 'leaves' ? 'active' : ''}`}
-                onClick={() => navTo('leaves')}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
-                  <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
-                </svg>
-                Leave Management
-              </button>
-              <button
-                className={`ta-nav-btn ${activeView === 'compliance' ? 'active' : ''}`}
-                onClick={() => navTo('compliance')}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
-                  <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
-                </svg>
-                Compliance &amp; Audit
-              </button>
-              <button
-                className={`ta-nav-btn ${activeView === 'hiring' ? 'active' : ''}`}
-                onClick={() => navTo('hiring')}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
-                  <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
-                </svg>
-                Hiring &amp; Onboarding
-              </button>
-              <button
-                className={`ta-nav-btn ${activeView === 'teamkpi' ? 'active' : ''}`}
-                onClick={() => navTo('teamkpi')}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
-                  <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
-                </svg>
-                Team KPI Dashboard
-              </button>
-              <button
-                className={`ta-nav-btn ${activeView === 'announcements' ? 'active' : ''}`}
-                onClick={() => navTo('announcements')}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
-                  <path d="M22 17H2a3 3 0 000 6h20a3 3 0 000-6z"/><path d="M17 8V2"/><path d="M12 8V5"/><path d="M7 8V1"/>
-                </svg>
-                Announcements
-              </button>
-            </>
-          )}
-        </nav>
+              {managerSectionOpen && (
+                <>
+                  <button className={`ta-nav-btn ${activeView === 'admin' ? 'active' : ''}`} onClick={() => navTo('admin')}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                    Manage Users
+                  </button>
+                  <button className={`ta-nav-btn ${activeView === 'schedules' ? 'active' : ''}`} onClick={() => navTo('schedules')}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    Schedule Management
+                  </button>
+                  <button id="nav-payroll" className={`ta-nav-btn ${activeView === 'payroll' ? 'active' : ''}`} onClick={() => navTo('payroll')}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                    Payroll
+                  </button>
+                  <button className={`ta-nav-btn ${activeView === 'reports' ? 'active' : ''}`} onClick={() => navTo('reports')}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    Reports &amp; Analytics
+                  </button>
+                  <button id="nav-kpi-manager" className={`ta-nav-btn ${activeView === 'kpi' ? 'active' : ''}`} onClick={() => navTo('kpi')}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    Sales KPIs
+                  </button>
+                  <button className={`ta-nav-btn ${activeView === 'leaves' ? 'active' : ''}`} onClick={() => navTo('leaves')}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                    Leave Management
+                  </button>
+                  <button className={`ta-nav-btn ${activeView === 'compliance' ? 'active' : ''}`} onClick={() => navTo('compliance')}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+                    Compliance &amp; Audit
+                  </button>
+                  <button className={`ta-nav-btn ${activeView === 'hiring' ? 'active' : ''}`} onClick={() => navTo('hiring')}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+                    Hiring &amp; Onboarding
+                  </button>
+                  <button className={`ta-nav-btn ${activeView === 'teamkpi' ? 'active' : ''}`} onClick={() => navTo('teamkpi')}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                    Team KPI Dashboard
+                  </button>
+                  <button className={`ta-nav-btn ${activeView === 'announcements' ? 'active' : ''}`} onClick={() => navTo('announcements')}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M22 17H2a3 3 0 000 6h20a3 3 0 000-6z"/><path d="M17 8V2"/><path d="M12 8V5"/><path d="M7 8V1"/></svg>
+                    Announcements
+                  </button>
+                </>
+              )}
+            </nav>
+          )
+        })()}
         <div className="mt-auto pt-4">
           <button
             id="nav-grokky"
@@ -3476,36 +3472,36 @@ export default function App() {
             <TimesheetView user={user} gamification={gamification} />
           )}
           {activeView === 'rewards' && (
-            <Rewards
-              totalHours={todayTotalMs / 3600000}
-              elapsedSeconds={Math.floor(sessionWorkedMs / 1000)}
-              isClockedIn={isClockedIn}
-              theme={(['green','white','orange','cyan','pink','purple'] as const).includes(theme as any) ? theme as 'green'|'white'|'orange'|'cyan'|'pink'|'purple' : 'green'}
-              user={user}
-              highlightRate={highlightRate}
-              xpTotalForPTO={appGState.totalXP}
-              onRateChange={(rate) => {
-                setClockHourlyRate(rate)
-                localStorage.setItem('swiftshift-hourly-rate', String(rate))
-                if (user?.id) {
-                  fetch(`${API_BASE}/api/users/${user.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ hourly_rate: rate }),
-                  }).catch(() => {})
-                }
-              }}
-            />
-          )}
-          {activeView === 'xpcenter' && (
-            <XPCenter
-              gState={appGState}
-              currentLevel={appCurrentLevel}
-              nextLevel={appNextLevel}
-              users={users}
-              accentColor={themeAccentHex}
-              totalHoursThisWeek={todayTotalMs / 3600000}
-            />
+            <div className="space-y-6">
+              <Rewards
+                totalHours={todayTotalMs / 3600000}
+                elapsedSeconds={Math.floor(sessionWorkedMs / 1000)}
+                isClockedIn={isClockedIn}
+                theme={(['green','white','orange','cyan','pink','purple'] as const).includes(theme as any) ? theme as 'green'|'white'|'orange'|'cyan'|'pink'|'purple' : 'green'}
+                user={user}
+                highlightRate={highlightRate}
+                xpTotalForPTO={appGState.totalXP}
+                onRateChange={(rate) => {
+                  setClockHourlyRate(rate)
+                  localStorage.setItem('swiftshift-hourly-rate', String(rate))
+                  if (user?.id) {
+                    fetch(`${API_BASE}/api/users/${user.id}`, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ hourly_rate: rate }),
+                    }).catch(() => {})
+                  }
+                }}
+              />
+              <XPCenter
+                gState={appGState}
+                currentLevel={appCurrentLevel}
+                nextLevel={appNextLevel}
+                users={users}
+                accentColor={themeAccentHex}
+                totalHoursThisWeek={todayTotalMs / 3600000}
+              />
+            </div>
           )}
           {activeView === 'admin' && (
             <div className="max-w-5xl mx-auto">
@@ -5560,16 +5556,27 @@ export default function App() {
               <div className="glass rounded-3xl p-6 flex items-center gap-6">
                 <div className="relative flex-shrink-0">
                   {profilePicUrl
-                    ? <img
-                        src={profilePicUrl}
-                        alt="Profile"
-                        className="w-20 h-20 rounded-2xl object-cover border border-white/20"
-                        style={{
-                          objectPosition: `${profilePicX}% ${profilePicY}%`,
-                          transform: `scale(${profilePicZoom})`,
-                          transformOrigin: `${profilePicX}% ${profilePicY}%`,
-                        }}
-                      />
+                    ? (
+                      <div className="relative group cursor-pointer" onClick={() => setShowCropModal(true)} title="Click to adjust crop">
+                        <div className="w-20 h-20 rounded-2xl overflow-hidden border border-white/20">
+                          <img
+                            src={profilePicUrl}
+                            alt="Profile"
+                            className="w-full h-full object-cover"
+                            style={{
+                              objectPosition: `${profilePicX}% ${profilePicY}%`,
+                              transform: `scale(${profilePicZoom})`,
+                              transformOrigin: `${profilePicX}% ${profilePicY}%`,
+                            }}
+                          />
+                        </div>
+                        <div className="absolute inset-0 rounded-2xl bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                          </svg>
+                        </div>
+                      </div>
+                    )
                     : (
                       <div className="w-20 h-20 rounded-2xl bg-white/10 flex items-center justify-center">
                         <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -5594,6 +5601,7 @@ export default function App() {
                           const url = ev.target?.result as string
                           setProfilePicUrl(url)
                           localStorage.setItem('swiftshift-profile-pic', url)
+                          setShowCropModal(true)
                         }
                         reader.readAsDataURL(file)
                         e.target.value = ''
@@ -5611,53 +5619,60 @@ export default function App() {
                     <span className="text-xs text-zinc-500">{appGState.totalXP} XP total</span>
                     <span className="text-xs text-zinc-500">· {appGState.submits} timesheets submitted</span>
                   </div>
-                  {profilePicUrl && (
-                    <div className="mt-3 space-y-2">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-zinc-500 w-16 flex-shrink-0">Zoom</span>
-                        <input
-                          type="range" min="1" max="3" step="0.05"
-                          value={profilePicZoom}
-                          onChange={e => {
-                            const v = parseFloat(e.target.value)
-                            setProfilePicZoom(v)
-                            localStorage.setItem('swiftshift-profile-pic-zoom', String(v))
-                          }}
-                          className="flex-1 h-1 accent-[var(--accent-color)]"
-                        />
-                        <span className="text-xs text-zinc-500 w-8 text-right">{profilePicZoom.toFixed(1)}×</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-zinc-500 w-16 flex-shrink-0">Horizontal</span>
-                        <input
-                          type="range" min="0" max="100" step="1"
-                          value={profilePicX}
-                          onChange={e => {
-                            const v = parseFloat(e.target.value)
-                            setProfilePicX(v)
-                            localStorage.setItem('swiftshift-profile-pic-x', String(v))
-                          }}
-                          className="flex-1 h-1 accent-[var(--accent-color)]"
+                  {profilePicUrl
+                    ? <div className="text-xs text-zinc-600 mt-1.5">Click photo to adjust crop</div>
+                    : <div className="text-xs text-zinc-600 mt-1">Click the upload button to add a profile photo</div>
+                  }
+                </div>
+              </div>
+
+              {/* Profile pic crop modal */}
+              {showCropModal && profilePicUrl && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowCropModal(false)}>
+                  <div className="glass rounded-3xl p-6 w-full max-w-sm mx-4 border border-white/20" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center justify-between mb-5">
+                      <h3 className="text-lg font-semibold text-white">Adjust Photo</h3>
+                      <button onClick={() => setShowCropModal(false)} className="text-zinc-400 hover:text-white transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      </button>
+                    </div>
+                    <div className="flex justify-center mb-5">
+                      <div className="w-28 h-28 rounded-2xl overflow-hidden border border-white/20">
+                        <img src={profilePicUrl} alt="Preview" className="w-full h-full object-cover"
+                          style={{ objectPosition: `${profilePicX}% ${profilePicY}%`, transform: `scale(${profilePicZoom})`, transformOrigin: `${profilePicX}% ${profilePicY}%` }}
                         />
                       </div>
+                    </div>
+                    <div className="space-y-4">
                       <div className="flex items-center gap-3">
-                        <span className="text-xs text-zinc-500 w-16 flex-shrink-0">Vertical</span>
-                        <input
-                          type="range" min="0" max="100" step="1"
-                          value={profilePicY}
-                          onChange={e => {
-                            const v = parseFloat(e.target.value)
-                            setProfilePicY(v)
-                            localStorage.setItem('swiftshift-profile-pic-y', String(v))
-                          }}
+                        <span className="text-xs text-zinc-500 w-20 flex-shrink-0">Zoom</span>
+                        <input type="range" min="1" max="3" step="0.05" value={profilePicZoom}
+                          onChange={e => { const v = parseFloat(e.target.value); setProfilePicZoom(v); localStorage.setItem('swiftshift-profile-pic-zoom', String(v)) }}
+                          className="flex-1 h-1 accent-[var(--accent-color)]"
+                        />
+                        <span className="text-xs text-zinc-400 w-10 text-right">{profilePicZoom.toFixed(1)}×</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-zinc-500 w-20 flex-shrink-0">Horizontal</span>
+                        <input type="range" min="0" max="100" step="1" value={profilePicX}
+                          onChange={e => { const v = parseFloat(e.target.value); setProfilePicX(v); localStorage.setItem('swiftshift-profile-pic-x', String(v)) }}
+                          className="flex-1 h-1 accent-[var(--accent-color)]"
+                        />
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-zinc-500 w-20 flex-shrink-0">Vertical</span>
+                        <input type="range" min="0" max="100" step="1" value={profilePicY}
+                          onChange={e => { const v = parseFloat(e.target.value); setProfilePicY(v); localStorage.setItem('swiftshift-profile-pic-y', String(v)) }}
                           className="flex-1 h-1 accent-[var(--accent-color)]"
                         />
                       </div>
                     </div>
-                  )}
-                  {!profilePicUrl && <div className="text-xs text-zinc-600 mt-1">Click the upload button to change your profile photo</div>}
+                    <button onClick={() => setShowCropModal(false)} className="mt-5 w-full py-2.5 rounded-xl text-sm font-semibold text-black transition-opacity hover:opacity-90" style={{ background: 'var(--accent-color)' }}>
+                      Done
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Tab nav */}
               <div className="flex gap-2 flex-wrap">

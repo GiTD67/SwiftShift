@@ -347,9 +347,9 @@ export function SalesKPI({ isAdmin = true, accentColor = '#22c55e', addXP }: Sal
     { key: 'leaderboard', label: 'Leaderboard' },
     { key: 'prizes', label: 'Prizes' },
     { key: 'goals', label: 'Goals' },
-    { key: 'pipeline', label: '📊 Pipeline' },
-    { key: 'history', label: '📅 History' },
-    { key: 'quotas', label: '🎯 Quotas' },
+    { key: 'pipeline', label: 'Pipeline' },
+    { key: 'history', label: 'History' },
+    { key: 'quotas', label: 'Quotas' },
   ]
 
   const tabClass = (t: string) =>
