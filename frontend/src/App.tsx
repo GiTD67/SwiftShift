@@ -823,11 +823,11 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
                     {h > 0 ? h.toFixed(1) : '-'}
                   </div>
                   {sessions.length > 0 && sessions.map((s: any, si: number) => (
-                    <div key={si} className="text-[8px] text-zinc-600 mt-0.5 leading-tight">
-                      <span style={{ color: 'var(--accent-color)', opacity: 0.7 }}>
+                    <div key={si} className="text-[10px] text-zinc-400 mt-0.5 leading-tight">
+                      <span style={{ color: 'var(--accent-color)', opacity: 0.9 }}>
                         {new Date(s.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
-                      {s.clock_out && <span>-{new Date(s.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+                      {s.clock_out && <span className="text-zinc-300">–{new Date(s.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
                     </div>
                   ))}
                 </div>
@@ -1080,12 +1080,12 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
                   />
                   <div className="text-[9px] text-zinc-600 mt-0.5">{h > 0 ? `${h.toFixed(1)}h` : ''}</div>
                   {daySessions.map((s: any, si: number) => (
-                    <div key={si} className="mt-0.5 text-[8px] bg-white/5 rounded px-0.5 leading-tight">
-                      <span style={{ color: 'var(--accent-color)', opacity: 0.8 }}>
+                    <div key={si} className="mt-0.5 text-[10px] bg-white/5 rounded px-0.5 leading-tight">
+                      <span style={{ color: 'var(--accent-color)', opacity: 0.9 }}>
                         {new Date(s.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                       {s.clock_out
-                        ? <span className="text-zinc-600">-{new Date(s.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        ? <span className="text-zinc-300">–{new Date(s.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         : <span className="text-amber-400"> •</span>}
                     </div>
                   ))}
@@ -2702,9 +2702,14 @@ export default function App() {
           setBreakMsAccum(0)
           setPaidBreakMsAccum(0)
         } else {
-          setClockInAt(null)
-          localStorage.removeItem('swiftshift-clock-in-at')
-          setActiveSessionId(null)
+          // Only clear clock state if localStorage also has no active session.
+          // If localStorage has a clock-in time but DB doesn't (race condition,
+          // failed POST, or brief network blip), clearing it would stop all timers.
+          const localClockIn = localStorage.getItem('swiftshift-clock-in-at')
+          if (!localClockIn) {
+            setClockInAt(null)
+            setActiveSessionId(null)
+          }
         }
 
         setTodayWorkedMs(todayMs)
@@ -3245,6 +3250,19 @@ export default function App() {
           </div>
         </div>
         <div className="ta-navbar-user">
+          {/* Upgrade CTA — prominent, left of achievements */}
+          <button
+            onClick={() => navTo('pricing')}
+            className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-full transition-all hover:scale-105 active:scale-95"
+            style={{
+              background: 'var(--accent-color)',
+              color: '#000',
+              boxShadow: '0 0 12px 2px rgba(var(--accent-color-rgb), 0.45)',
+            }}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 11 12 6 7 11"/><line x1="12" y1="18" x2="12" y2="6"/></svg>
+            Upgrade
+          </button>
           {/* Achievements badge */}
           <div className="relative group">
             <button
@@ -3284,15 +3302,6 @@ export default function App() {
               )}
             </div>
           </div>
-          {/* Upgrade CTA */}
-          <button
-            onClick={() => navTo('pricing')}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border transition-all hover:opacity-90"
-            style={{ borderColor: 'var(--accent-color)', color: 'var(--accent-color)' }}
-          >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 11 12 6 7 11"/><line x1="12" y1="18" x2="12" y2="6"/></svg>
-            Upgrade
-          </button>
           {/* Daily streak counter */}
           <div className="flex items-center gap-1.5 px-3 py-1 text-sm text-white/60 border border-white/10 rounded-full">
             <span style={{ color: 'var(--accent-color)' }}>
