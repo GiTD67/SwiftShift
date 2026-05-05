@@ -50,11 +50,11 @@ const LEVEL_RING_COLORS: Record<number, string> = {
 }
 
 function getTier(xp: number) {
-  if (xp >= 3200) return { name: 'Legend', color: '#FFD700', icon: '👑' }
-  if (xp >= 2000) return { name: 'Platinum', color: '#E5E4E2', icon: '💎' }
-  if (xp >= 1000) return { name: 'Gold', color: '#F59E0B', icon: '🥇' }
-  if (xp >= 500) return { name: 'Silver', color: '#94A3B8', icon: '🥈' }
-  return { name: 'Bronze', color: '#CD7F32', icon: '🥉' }
+  if (xp >= 3200) return { name: 'Legend', color: '#FFD700' }
+  if (xp >= 2000) return { name: 'Platinum', color: '#E5E4E2' }
+  if (xp >= 1000) return { name: 'Gold', color: '#F59E0B' }
+  if (xp >= 500) return { name: 'Silver', color: '#94A3B8' }
+  return { name: 'Bronze', color: '#CD7F32' }
 }
 
 function simXP(uid: number) {
@@ -82,8 +82,8 @@ function simCustomMetric(uid: number, metricIdx: number, target: number) {
 }
 
 const DEFAULT_METRICS: CustomMetric[] = [
-  { id: 'quality', name: 'Quality Score', description: 'Average task quality rating from peer reviews', unit: '%', icon: '⭐', target: 100 },
-  { id: 'punctuality', name: 'Punctuality', description: 'On-time clock-in rate', unit: '%', icon: '⏰', target: 100 },
+  { id: 'quality', name: 'Quality Score', description: 'Average task quality rating from peer reviews', unit: '%', icon: '', target: 100 },
+  { id: 'punctuality', name: 'Punctuality', description: 'On-time clock-in rate', unit: '%', icon: '', target: 100 },
 ]
 
 function loadCustomMetrics(): CustomMetric[] {
@@ -99,7 +99,7 @@ function saveCustomMetrics(metrics: CustomMetric[]) {
   localStorage.setItem('swiftshift-leaderboard-metrics', JSON.stringify(metrics))
 }
 
-const BLANK_METRIC: Omit<CustomMetric, 'id'> = { name: '', description: '', unit: '', icon: '📊', target: 100 }
+const BLANK_METRIC: Omit<CustomMetric, 'id'> = { name: '', description: '', unit: '', icon: '', target: 100 }
 
 export function Leaderboard({ gState, users, accentColor, user, totalHoursThisWeek, isAdmin }: LeaderboardProps) {
   const [category, setCategory] = useState<Category>('xp')
@@ -167,11 +167,11 @@ export function Leaderboard({ gState, users, accentColor, user, totalHoursThisWe
 
   const maxScore = entries[0]?.score || 1
 
-  const catLabels: { id: Category; label: string; icon: string }[] = [
-    { id: 'xp', label: 'XP Ranking', icon: '⚡' },
-    { id: 'hours', label: 'Hours Worked', icon: '⏱' },
-    { id: 'submissions', label: 'Timesheets', icon: '📋' },
-    { id: 'custom', label: 'Custom Metrics', icon: '🎯' },
+  const catLabels: { id: Category; label: string }[] = [
+    { id: 'xp', label: 'XP Ranking' },
+    { id: 'hours', label: 'Hours Worked' },
+    { id: 'submissions', label: 'Timesheets' },
+    { id: 'custom', label: 'Custom Metrics' },
   ]
 
   const periodLabels: { id: Period; label: string }[] = [
@@ -208,7 +208,7 @@ export function Leaderboard({ gState, users, accentColor, user, totalHoursThisWe
       <div className="glass rounded-3xl p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-2xl font-bold" style={{ color: accentColor }}>🏆 Leaderboard</div>
+            <div className="text-2xl font-bold" style={{ color: accentColor }}>Leaderboard</div>
             <div className="text-sm text-zinc-400 mt-0.5">Compete, improve, and earn rewards</div>
           </div>
           {myEntry && (
@@ -222,12 +222,12 @@ export function Leaderboard({ gState, users, accentColor, user, totalHoursThisWe
               <div>
                 <div className="text-xs text-zinc-400">Your rank</div>
                 <div className="text-lg font-bold tabular-nums" style={{ color: accentColor }}>
-                  {myRank === 1 ? '🥇 #1' : myRank === 2 ? '🥈 #2' : myRank === 3 ? '🥉 #3' : `#${myRank}`}
+                  #{myRank}
                 </div>
               </div>
               <div className="w-px h-8 bg-white/10" />
               <div>
-                <div className="text-xs text-zinc-400">{myEntry.tier.icon} {myEntry.tier.name}</div>
+                <div className="text-xs text-zinc-400">{myEntry.tier.name}</div>
                 <div className="text-sm font-semibold">{myEntry.displayValue}</div>
               </div>
             </div>
@@ -247,7 +247,7 @@ export function Leaderboard({ gState, users, accentColor, user, totalHoursThisWe
                 ? { backgroundColor: accentColor, color: '#000' }
                 : { backgroundColor: 'rgba(255,255,255,0.06)', color: '#a1a1aa' }}
             >
-              {cat.icon} {cat.label}
+              {cat.label}
             </button>
           ))}
         </div>
@@ -295,7 +295,7 @@ export function Leaderboard({ gState, users, accentColor, user, totalHoursThisWe
                     ? { backgroundColor: accentColor, color: '#000' }
                     : { backgroundColor: 'rgba(255,255,255,0.06)', color: '#a1a1aa' }}
                 >
-                  {m.icon} {m.name}
+                  {m.name}
                 </button>
                 {isAdmin && (
                   <>
@@ -398,7 +398,6 @@ export function Leaderboard({ gState, users, accentColor, user, totalHoursThisWe
               const e = entries[1]
               return (
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="flex flex-col items-center gap-2 flex-1 max-w-[140px]">
-                  <div className="text-2xl">🥈</div>
                   <div
                     className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold"
                     style={{ backgroundColor: e.isMe ? accentColor : 'rgba(255,255,255,0.1)', color: e.isMe ? '#000' : 'white', boxShadow: `0 0 0 2px ${LEVEL_RING_COLORS[Math.min(e.lvl.level, 10)]}` }}
@@ -407,7 +406,7 @@ export function Leaderboard({ gState, users, accentColor, user, totalHoursThisWe
                   </div>
                   <div className="text-center">
                     <div className="text-xs font-semibold truncate max-w-[120px]">{e.name}{e.isMe ? ' (You)' : ''}</div>
-                    <div className="text-[10px] text-zinc-500">{e.tier.icon} {e.tier.name}</div>
+                    <div className="text-[10px] text-zinc-500">{e.tier.name}</div>
                     <div className="text-xs font-bold mt-0.5" style={e.isMe ? { color: accentColor } : {}}>{e.displayValue}</div>
                   </div>
                   <div className="w-full h-16 rounded-t-xl flex items-end justify-center pb-2" style={{ backgroundColor: 'rgba(148,163,184,0.15)' }}>
@@ -422,7 +421,6 @@ export function Leaderboard({ gState, users, accentColor, user, totalHoursThisWe
               const e = entries[0]
               return (
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0 }} className="flex flex-col items-center gap-2 flex-1 max-w-[160px]">
-                  <div className="text-3xl">🥇</div>
                   <div
                     className="w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold"
                     style={{ backgroundColor: e.isMe ? accentColor : '#FFD700', color: '#000', boxShadow: `0 0 12px ${LEVEL_RING_COLORS[Math.min(e.lvl.level, 10)]}, 0 0 0 2px ${LEVEL_RING_COLORS[Math.min(e.lvl.level, 10)]}` }}
@@ -431,7 +429,7 @@ export function Leaderboard({ gState, users, accentColor, user, totalHoursThisWe
                   </div>
                   <div className="text-center">
                     <div className="text-sm font-bold truncate max-w-[140px]">{e.name}{e.isMe ? ' (You)' : ''}</div>
-                    <div className="text-[10px] text-zinc-400">{e.tier.icon} {e.tier.name}</div>
+                    <div className="text-[10px] text-zinc-400">{e.tier.name}</div>
                     <div className="text-sm font-bold mt-0.5" style={{ color: accentColor }}>{e.displayValue}</div>
                   </div>
                   <div className="w-full h-24 rounded-t-xl flex items-end justify-center pb-2" style={{ backgroundColor: `${accentColor}18` }}>
@@ -446,7 +444,6 @@ export function Leaderboard({ gState, users, accentColor, user, totalHoursThisWe
               const e = entries[2]
               return (
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="flex flex-col items-center gap-2 flex-1 max-w-[140px]">
-                  <div className="text-2xl">🥉</div>
                   <div
                     className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold"
                     style={{ backgroundColor: e.isMe ? accentColor : 'rgba(255,255,255,0.1)', color: e.isMe ? '#000' : 'white', boxShadow: `0 0 0 2px ${LEVEL_RING_COLORS[Math.min(e.lvl.level, 10)]}` }}
@@ -455,7 +452,7 @@ export function Leaderboard({ gState, users, accentColor, user, totalHoursThisWe
                   </div>
                   <div className="text-center">
                     <div className="text-xs font-semibold truncate max-w-[120px]">{e.name}{e.isMe ? ' (You)' : ''}</div>
-                    <div className="text-[10px] text-zinc-500">{e.tier.icon} {e.tier.name}</div>
+                    <div className="text-[10px] text-zinc-500">{e.tier.name}</div>
                     <div className="text-xs font-bold mt-0.5" style={e.isMe ? { color: accentColor } : {}}>{e.displayValue}</div>
                   </div>
                   <div className="w-full h-10 rounded-t-xl flex items-end justify-center pb-2" style={{ backgroundColor: 'rgba(205,127,50,0.12)' }}>
@@ -472,7 +469,7 @@ export function Leaderboard({ gState, users, accentColor, user, totalHoursThisWe
       <div className="glass rounded-3xl p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="text-lg font-semibold" style={{ color: accentColor }}>
-            {catLabels.find(c => c.id === category)?.icon} Full Rankings
+            Full Rankings
           </div>
           <div className="text-xs text-zinc-500">
             {entries.length} employees
@@ -485,7 +482,7 @@ export function Leaderboard({ gState, users, accentColor, user, totalHoursThisWe
           <div className="space-y-2">
             {entries.map((entry, i) => {
               const pct = maxScore > 0 ? (entry.score / maxScore) * 100 : 0
-              const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null
+              const medal = i < 3 ? `#${i + 1}` : null
 
               return (
                 <motion.div
@@ -520,7 +517,7 @@ export function Leaderboard({ gState, users, accentColor, user, totalHoursThisWe
                           Lv.{entry.lvl.level} {entry.lvl.name}
                         </span>
                       </div>
-                      <div className="text-[10px] text-zinc-500 truncate">{entry.jobRole || 'Employee'} · {entry.tier.icon} {entry.tier.name}</div>
+                      <div className="text-[10px] text-zinc-500 truncate">{entry.jobRole || 'Employee'} · {entry.tier.name}</div>
                       <div className="h-1.5 bg-white/10 rounded-full overflow-hidden mt-1.5">
                         <motion.div
                           className="h-full rounded-full"
@@ -553,15 +550,14 @@ export function Leaderboard({ gState, users, accentColor, user, totalHoursThisWe
             {(['Legend', 'Platinum', 'Gold', 'Silver', 'Bronze'] as const).map(tierName => {
               const tierEntries = entries.filter(e => e.tier.name === tierName)
               const tierInfo = {
-                Legend: { color: '#FFD700', icon: '👑', min: '3200+ XP' },
-                Platinum: { color: '#E5E4E2', icon: '💎', min: '2000+ XP' },
-                Gold: { color: '#F59E0B', icon: '🥇', min: '1000+ XP' },
-                Silver: { color: '#94A3B8', icon: '🥈', min: '500+ XP' },
-                Bronze: { color: '#CD7F32', icon: '🥉', min: '0+ XP' },
+                Legend: { color: '#FFD700', min: '3200+ XP' },
+                Platinum: { color: '#E5E4E2', min: '2000+ XP' },
+                Gold: { color: '#F59E0B', min: '1000+ XP' },
+                Silver: { color: '#94A3B8', min: '500+ XP' },
+                Bronze: { color: '#CD7F32', min: '0+ XP' },
               }[tierName]
               return (
                 <div key={tierName} className="glass rounded-2xl p-4 text-center">
-                  <div className="text-2xl mb-1">{tierInfo.icon}</div>
                   <div className="text-sm font-semibold" style={{ color: tierInfo.color }}>{tierName}</div>
                   <div className="text-xs text-zinc-500 mb-2">{tierInfo.min}</div>
                   <div className="text-2xl font-bold tabular-nums" style={{ color: tierInfo.color }}>{tierEntries.length}</div>

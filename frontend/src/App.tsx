@@ -2221,6 +2221,7 @@ export default function App() {
   const [customAccentColor, setCustomAccentColor] = useState<string>(() => localStorage.getItem('swiftshift-custom-accent') || '#00FF88')
   const [backgroundStyle, setBackgroundStyle] = useState<string>(() => localStorage.getItem('swiftshift-bg-style') || 'default')
   const [avatarFrame, setAvatarFrame] = useState<string>(() => localStorage.getItem('swiftshift-avatar-frame') || 'none')
+  const [isMasterMode, setIsMasterMode] = useState<boolean>(() => localStorage.getItem('swiftshift-master-mode') === '1')
 
   const gamification = useGamification()
   const { gState: appGState, currentLevel: appCurrentLevel, nextLevel: appNextLevel } = gamification
@@ -2304,6 +2305,15 @@ export default function App() {
     'Mia Thompson': [false, false, false, false, false, false],
     'Leo Kim': [true, true, true, true, false, false],
   })
+
+  // New hire onboarding modal state
+  const [showAddHireModal, setShowAddHireModal] = useState(false)
+  const [addHireForm, setAddHireForm] = useState({ first_name: '', last_name: '', email: '', job_role: '', hourly_rate: '', temp_password: '' })
+  const [addHireLoading, setAddHireLoading] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importCsv, setImportCsv] = useState('')
+  const [importLoading, setImportLoading] = useState(false)
+  const [importResult, setImportResult] = useState<{ success: number; errors: string[] } | null>(null)
 
   // Payroll sign-off state
   const [payrollSignoffs, setPayrollSignoffs] = useState<Record<string, boolean>>({
@@ -2535,6 +2545,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('swiftshift-avatar-frame', avatarFrame)
   }, [avatarFrame])
+
+  useEffect(() => {
+    localStorage.setItem('swiftshift-master-mode', isMasterMode ? '1' : '0')
+  }, [isMasterMode])
 
   // Apply custom accent color as CSS variable when custom theme is active
   useEffect(() => {
@@ -3239,6 +3253,72 @@ export default function App() {
     window.location.href = 'login'
   }
 
+  async function handleAddHire() {
+    const { first_name, last_name, email, job_role, hourly_rate, temp_password } = addHireForm
+    if (!first_name.trim() || !last_name.trim() || !email.trim() || !temp_password.trim()) {
+      toast.error('First name, last name, email, and temporary password are required.')
+      return
+    }
+    setAddHireLoading(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ first_name: first_name.trim(), last_name: last_name.trim(), email: email.trim(), job_role: job_role.trim() || undefined, hourly_rate: hourly_rate ? Number(hourly_rate) : undefined, password: temp_password }),
+      })
+      if (res.status === 409) { toast.error('An account with that email already exists.'); return }
+      if (!res.ok) { toast.error('Failed to create employee.'); return }
+      const newUser = await res.json()
+      setUsers(prev => [...prev, newUser])
+      toast.success(`${first_name} ${last_name} added successfully!`)
+      setShowAddHireModal(false)
+      setAddHireForm({ first_name: '', last_name: '', email: '', job_role: '', hourly_rate: '', temp_password: '' })
+    } catch {
+      toast.error('Network error.')
+    } finally {
+      setAddHireLoading(false)
+    }
+  }
+
+  async function handleImportCsv() {
+    const lines = importCsv.trim().split('\n').filter(l => l.trim())
+    if (lines.length < 2) { toast.error('CSV must have a header row and at least one data row.'); return }
+    const header = lines[0].split(',').map(h => h.trim().toLowerCase())
+    const requiredCols = ['first_name', 'last_name', 'email', 'password']
+    const missing = requiredCols.filter(c => !header.includes(c))
+    if (missing.length) { toast.error(`Missing required columns: ${missing.join(', ')}`); return }
+    setImportLoading(true)
+    const success: number[] = []
+    const errors: string[] = []
+    for (let i = 1; i < lines.length; i++) {
+      const vals = lines[i].split(',').map(v => v.trim())
+      const row: Record<string, string> = {}
+      header.forEach((h, idx) => { row[h] = vals[idx] || '' })
+      if (!row.first_name || !row.last_name || !row.email || !row.password) {
+        errors.push(`Row ${i + 1}: missing required fields`)
+        continue
+      }
+      try {
+        const res = await fetch(`${API_BASE}/api/users`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ first_name: row.first_name, last_name: row.last_name, email: row.email, password: row.password, job_role: row.job_role || undefined, hourly_rate: row.hourly_rate ? Number(row.hourly_rate) : undefined }),
+        })
+        if (res.status === 409) { errors.push(`Row ${i + 1}: email ${row.email} already exists`); continue }
+        if (!res.ok) { errors.push(`Row ${i + 1}: server error`); continue }
+        const newUser = await res.json()
+        setUsers(prev => [...prev, newUser])
+        success.push(newUser.id)
+      } catch {
+        errors.push(`Row ${i + 1}: network error`)
+      }
+    }
+    setImportResult({ success: success.length, errors })
+    setImportLoading(false)
+    if (success.length > 0) toast.success(`Imported ${success.length} employee${success.length !== 1 ? 's' : ''} successfully!`)
+    if (errors.length > 0) toast.error(`${errors.length} row${errors.length !== 1 ? 's' : ''} failed to import.`)
+  }
+
   const navUnlockedAchievements = appGState.unlockedAchievements
 
   return (
@@ -3387,7 +3467,7 @@ export default function App() {
                     { id: 'teal', label: 'Teal', color: '#2DD4BF', unlock: 9 },
                     { id: 'blue', label: 'Blue', color: '#60A5FA', unlock: 10 },
                   ].map(t => {
-                    const unlocked = appCurrentLevel.level >= t.unlock
+                    const unlocked = isMasterMode || appCurrentLevel.level >= t.unlock
                     return (
                       <button
                         key={t.id}
@@ -3412,7 +3492,7 @@ export default function App() {
                   })}
                 </div>
               </div>
-              {appCurrentLevel.level >= 5 && (
+              {(isMasterMode || appCurrentLevel.level >= 5) && (
                 <div className="px-3 py-2 border-t border-white/10">
                   <div className="text-xs text-zinc-500 mb-1.5">Custom Color <span className="text-[9px]">(Lv.5 unlock)</span></div>
                   <div className="flex items-center gap-2">
@@ -3450,7 +3530,7 @@ export default function App() {
                     { id: 'aurora', label: 'Aurora', unlock: 10, preview: 'linear-gradient(135deg,rgba(100,0,255,0.15),rgba(0,255,200,0.15))' },
                     { id: 'gravity-grid', label: 'Gravity', unlock: 11, preview: 'radial-gradient(ellipse at 40% 60%,rgba(100,130,255,0.25),rgba(50,0,80,0.4) 60%,#000)' },
                   ].map(bg => {
-                    const unlocked = appCurrentLevel.level >= bg.unlock
+                    const unlocked = isMasterMode || appCurrentLevel.level >= bg.unlock
                     return (
                       <button
                         key={bg.id}
@@ -3466,7 +3546,7 @@ export default function App() {
                 </div>
               </div>
               {/* Avatar Frames */}
-              {appCurrentLevel.level >= 3 && (
+              {(isMasterMode || appCurrentLevel.level >= 3) && (
                 <div className="px-3 py-2 border-t border-white/10">
                   <div className="text-xs text-zinc-500 mb-1.5">Avatar Frame</div>
                   <div className="flex gap-1.5 flex-wrap">
@@ -3476,7 +3556,7 @@ export default function App() {
                       { id: 'gold', label: 'Gold', unlock: 6 },
                       { id: 'rainbow', label: 'Elite', unlock: 9 },
                     ].map(frame => {
-                      const unlocked = appCurrentLevel.level >= frame.unlock
+                      const unlocked = isMasterMode || appCurrentLevel.level >= frame.unlock
                       return (
                         <button
                           key={frame.id}
@@ -3497,6 +3577,20 @@ export default function App() {
               >
                 Pricing
               </button>
+              <div className="px-4 py-2 border-t border-white/10 flex items-center justify-between gap-2">
+                <div>
+                  <div className="text-xs font-medium text-zinc-300">Master Mode</div>
+                  <div className="text-[10px] text-zinc-500">Unlock all themes & features</div>
+                </div>
+                <button
+                  onClick={() => setIsMasterMode(v => !v)}
+                  className={`relative w-9 h-5 rounded-full transition-colors ${isMasterMode ? '' : 'bg-white/10'}`}
+                  style={isMasterMode ? { backgroundColor: 'var(--accent-color)' } : {}}
+                  aria-label="Toggle master mode"
+                >
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${isMasterMode ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
               <button
                 onClick={handleLogout}
                 className="w-full text-left px-4 py-2 text-sm hover:bg-white/5 text-red-400 rounded-b-xl border-t border-white/10"
@@ -4127,7 +4221,7 @@ export default function App() {
               accentColor={themeAccentHex}
               user={user}
               totalHoursThisWeek={todayTotalMs / 3600000}
-              isAdmin={isAdmin}
+              isAdmin={isAdmin || isMasterMode}
             />
           )}
           {activeView === 'holidays' && (() => {
@@ -5081,7 +5175,7 @@ export default function App() {
             <SalesKPI
               user={user}
               users={users}
-              isAdmin={isAdmin}
+              isAdmin={isAdmin || isMasterMode}
               accentColor={themeAccentHex}
               addXP={gamification.addXP}
             />
@@ -5417,9 +5511,22 @@ export default function App() {
                   <h1 className="text-2xl font-semibold neon-green">Hiring &amp; Onboarding</h1>
                   <p className="text-sm text-zinc-400">Recruitment pipeline and new hire management</p>
                 </div>
-                <button className="px-4 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
-                  + Post Job
-                </button>
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    onClick={() => { setShowImportModal(true); setImportResult(null); setImportCsv('') }}
+                    className="px-4 py-2 rounded-xl text-sm font-medium border"
+                    style={{ borderColor: 'var(--accent-color)', color: 'var(--accent-color)', backgroundColor: 'transparent' }}
+                  >
+                    Import from CSV
+                  </button>
+                  <button
+                    onClick={() => setShowAddHireModal(true)}
+                    className="px-4 py-2 rounded-xl text-sm font-medium"
+                    style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
+                  >
+                    + Add New Hire
+                  </button>
+                </div>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {[['Open Positions', '6'], ['Active Applicants', '38'], ['Interviews This Week', '9'], ['Offers Pending', '3']].map(([label, val]) => (
@@ -5521,6 +5628,91 @@ export default function App() {
                   })}
                 </div>
               </div>
+
+              {/* Add New Hire Modal */}
+              {showAddHireModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setShowAddHireModal(false)}>
+                  <div className="glass rounded-3xl p-6 w-full max-w-md space-y-4" onClick={e => e.stopPropagation()}>
+                    <div>
+                      <div className="text-lg font-bold" style={{ color: 'var(--accent-color)' }}>Add New Hire</div>
+                      <div className="text-xs text-zinc-400 mt-0.5">Create an account for a new employee. They can log in with the temporary password.</div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-zinc-400 block mb-1">First Name *</label>
+                        <input className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm" value={addHireForm.first_name} onChange={e => setAddHireForm(f => ({ ...f, first_name: e.target.value }))} placeholder="Jane" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-zinc-400 block mb-1">Last Name *</label>
+                        <input className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm" value={addHireForm.last_name} onChange={e => setAddHireForm(f => ({ ...f, last_name: e.target.value }))} placeholder="Smith" />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-xs text-zinc-400 block mb-1">Email *</label>
+                        <input type="email" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm" value={addHireForm.email} onChange={e => setAddHireForm(f => ({ ...f, email: e.target.value }))} placeholder="jane@company.com" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-zinc-400 block mb-1">Job Role</label>
+                        <input className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm" value={addHireForm.job_role} onChange={e => setAddHireForm(f => ({ ...f, job_role: e.target.value }))} placeholder="e.g. Engineer" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-zinc-400 block mb-1">Hourly Rate ($)</label>
+                        <input type="number" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm" value={addHireForm.hourly_rate} onChange={e => setAddHireForm(f => ({ ...f, hourly_rate: e.target.value }))} placeholder="25.00" />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-xs text-zinc-400 block mb-1">Temporary Password *</label>
+                        <input type="text" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm font-mono" value={addHireForm.temp_password} onChange={e => setAddHireForm(f => ({ ...f, temp_password: e.target.value }))} placeholder="Share this with the employee" />
+                      </div>
+                    </div>
+                    <div className="flex gap-2 justify-end pt-1">
+                      <button onClick={() => setShowAddHireModal(false)} className="px-4 py-2 rounded-xl text-sm bg-white/5 text-zinc-400">Cancel</button>
+                      <button onClick={handleAddHire} disabled={addHireLoading} className="px-4 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000', opacity: addHireLoading ? 0.6 : 1 }}>
+                        {addHireLoading ? 'Adding...' : 'Add Employee'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Import from CSV Modal */}
+              {showImportModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => { setShowImportModal(false); setImportResult(null) }}>
+                  <div className="glass rounded-3xl p-6 w-full max-w-lg space-y-4" onClick={e => e.stopPropagation()}>
+                    <div>
+                      <div className="text-lg font-bold" style={{ color: 'var(--accent-color)' }}>Import Employees from CSV</div>
+                      <div className="text-xs text-zinc-400 mt-0.5">Paste or type CSV data to bulk-import employees from another system.</div>
+                    </div>
+                    <div className="bg-black/30 rounded-xl p-3 text-[10px] text-zinc-500 font-mono leading-relaxed">
+                      <div className="text-zinc-400 mb-1 text-xs font-sans font-medium">Required columns:</div>
+                      <div>first_name, last_name, email, password</div>
+                      <div className="mt-1 text-zinc-600">Optional: job_role, hourly_rate</div>
+                      <div className="mt-2 text-zinc-500">Example:</div>
+                      <div>first_name,last_name,email,password,job_role,hourly_rate</div>
+                      <div>Jane,Smith,jane@co.com,TempPass1,Engineer,35</div>
+                    </div>
+                    <textarea
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono resize-y"
+                      rows={6}
+                      value={importCsv}
+                      onChange={e => setImportCsv(e.target.value)}
+                      placeholder="first_name,last_name,email,password,job_role,hourly_rate&#10;Jane,Smith,jane@co.com,TempPass1,Engineer,35"
+                    />
+                    {importResult && (
+                      <div className="rounded-xl p-3 text-xs space-y-1" style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div style={{ color: 'var(--accent-color)' }}>{importResult.success} employee{importResult.success !== 1 ? 's' : ''} imported successfully</div>
+                        {importResult.errors.map((e, i) => <div key={i} className="text-red-400">{e}</div>)}
+                      </div>
+                    )}
+                    <div className="flex gap-2 justify-end pt-1">
+                      <button onClick={() => { setShowImportModal(false); setImportResult(null) }} className="px-4 py-2 rounded-xl text-sm bg-white/5 text-zinc-400">Close</button>
+                      {!importResult && (
+                        <button onClick={handleImportCsv} disabled={importLoading || !importCsv.trim()} className="px-4 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000', opacity: (importLoading || !importCsv.trim()) ? 0.6 : 1 }}>
+                          {importLoading ? 'Importing...' : 'Import'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           {activeView === 'teamkpi' && (
