@@ -19,7 +19,7 @@ import { Leaderboard } from './components/Leaderboard'
 
 const API_BASE = ''
 
-type View = 'clock' | 'timesheet' | 'rewards' | 'xpcenter' | 'admin' | 'profile' | 'insurance' | 'orgchart' | 'taxes' | 'groktax' | 'grokky' | 'applications' | 'jobs' | 'schedules' | 'payroll' | 'reports' | 'leaves' | 'compliance' | 'hiring' | 'kpi' | 'teamkpi' | 'announcements' | 'pricing' | 'auditlog' | 'enterprise' | 'alerts' | 'leaderboard'
+type View = 'clock' | 'timesheet' | 'rewards' | 'xpcenter' | 'admin' | 'profile' | 'insurance' | 'orgchart' | 'taxes' | 'groktax' | 'grokky' | 'applications' | 'jobs' | 'schedules' | 'payroll' | 'reports' | 'leaves' | 'compliance' | 'hiring' | 'kpi' | 'teamkpi' | 'announcements' | 'pricing' | 'auditlog' | 'enterprise' | 'alerts' | 'leaderboard' | 'holidays'
 
 function formatMs(ms: number): string {
   const totalSec = Math.floor(ms / 1000)
@@ -2248,7 +2248,7 @@ export default function App() {
   const [showCropModal, setShowCropModal] = useState(false)
 
   // Sidebar customization
-  const DEFAULT_SIDEBAR_ORDER = ['clock','timesheet','rewards','leaderboard','kpi','insurance','orgchart','taxes','groktax','applications']
+  const DEFAULT_SIDEBAR_ORDER = ['clock','timesheet','rewards','leaderboard','holidays','kpi','insurance','orgchart','taxes','groktax','applications']
   const [sidebarOrder, setSidebarOrder] = useState<string[]>(() => {
     try { const s = localStorage.getItem('swiftshift-sidebar-order'); return s ? JSON.parse(s) : DEFAULT_SIDEBAR_ORDER } catch { return DEFAULT_SIDEBAR_ORDER }
   })
@@ -2291,6 +2291,12 @@ export default function App() {
   ])
   const [showAnnouncementForm, setShowAnnouncementForm] = useState(false)
   const [announcementForm, setAnnouncementForm] = useState({ title: '', body: '', priority: 'normal' as 'normal' | 'urgent' })
+
+  // Company Holidays state
+  const [holidays, setHolidays] = useState<Array<{ id: number; name: string; date: string; recurring: number; description: string; created_at: string }>>([])
+  const [showHolidayForm, setShowHolidayForm] = useState(false)
+  const [editingHoliday, setEditingHoliday] = useState<number | null>(null)
+  const [holidayForm, setHolidayForm] = useState({ name: '', date: '', recurring: false, description: '' })
 
   // Onboarding tasks state
   const [onboardingTasks, setOnboardingTasks] = useState<Record<string, boolean[]>>({
@@ -2585,6 +2591,11 @@ export default function App() {
     fetch(`${API_BASE}/api/pto/requests?user_id=${uid}`).then(r => r.json()).then(r => setPtoRequests(Array.isArray(r) ? r : [])).catch(() => {})
     fetch(`${API_BASE}/api/pto/requests`).then(r => r.json()).then(r => setAllPtoRequests(Array.isArray(r) ? r : [])).catch(() => {})
   }, [activeView, user?.id])
+
+  // Load company holidays (always fetch, accessible to all)
+  useEffect(() => {
+    fetch(`${API_BASE}/api/holidays`).then(r => r.json()).then(r => setHolidays(Array.isArray(r) ? r : [])).catch(() => {})
+  }, [activeView])
 
   // Load schedules data
   useEffect(() => {
@@ -3510,6 +3521,7 @@ export default function App() {
             { id: 'timesheet', label: 'Timesheet', view: 'timesheet', htmlId: 'nav-timesheet', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> },
             { id: 'rewards', label: 'Rewards', view: 'rewards', htmlId: 'nav-rewards', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg> },
             { id: 'leaderboard', label: 'Leaderboard', view: 'leaderboard', htmlId: 'nav-leaderboard', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> },
+            { id: 'holidays', label: 'Holidays', view: 'holidays', htmlId: 'nav-holidays', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="16" y1="14" x2="16" y2="14"/></svg> },
             { id: 'kpi', label: 'My KPIs', view: 'kpi', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> },
             { id: 'insurance', label: 'Insurance & Benefits', view: 'insurance', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> },
             { id: 'orgchart', label: 'Org Chart', view: 'orgchart', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><rect x="8" y="2" width="8" height="4" rx="1"/><rect x="2" y="14" width="8" height="4" rx="1"/><rect x="14" y="14" width="8" height="4" rx="1"/><line x1="12" y1="6" x2="12" y2="11"/><line x1="6" y1="14" x2="6" y2="11"/><line x1="18" y1="14" x2="18" y2="11"/><line x1="6" y1="11" x2="18" y2="11"/></svg> },
@@ -3641,6 +3653,10 @@ export default function App() {
                   <button className={`ta-nav-btn ${activeView === 'announcements' ? 'active' : ''}`} onClick={() => navTo('announcements')}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M22 17H2a3 3 0 000 6h20a3 3 0 000-6z"/><path d="M17 8V2"/><path d="M12 8V5"/><path d="M7 8V1"/></svg>
                     Announcements
+                  </button>
+                  <button className={`ta-nav-btn ${activeView === 'holidays' ? 'active' : ''}`} onClick={() => navTo('holidays')}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    Manage Holidays
                   </button>
                   <button className={`ta-nav-btn ${activeView === 'auditlog' ? 'active' : ''}`} onClick={() => navTo('auditlog')}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -3978,6 +3994,34 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Next Holiday widget */}
+                {(() => {
+                  const today = new Date(); today.setHours(0,0,0,0)
+                  const upcoming = holidays
+                    .map(h => {
+                      const d = new Date(h.date + 'T00:00:00')
+                      if (h.recurring) {
+                        d.setFullYear(today.getFullYear())
+                        if (d < today) d.setFullYear(today.getFullYear() + 1)
+                      }
+                      return { ...h, nextDate: d }
+                    })
+                    .filter(h => h.nextDate >= today)
+                    .sort((a, b) => a.nextDate.getTime() - b.nextDate.getTime())[0]
+                  if (!upcoming) return null
+                  const daysUntil = Math.round((upcoming.nextDate.getTime() - today.getTime()) / 86400000)
+                  return (
+                    <div className="glass rounded-3xl p-5 cursor-pointer hover:bg-white/5 transition-colors" onClick={() => navTo('holidays')}>
+                      <div className="text-xs uppercase tracking-[2px] text-zinc-400 mb-2">Next Holiday</div>
+                      <div className="font-semibold neon-green text-lg leading-tight">{upcoming.name}</div>
+                      <div className="text-sm text-zinc-400 mt-1">{upcoming.nextDate.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}</div>
+                      <div className="mt-3 text-sm font-bold" style={{ color: 'var(--accent-color)' }}>
+                        {daysUntil === 0 ? 'Today!' : daysUntil === 1 ? 'Tomorrow' : `${daysUntil} days away`}
+                      </div>
+                    </div>
+                  )
+                })()}
+
                 {/* This pay period - below Real Time Rewards */}
                 <div className="glass rounded-3xl p-8 flex-1">
                   <div className="flex items-center justify-between mb-4">
@@ -4086,6 +4130,203 @@ export default function App() {
               isAdmin={isAdmin}
             />
           )}
+          {activeView === 'holidays' && (() => {
+            const today = new Date(); today.setHours(0,0,0,0)
+            const enriched = holidays.map(h => {
+              const base = new Date(h.date + 'T00:00:00')
+              let next = new Date(base)
+              if (h.recurring) {
+                next.setFullYear(today.getFullYear())
+                if (next < today) next.setFullYear(today.getFullYear() + 1)
+              }
+              const daysUntil = Math.round((next.getTime() - today.getTime()) / 86400000)
+              return { ...h, nextDate: next, daysUntil }
+            }).sort((a, b) => a.daysUntil - b.daysUntil)
+
+            const saveHoliday = () => {
+              if (!holidayForm.name.trim() || !holidayForm.date) { toast.error('Name and date are required'); return }
+              const method = editingHoliday ? 'PUT' : 'POST'
+              const url = editingHoliday ? `${API_BASE}/api/holidays/${editingHoliday}` : `${API_BASE}/api/holidays`
+              fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(holidayForm) })
+                .then(r => r.json())
+                .then(row => {
+                  if (row.error) { toast.error(row.error); return }
+                  if (editingHoliday) {
+                    setHolidays(prev => prev.map(h => h.id === editingHoliday ? row : h))
+                    toast.success('Holiday updated!')
+                  } else {
+                    setHolidays(prev => [...prev, row])
+                    toast.success('Holiday added!')
+                  }
+                  setShowHolidayForm(false)
+                  setEditingHoliday(null)
+                  setHolidayForm({ name: '', date: '', recurring: false, description: '' })
+                })
+                .catch(() => toast.error('Failed to save holiday'))
+            }
+
+            const deleteHoliday = (id: number) => {
+              fetch(`${API_BASE}/api/holidays/${id}`, { method: 'DELETE' })
+                .then(() => { setHolidays(prev => prev.filter(h => h.id !== id)); toast.success('Holiday deleted') })
+                .catch(() => toast.error('Failed to delete'))
+            }
+
+            const upcoming = enriched.filter(h => h.daysUntil >= 0)
+            const past = enriched.filter(h => h.daysUntil < 0)
+
+            return (
+              <div className="max-w-3xl mx-auto space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h1 className="text-2xl font-semibold neon-green">Company Holidays</h1>
+                    <p className="text-sm text-zinc-400 mt-0.5">Official company days off</p>
+                  </div>
+                  {isAdmin && (
+                    <button
+                      onClick={() => { setShowHolidayForm(v => !v); setEditingHoliday(null); setHolidayForm({ name: '', date: '', recurring: false, description: '' }) }}
+                      className="px-4 py-2 rounded-xl text-sm font-medium"
+                      style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
+                    >
+                      {showHolidayForm && !editingHoliday ? 'Cancel' : '+ Add Holiday'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Stats row */}
+                <div className="grid grid-cols-3 gap-4">
+                  {[
+                    ['Total Holidays', String(holidays.length)],
+                    ['Upcoming', String(upcoming.length)],
+                    ['Next in', upcoming[0] ? (upcoming[0].daysUntil === 0 ? 'Today!' : upcoming[0].daysUntil === 1 ? 'Tomorrow' : `${upcoming[0].daysUntil}d`) : 'N/A'],
+                  ].map(([label, val]) => (
+                    <div key={label} className="glass rounded-2xl p-4 text-center">
+                      <div className="text-2xl font-bold" style={{ color: 'var(--accent-color)' }}>{val}</div>
+                      <div className="text-xs text-zinc-400 mt-1">{label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Add/Edit form */}
+                {(showHolidayForm || editingHoliday) && (
+                  <div className="glass rounded-3xl p-6 space-y-4">
+                    <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>{editingHoliday ? 'Edit Holiday' : 'Add Holiday'}</h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <div className="text-xs text-zinc-400 mb-1">Holiday Name</div>
+                        <input type="text" value={holidayForm.name} onChange={e => setHolidayForm(f => ({ ...f, name: e.target.value }))}
+                          className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
+                          placeholder="e.g. Christmas Day" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-zinc-400 mb-1">Date</div>
+                        <input type="date" value={holidayForm.date} onChange={e => setHolidayForm(f => ({ ...f, date: e.target.value }))}
+                          className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <div className="text-xs text-zinc-400 mb-1">Description (optional)</div>
+                        <input type="text" value={holidayForm.description} onChange={e => setHolidayForm(f => ({ ...f, description: e.target.value }))}
+                          className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
+                          placeholder="Optional description" />
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <input type="checkbox" id="recurring-check" checked={holidayForm.recurring} onChange={e => setHolidayForm(f => ({ ...f, recurring: e.target.checked }))}
+                          className="w-4 h-4 accent-[var(--accent-color)] cursor-pointer" />
+                        <label htmlFor="recurring-check" className="text-sm text-zinc-300 cursor-pointer">Repeats yearly</label>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <button onClick={saveHoliday} className="px-5 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
+                        {editingHoliday ? 'Save Changes' : 'Add Holiday'}
+                      </button>
+                      <button onClick={() => { setShowHolidayForm(false); setEditingHoliday(null); setHolidayForm({ name: '', date: '', recurring: false, description: '' }) }}
+                        className="px-4 py-2 rounded-xl text-sm border border-white/10 hover:bg-white/5 text-zinc-300">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Upcoming holidays */}
+                <div className="glass rounded-3xl p-6">
+                  <h2 className="text-base font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Upcoming</h2>
+                  {upcoming.length === 0 ? (
+                    <div className="text-sm text-zinc-500 text-center py-6">No upcoming holidays.{isAdmin ? ' Click "+ Add Holiday" to get started.' : ''}</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {upcoming.map(h => (
+                        <div key={h.id} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3 gap-3">
+                          <div className="flex items-center gap-4 min-w-0">
+                            <div className="w-12 h-12 rounded-xl flex flex-col items-center justify-center flex-shrink-0 text-center" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
+                              <div className="text-[10px] font-bold uppercase leading-none">{h.nextDate.toLocaleDateString(undefined, { month: 'short' })}</div>
+                              <div className="text-xl font-bold leading-tight">{h.nextDate.getDate()}</div>
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-semibold truncate">{h.name}</div>
+                              {h.description && <div className="text-xs text-zinc-400 mt-0.5 truncate">{h.description}</div>}
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-xs text-zinc-500">{h.nextDate.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                {h.recurring ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 text-zinc-400">yearly</span> : null}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            <span className="text-sm font-semibold" style={{ color: 'var(--accent-color)' }}>
+                              {h.daysUntil === 0 ? 'Today' : h.daysUntil === 1 ? 'Tomorrow' : `${h.daysUntil}d`}
+                            </span>
+                            {isAdmin && (
+                              <div className="flex gap-1">
+                                <button onClick={() => { setEditingHoliday(h.id); setShowHolidayForm(false); setHolidayForm({ name: h.name, date: h.date, recurring: !!h.recurring, description: h.description || '' }) }}
+                                  className="p-1.5 rounded-lg hover:bg-white/10 text-zinc-400 hover:text-white transition-colors" title="Edit">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                </button>
+                                <button onClick={() => deleteHoliday(h.id)} className="p-1.5 rounded-lg hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition-colors" title="Delete">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Past holidays */}
+                {past.length > 0 && (
+                  <div className="glass rounded-3xl p-6">
+                    <h2 className="text-base font-semibold mb-4 text-zinc-400">Past this year</h2>
+                    <div className="space-y-2">
+                      {past.slice().reverse().map(h => (
+                        <div key={h.id} className="flex items-center justify-between bg-white/[0.03] rounded-xl px-4 py-3 gap-3 opacity-60">
+                          <div className="flex items-center gap-4 min-w-0">
+                            <div className="w-10 h-10 rounded-xl flex flex-col items-center justify-center flex-shrink-0 bg-white/10">
+                              <div className="text-[9px] font-bold uppercase leading-none text-zinc-400">{h.nextDate.toLocaleDateString(undefined, { month: 'short' })}</div>
+                              <div className="text-base font-bold leading-tight text-zinc-300">{h.nextDate.getDate()}</div>
+                            </div>
+                            <div>
+                              <div className="font-medium text-sm text-zinc-300">{h.name}</div>
+                              {h.description && <div className="text-xs text-zinc-500">{h.description}</div>}
+                            </div>
+                          </div>
+                          {isAdmin && (
+                            <div className="flex gap-1 flex-shrink-0">
+                              <button onClick={() => { setEditingHoliday(h.id); setShowHolidayForm(false); setHolidayForm({ name: h.name, date: h.date, recurring: !!h.recurring, description: h.description || '' }) }}
+                                className="p-1.5 rounded-lg hover:bg-white/10 text-zinc-500 hover:text-white transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                              </button>
+                              <button onClick={() => deleteHoliday(h.id)} className="p-1.5 rounded-lg hover:bg-red-500/20 text-zinc-500 hover:text-red-400 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
           {activeView === 'admin' && (
             <div className="max-w-5xl mx-auto">
               <div className="glass rounded-3xl p-8">
