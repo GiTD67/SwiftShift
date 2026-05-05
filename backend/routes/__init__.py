@@ -9,5 +9,6 @@ from .timesheet_submissions import bp as timesheet_submissions_bp
 from .pto import bp as pto_bp
 from .availability import bp as availability_bp
 from .shift_swaps import bp as shift_swaps_bp
+from .holidays import bp as holidays_bp
 
-__all__ = ["health_bp", "employees_bp", "time_entries_bp", "clock_sessions_bp", "users_bp", "grok_bp", "jobs_bp", "timesheet_submissions_bp", "pto_bp", "availability_bp", "shift_swaps_bp"]
+__all__ = ["health_bp", "employees_bp", "time_entries_bp", "clock_sessions_bp", "users_bp", "grok_bp", "jobs_bp", "timesheet_submissions_bp", "pto_bp", "availability_bp", "shift_swaps_bp", "holidays_bp"]
