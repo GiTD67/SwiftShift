@@ -2601,9 +2601,15 @@ export default function App() {
       const g = parseInt(customAccentColor.slice(3, 5), 16)
       const b = parseInt(customAccentColor.slice(5, 7), 16)
       document.documentElement.style.setProperty('--accent-color-rgb', `${r}, ${g}, ${b}`)
+      // Readable text on accent fills: light text for dark accents, dark for light.
+      // Threshold ~0.18 relative luminance is where black/white contrast crosses over.
+      const lin = (c: number) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4) }
+      const lum = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+      document.documentElement.style.setProperty('--accent-contrast', lum > 0.18 ? '#0A0E1A' : '#FFFFFF')
     } else {
       document.documentElement.style.removeProperty('--accent-color')
       document.documentElement.style.removeProperty('--accent-color-rgb')
+      document.documentElement.style.removeProperty('--accent-contrast')
     }
   }, [theme, customAccentColor])
 

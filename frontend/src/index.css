@@ -584,6 +584,30 @@ button, [role="button"] {
   color: #fff;
   border-color: rgba(155, 81, 254, 0.6);
 }
+[data-theme="red"] .glass-btn-green,
+[data-theme="red"] .glass-btn-green:hover {
+  background: #EF4444;
+  color: #fff;
+  border-color: rgba(239, 68, 68, 0.6);
+}
+[data-theme="gold"] .glass-btn-green,
+[data-theme="gold"] .glass-btn-green:hover {
+  background: #F59E0B;
+  color: #000;
+  border-color: rgba(245, 158, 11, 0.6);
+}
+[data-theme="teal"] .glass-btn-green,
+[data-theme="teal"] .glass-btn-green:hover {
+  background: #2DD4BF;
+  color: #000;
+  border-color: rgba(45, 212, 191, 0.6);
+}
+[data-theme="blue"] .glass-btn-green,
+[data-theme="blue"] .glass-btn-green:hover {
+  background: #60A5FA;
+  color: #000;
+  border-color: rgba(96, 165, 250, 0.6);
+}
 
 /* Global accent CSS vars per theme */
 [data-theme="green"] {
@@ -616,300 +640,74 @@ button, [role="button"] {
   --accent-color-rgb: 155, 81, 254;
   --accent-color-dim: rgba(155, 81, 254, 0.15);
 }
-
-/* Emerald accent → theme color */
-[data-theme="white"] .text-emerald-400,
-[data-theme="white"] .text-emerald-500 {
-  color: #e5e7eb !important;
+[data-theme="red"] {
+  --accent-color: #EF4444;
+  --accent-color-rgb: 239, 68, 68;
+  --accent-color-dim: rgba(239, 68, 68, 0.15);
 }
-[data-theme="orange"] .text-emerald-400,
-[data-theme="orange"] .text-emerald-500 {
-  color: #fb923c !important;
+[data-theme="gold"] {
+  --accent-color: #F59E0B;
+  --accent-color-rgb: 245, 158, 11;
+  --accent-color-dim: rgba(245, 158, 11, 0.15);
 }
-[data-theme="cyan"] .text-emerald-400,
-[data-theme="cyan"] .text-emerald-500 {
-  color: #51FEFE !important;
+[data-theme="teal"] {
+  --accent-color: #2DD4BF;
+  --accent-color-rgb: 45, 212, 191;
+  --accent-color-dim: rgba(45, 212, 191, 0.15);
 }
-[data-theme="pink"] .text-emerald-400,
-[data-theme="pink"] .text-emerald-500 {
-  color: #FE51D7 !important;
-}
-[data-theme="purple"] .text-emerald-400,
-[data-theme="purple"] .text-emerald-500 {
-  color: #9B51FE !important;
+[data-theme="blue"] {
+  --accent-color: #60A5FA;
+  --accent-color-rgb: 96, 165, 250;
+  --accent-color-dim: rgba(96, 165, 250, 0.15);
 }
 
-[data-theme="white"] .bg-emerald-400,
-[data-theme="white"] .bg-emerald-500 {
-  background-color: #e5e7eb !important;
-}
-[data-theme="orange"] .bg-emerald-400,
-[data-theme="orange"] .bg-emerald-500 {
-  background-color: #f97316 !important;
-}
-[data-theme="cyan"] .bg-emerald-400,
-[data-theme="cyan"] .bg-emerald-500 {
-  background-color: #51FEFE !important;
-}
-[data-theme="pink"] .bg-emerald-400,
-[data-theme="pink"] .bg-emerald-500 {
-  background-color: #FE51D7 !important;
-}
-[data-theme="purple"] .bg-emerald-400,
-[data-theme="purple"] .bg-emerald-500 {
-  background-color: #9B51FE !important;
-}
+/* ============================================
+   ACCENT UTILITY REMAPS (theme-agnostic)
+   Tailwind emerald-* / border-white/* are hardcoded colors; these single rules
+   make them follow the live --accent-color for ALL themes, replacing ~290 lines
+   of per-theme !important overrides. The per-theme --accent-color var defs
+   (above) and Overdrive (below) still drive the actual color. .neon-green is
+   handled by its own base rule earlier in this file.
+   ============================================ */
 
-[data-theme="white"] .border-emerald-400,
-[data-theme="white"] .border-emerald-500 {
-  border-color: #e5e7eb !important;
-}
-[data-theme="orange"] .border-emerald-400,
-[data-theme="orange"] .border-emerald-500 {
-  border-color: #f97316 !important;
-}
-[data-theme="cyan"] .border-emerald-400,
-[data-theme="cyan"] .border-emerald-500 {
-  border-color: #51FEFE !important;
-}
-[data-theme="pink"] .border-emerald-400,
-[data-theme="pink"] .border-emerald-500 {
-  border-color: #FE51D7 !important;
-}
-[data-theme="purple"] .border-emerald-400,
-[data-theme="purple"] .border-emerald-500 {
-  border-color: #9B51FE !important;
-}
+/* Emerald text → accent */
+.text-emerald-400, .text-emerald-500 { color: var(--accent-color); }
 
-/* Subtle accent backgrounds */
-[data-theme="white"] .bg-emerald-500\/20 {
-  background-color: rgba(229, 231, 235, 0.2) !important;
-  color: #e5e7eb !important;
+/* Emerald solid fills → accent fill with readable text */
+.bg-emerald-400, .bg-emerald-500, .bg-emerald-600 {
+  background-color: var(--accent-color);
+  color: var(--accent-contrast);
 }
-[data-theme="orange"] .bg-emerald-500\/20 {
-  background-color: rgba(249, 115, 22, 0.2) !important;
-  color: #fb923c !important;
-}
-[data-theme="cyan"] .bg-emerald-500\/20 {
-  background-color: rgba(81, 254, 254, 0.2) !important;
-  color: #51FEFE !important;
-}
-[data-theme="pink"] .bg-emerald-500\/20 {
-  background-color: rgba(254, 81, 215, 0.2) !important;
-  color: #FE51D7 !important;
-}
-[data-theme="purple"] .bg-emerald-500\/20 {
-  background-color: rgba(155, 81, 254, 0.2) !important;
-  color: #9B51FE !important;
-}
+.bg-emerald-500\/80 { background-color: rgba(var(--accent-color-rgb), 0.8); color: var(--accent-contrast); }
 
-/* Theme-colored highlights / neon text */
-[data-theme="green"] .neon-green {
-  color: #d7fe51 !important;
-}
-[data-theme="white"] .neon-green {
-  color: #e5e7eb !important;
-}
-[data-theme="orange"] .neon-green {
-  color: #f97316 !important;
-}
-[data-theme="cyan"] .neon-green {
-  color: #51FEFE !important;
-}
-[data-theme="pink"] .neon-green {
-  color: #FE51D7 !important;
-}
-[data-theme="purple"] .neon-green {
-  color: #9B51FE !important;
-}
+/* Emerald translucent tints → accent tint */
+.bg-emerald-500\/40 { background-color: rgba(var(--accent-color-rgb), 0.40); }
+.bg-emerald-500\/30 { background-color: rgba(var(--accent-color-rgb), 0.30); }
+.bg-emerald-500\/20 { background-color: rgba(var(--accent-color-rgb), 0.20); color: var(--accent-color); }
+.bg-emerald-500\/15 { background-color: rgba(var(--accent-color-rgb), 0.15); }
+.bg-emerald-500\/10 { background-color: rgba(var(--accent-color-rgb), 0.10); }
 
-/* Theme-colored borders (border-white/* → theme color) */
-[data-theme="green"] .border-white {
-  border-color: #d7fe51 !important;
-}
-[data-theme="white"] .border-white {
-  border-color: #e5e7eb !important;
-}
-[data-theme="orange"] .border-white {
-  border-color: #f97316 !important;
-}
-[data-theme="cyan"] .border-white {
-  border-color: #51FEFE !important;
-}
-[data-theme="pink"] .border-white {
-  border-color: #FE51D7 !important;
-}
-[data-theme="purple"] .border-white {
-  border-color: #9B51FE !important;
-}
+/* Emerald borders → accent */
+.border-emerald-400, .border-emerald-500 { border-color: var(--accent-color); }
+.border-emerald-500\/30 { border-color: rgba(var(--accent-color-rgb), 0.30); }
+.border-emerald-500\/20 { border-color: rgba(var(--accent-color-rgb), 0.20); }
 
-[data-theme="green"] .border-white\/10 {
-  border-color: rgba(215, 254, 81, 0.1) !important;
-}
-[data-theme="white"] .border-white\/10 {
-  border-color: rgba(229, 231, 235, 0.1) !important;
-}
-[data-theme="orange"] .border-white\/10 {
-  border-color: rgba(249, 115, 22, 0.1) !important;
-}
-[data-theme="cyan"] .border-white\/10 {
-  border-color: rgba(81, 254, 254, 0.1) !important;
-}
-[data-theme="pink"] .border-white\/10 {
-  border-color: rgba(254, 81, 215, 0.1) !important;
-}
-[data-theme="purple"] .border-white\/10 {
-  border-color: rgba(155, 81, 254, 0.1) !important;
-}
+/* White borders → accent (preserves the prior accent-tinted-border behavior) */
+.border-white { border-color: var(--accent-color); }
+.border-white\/10 { border-color: rgba(var(--accent-color-rgb), 0.10); }
+.border-white\/15 { border-color: rgba(var(--accent-color-rgb), 0.15); }
+.border-white\/20 { border-color: rgba(var(--accent-color-rgb), 0.20); }
+.border-white\/30 { border-color: rgba(var(--accent-color-rgb), 0.30); }
+.border-white\/40 { border-color: rgba(var(--accent-color-rgb), 0.40); }
+.border-white\/70 { border-color: rgba(var(--accent-color-rgb), 0.70); }
 
-[data-theme="green"] .border-white\/20 {
-  border-color: rgba(215, 254, 81, 0.2) !important;
-}
-[data-theme="white"] .border-white\/20 {
-  border-color: rgba(229, 231, 235, 0.2) !important;
-}
-[data-theme="orange"] .border-white\/20 {
-  border-color: rgba(249, 115, 22, 0.2) !important;
-}
-[data-theme="cyan"] .border-white\/20 {
-  border-color: rgba(81, 254, 254, 0.2) !important;
-}
-[data-theme="pink"] .border-white\/20 {
-  border-color: rgba(254, 81, 215, 0.2) !important;
-}
-[data-theme="purple"] .border-white\/20 {
-  border-color: rgba(155, 81, 254, 0.2) !important;
-}
-
-[data-theme="green"] .border-white\/30 {
-  border-color: rgba(215, 254, 81, 0.3) !important;
-}
-[data-theme="white"] .border-white\/30 {
-  border-color: rgba(229, 231, 235, 0.3) !important;
-}
-[data-theme="orange"] .border-white\/30 {
-  border-color: rgba(249, 115, 22, 0.3) !important;
-}
-[data-theme="cyan"] .border-white\/30 {
-  border-color: rgba(81, 254, 254, 0.3) !important;
-}
-[data-theme="pink"] .border-white\/30 {
-  border-color: rgba(254, 81, 215, 0.3) !important;
-}
-[data-theme="purple"] .border-white\/30 {
-  border-color: rgba(155, 81, 254, 0.3) !important;
-}
-
-[data-theme="green"] .border-white\/40 {
-  border-color: rgba(215, 254, 81, 0.4) !important;
-}
-[data-theme="white"] .border-white\/40 {
-  border-color: rgba(229, 231, 235, 0.4) !important;
-}
-[data-theme="orange"] .border-white\/40 {
-  border-color: rgba(249, 115, 22, 0.4) !important;
-}
-[data-theme="cyan"] .border-white\/40 {
-  border-color: rgba(81, 254, 254, 0.4) !important;
-}
-[data-theme="pink"] .border-white\/40 {
-  border-color: rgba(254, 81, 215, 0.4) !important;
-}
-[data-theme="purple"] .border-white\/40 {
-  border-color: rgba(155, 81, 254, 0.4) !important;
-}
-
-[data-theme="green"] .border-white\/15 {
-  border-color: rgba(215, 254, 81, 0.15) !important;
-}
-[data-theme="white"] .border-white\/15 {
-  border-color: rgba(229, 231, 235, 0.15) !important;
-}
-[data-theme="orange"] .border-white\/15 {
-  border-color: rgba(249, 115, 22, 0.15) !important;
-}
-[data-theme="cyan"] .border-white\/15 {
-  border-color: rgba(81, 254, 254, 0.15) !important;
-}
-[data-theme="pink"] .border-white\/15 {
-  border-color: rgba(254, 81, 215, 0.15) !important;
-}
-[data-theme="purple"] .border-white\/15 {
-  border-color: rgba(155, 81, 254, 0.15) !important;
-}
-
-[data-theme="green"] .border-white\/70 {
-  border-color: rgba(215, 254, 81, 0.7) !important;
-}
-[data-theme="white"] .border-white\/70 {
-  border-color: rgba(229, 231, 235, 0.7) !important;
-}
-[data-theme="orange"] .border-white\/70 {
-  border-color: rgba(249, 115, 22, 0.7) !important;
-}
-[data-theme="cyan"] .border-white\/70 {
-  border-color: rgba(81, 254, 254, 0.7) !important;
-}
-[data-theme="pink"] .border-white\/70 {
-  border-color: rgba(254, 81, 215, 0.7) !important;
-}
-[data-theme="purple"] .border-white\/70 {
-  border-color: rgba(155, 81, 254, 0.7) !important;
-}
-
-/* Focus states with theme-colored borders */
-[data-theme="green"] .focus\:border-white\/30:focus,
-[data-theme="green"] .focus\:border-white\/40:focus {
-  border-color: rgba(215, 254, 81, 0.4) !important;
-}
-[data-theme="white"] .focus\:border-white\/30:focus,
-[data-theme="white"] .focus\:border-white\/40:focus {
-  border-color: rgba(229, 231, 235, 0.4) !important;
-}
-[data-theme="orange"] .focus\:border-white\/30:focus,
-[data-theme="orange"] .focus\:border-white\/40:focus {
-  border-color: rgba(249, 115, 22, 0.4) !important;
-}
-[data-theme="cyan"] .focus\:border-white\/30:focus,
-[data-theme="cyan"] .focus\:border-white\/40:focus {
-  border-color: rgba(81, 254, 254, 0.4) !important;
-}
-[data-theme="pink"] .focus\:border-white\/30:focus,
-[data-theme="pink"] .focus\:border-white\/40:focus {
-  border-color: rgba(254, 81, 215, 0.4) !important;
-}
-[data-theme="purple"] .focus\:border-white\/30:focus,
-[data-theme="purple"] .focus\:border-white\/40:focus {
-  border-color: rgba(155, 81, 254, 0.4) !important;
-}
-
-/* bg-emerald-600 → theme color */
-[data-theme="white"] .bg-emerald-600 { background-color: #e5e7eb !important; color: #000 !important; }
-[data-theme="orange"] .bg-emerald-600 { background-color: #f97316 !important; }
-[data-theme="cyan"] .bg-emerald-600 { background-color: #51FEFE !important; color: #000 !important; }
-[data-theme="pink"] .bg-emerald-600 { background-color: #FE51D7 !important; color: #000 !important; }
-[data-theme="purple"] .bg-emerald-600 { background-color: #9B51FE !important; }
-
-/* bg-emerald-500/80 → theme color */
-[data-theme="white"] .bg-emerald-500\/80 { background-color: rgba(229,231,235,0.8) !important; color: #000 !important; }
-[data-theme="orange"] .bg-emerald-500\/80 { background-color: rgba(249,115,22,0.8) !important; }
-[data-theme="cyan"] .bg-emerald-500\/80 { background-color: rgba(81,254,254,0.8) !important; color: #000 !important; }
-[data-theme="pink"] .bg-emerald-500\/80 { background-color: rgba(254,81,215,0.8) !important; color: #000 !important; }
-[data-theme="purple"] .bg-emerald-500\/80 { background-color: rgba(155,81,254,0.8) !important; }
-
-/* bg-emerald-500/10 → theme color */
-[data-theme="white"] .bg-emerald-500\/10 { background-color: rgba(229,231,235,0.1) !important; }
-[data-theme="orange"] .bg-emerald-500\/10 { background-color: rgba(249,115,22,0.1) !important; }
-[data-theme="cyan"] .bg-emerald-500\/10 { background-color: rgba(81,254,254,0.1) !important; }
-[data-theme="pink"] .bg-emerald-500\/10 { background-color: rgba(254,81,215,0.1) !important; }
-[data-theme="purple"] .bg-emerald-500\/10 { background-color: rgba(155,81,254,0.1) !important; }
-
-/* border-emerald-500/30 → theme color */
-[data-theme="white"] .border-emerald-500\/30 { border-color: rgba(229,231,235,0.3) !important; }
-[data-theme="orange"] .border-emerald-500\/30 { border-color: rgba(249,115,22,0.3) !important; }
-[data-theme="cyan"] .border-emerald-500\/30 { border-color: rgba(81,254,254,0.3) !important; }
-[data-theme="pink"] .border-emerald-500\/30 { border-color: rgba(254,81,215,0.3) !important; }
-[data-theme="purple"] .border-emerald-500\/30 { border-color: rgba(155,81,254,0.3) !important; }
+/* Focus/hover variant utilities are emitted LATE by Tailwind, so scope these
+   under [data-theme] to raise specificity above the literal (works in overdrive
+   too, since [data-overdrive] overrides --accent-color-rgb on the ancestor). */
+[data-theme] .focus\:border-white\/30:focus,
+[data-theme] .focus\:border-white\/40:focus { border-color: rgba(var(--accent-color-rgb), 0.40); }
+[data-theme] .hover\:bg-emerald-500\/30:hover { background-color: rgba(var(--accent-color-rgb), 0.30); }
+[data-theme] .hover\:bg-emerald-500\/40:hover { background-color: rgba(var(--accent-color-rgb), 0.40); }
 
 /* ============================================
    OVERTIME OVERDRIVE MODE — Gold Electric Theme
