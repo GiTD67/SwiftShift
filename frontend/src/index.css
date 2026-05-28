@@ -218,6 +218,15 @@ button, [role="button"] {
   border-radius: var(--radius-md);
 }
 
+/* Data tile: firm, contrast-safe nested cell for data-of-record (timesheet/KPI
+   cells). Same firm tone as .glass--data but NO backdrop-filter, since it sits
+   inside an already-blurred parent. */
+.glass-data-tile {
+  background: var(--glass-data-bg);
+  border: 1px solid var(--glass-ring);
+  border-radius: var(--radius-md);
+}
+
 /* Interactive: Apple-style squish/lift + radius morph on hover */
 .glass--interactive:hover {
   transform: translateY(-1px) scale(1.004);

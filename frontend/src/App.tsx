@@ -211,16 +211,28 @@ function fmtRange(start: Date, end: Date): string {
 function usePayPeriodRange(periodOffset: number) {
   return useMemo(() => {
     const anchor = new Date(2026, 2, 22)
+    anchor.setHours(0, 0, 0, 0)
     const msPerDay = 86400000
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    const daysSinceAnchor = Math.floor((today.getTime() - anchor.getTime()) / msPerDay)
+    // round() absorbs the ±1h DST skew so the current-period index stays stable
+    const daysSinceAnchor = Math.round((today.getTime() - anchor.getTime()) / msPerDay)
     const currentPeriodIndex = Math.max(0, Math.floor(daysSinceAnchor / 14))
     const targetPeriodIndex = currentPeriodIndex + periodOffset
-    const periodStart = new Date(anchor.getTime() + targetPeriodIndex * 14 * msPerDay)
+    // Step in whole calendar days (DST-safe) so periodStart always lands on the
+    // anchor's weekday (Sunday) — the day-grid header relies on this.
+    const periodStart = new Date(anchor)
+    periodStart.setDate(anchor.getDate() + targetPeriodIndex * 14)
     periodStart.setHours(0, 0, 0, 0)
-    const periodEnd = new Date(periodStart.getTime() + 13 * msPerDay)
-    const dayDates = Array.from({ length: 14 }, (_, i) => new Date(periodStart.getTime() + i * msPerDay))
+    const periodEnd = new Date(periodStart)
+    periodEnd.setDate(periodStart.getDate() + 13)
+    periodEnd.setHours(0, 0, 0, 0)
+    const dayDates = Array.from({ length: 14 }, (_, i) => {
+      const d = new Date(periodStart)
+      d.setDate(periodStart.getDate() + i)
+      d.setHours(0, 0, 0, 0)
+      return d
+    })
     const periodId = periodStart.toISOString().slice(0, 10)
     return { start: periodStart, end: periodEnd, dayDates, periodId }
   }, [periodOffset])
@@ -786,7 +798,8 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
     }
   }
 
-  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+  // Pay periods start on a Sunday (anchor in usePayPeriodRange), so columns run Sun→Sat.
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
   // History grid renderer — shows hours + clock in/out times
   const HistoryGrid = ({ period, pDates, pId }: { period: string; pDates: Date[]; pId: string }) => {
@@ -1045,12 +1058,12 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
             </div>
           </div>
         </div>
-        {/* Day grid */}
-        <div className="overflow-x-auto">
-          <div className="px-5 py-2.5 border-b border-white/10 flex gap-2 text-xs uppercase tracking-wider text-zinc-500" style={{ minWidth: '640px' }}>
-            {dayNames.map((n, i) => <div key={i} className="flex-1 text-center">{n}</div>)}
+        {/* Day grid — Liquid Heat Calendar (Mon–Sun × 2 weeks, no horizontal scroll) */}
+        <div className="p-4 sm:p-5">
+          <div className="grid grid-cols-7 gap-1.5 sm:gap-2 mb-2 text-[10px] sm:text-xs uppercase tracking-wider text-zinc-500">
+            {dayNames.map((n, i) => <div key={i} className="text-center">{n}</div>)}
           </div>
-          <div className="px-5 py-4 flex gap-2" style={{ minWidth: '640px' }}>
+          <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
             {dayDates.map((d, i) => {
               const key = entryKey(periodId, i)
               const val = entries[key] || ''
@@ -1061,36 +1074,61 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
               const isWeekend = d.getDay() === 0 || d.getDay() === 6
               const dateStr = d.toISOString().slice(0, 10)
               const daySessions = clockSessionsByDate[dateStr] || []
+              const fill = Math.min(h / 8, 1) // 0..1 of an 8-hour day
               return (
-                <div key={i} className="flex-1 text-center" style={isHighlighted ? { animation: 'flashCell 0.6s ease-in-out' } : undefined}>
-                  <div className="text-[9px] text-zinc-500 mb-0.5" style={isToday ? { color: 'var(--accent-color)' } : undefined}>
-                    {d.toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                  </div>
-                  <input type="text" inputMode="decimal" value={val}
-                    onChange={e => {
-                      setDayHours(i, e.target.value)
-                      const hrs = parseHours(e.target.value)
-                      if (hrs > 0) addXP(Math.round(hrs), 20 + (i / 14) * 60, 50)
-                    }}
-                    className={`w-full text-center font-mono text-sm rounded-xl bg-black/40 border px-1 py-2 focus:outline-none transition-colors ${
-                      isOT ? 'border-amber-400/60 text-amber-400' :
-                      isToday ? 'border-[var(--accent-color)]/40' :
-                      isWeekend ? 'border-white/5 opacity-60' :
-                      'border-white/10 focus:border-white/30'
-                    }`}
-                    placeholder="0" disabled={isSubmitted}
-                  />
-                  <div className="text-[9px] text-zinc-600 mt-0.5">{h > 0 ? `${h.toFixed(1)}h` : ''}</div>
-                  {daySessions.map((s: any, si: number) => (
-                    <div key={si} className="mt-0.5 text-[10px] bg-white/5 rounded px-0.5 leading-tight">
-                      <span style={{ color: 'var(--accent-color)', opacity: 0.9 }}>
-                        {new Date(s.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                      {s.clock_out
-                        ? <span className="text-zinc-300">–{new Date(s.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                        : <span className="text-amber-400"> •</span>}
+                <div
+                  key={i}
+                  className={`glass-data-tile relative overflow-hidden p-1.5 sm:p-2 flex flex-col items-center ${isWeekend && h === 0 ? 'opacity-70' : ''}`}
+                  style={{
+                    ...(isToday ? { boxShadow: 'inset 0 0 0 1.5px rgba(var(--accent-color-rgb),0.55)' } : {}),
+                    ...(isHighlighted ? { animation: 'flashCell 0.6s ease-in-out' } : {}),
+                  }}
+                >
+                  {/* Heat fill — encodes hours: rises with the day, amber past 8h */}
+                  {h > 0 && (
+                    <div
+                      className="absolute inset-x-0 bottom-0 pointer-events-none transition-[height] duration-500"
+                      style={{
+                        height: `${(isOT ? 1 : fill) * 100}%`,
+                        background: isOT
+                          ? 'linear-gradient(to top, rgba(245,158,11,0.30), rgba(245,158,11,0.04))'
+                          : `linear-gradient(to top, rgba(var(--accent-color-rgb), ${(0.12 + fill * 0.22).toFixed(2)}), transparent)`,
+                      }}
+                    />
+                  )}
+                  <div className="relative z-10 w-full flex flex-col items-center">
+                    <div className="text-[9px] sm:text-[10px] text-zinc-500 mb-1 text-center leading-tight" style={isToday ? { color: 'var(--accent-color)' } : undefined}>
+                      {d.toLocaleDateString([], { month: 'short', day: 'numeric' })}
                     </div>
-                  ))}
+                    <input type="text" inputMode="decimal" value={val}
+                      onChange={e => {
+                        setDayHours(i, e.target.value)
+                        const hrs = parseHours(e.target.value)
+                        if (hrs > 0) addXP(Math.round(hrs), 20 + (i / 14) * 60, 50)
+                      }}
+                      className={`w-full text-center font-mono tnum text-sm rounded-lg bg-black/30 border px-1 py-1.5 focus:outline-none transition-colors ${
+                        isOT ? 'border-amber-400/60 text-amber-300' :
+                        isToday ? 'border-[var(--accent-color)]/50 text-white' :
+                        'border-white/10 focus:border-white/30 text-white'
+                      }`}
+                      placeholder="0" disabled={isSubmitted}
+                    />
+                    {/* Clock-in/out times: hidden on the narrowest phones where the 7-col tile is too small */}
+                    {daySessions.map((s: any, si: number) => (
+                      <div key={si} className="mt-0.5 text-[10px] leading-tight text-center hidden sm:block">
+                        <span style={{ color: 'var(--accent-color)', opacity: 0.9 }}>
+                          {new Date(s.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        {s.clock_out
+                          ? <span className="text-zinc-400">–{new Date(s.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          : <span className="text-amber-400"> •</span>}
+                      </div>
+                    ))}
+                    {/* Compact "logged" dot on mobile so sessions aren't invisible */}
+                    {daySessions.length > 0 && (
+                      <div className="sm:hidden mt-1 w-1 h-1 rounded-full" style={{ background: 'var(--accent-color)' }} aria-hidden="true" />
+                    )}
+                  </div>
                 </div>
               )
             })}
