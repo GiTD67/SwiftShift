@@ -16,6 +16,7 @@ import { SalesKPI } from './components/SalesKPI'
 import { GravityGridBackground } from './components/GravityGridBackground'
 import { STATE_BREAK_RULES, STATE_CODES } from './data/stateBreakRules'
 import { Leaderboard } from './components/Leaderboard'
+import { Odometer } from './components/Odometer'
 
 const API_BASE = ''
 
@@ -2821,6 +2822,29 @@ export default function App() {
   const todayTotalMs = todayWorkedMs + sessionWorkedMs
   const isOvertimeOverdrive = todayTotalMs >= 8 * 3600000
 
+  // Daily-goal + overdrive milestone confetti — fired from an effect (NOT during
+  // render, which was a setState-in-render bug), gated to the clock view and to
+  // prefers-reduced-motion.
+  useEffect(() => {
+    if (activeView !== 'clock') return
+    const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    const raw = todayTotalMs / (8 * 3600000)
+    if (raw >= 1 && !targetRingConfettiFired) {
+      if (!reduce) {
+        confetti({ particleCount: 200, spread: 100, origin: { y: 0.6 }, colors: [themeAccentHex, '#39FF14', '#00CC00'] })
+        confetti({ particleCount: 120, spread: 70, origin: { y: 0.7 }, colors: [themeAccentHex, '#39FF14'] })
+      }
+      setTargetRingConfettiFired(true)
+    }
+    if (raw > 1 && !overdriveConfettiFired) {
+      if (!reduce) {
+        confetti({ particleCount: 300, spread: 120, origin: { y: 0.5 }, colors: ['#FFAA00', '#FFD700', '#FFA500'] })
+        confetti({ particleCount: 180, spread: 80, origin: { y: 0.6 }, colors: ['#FFAA00', '#FFD700'] })
+      }
+      setOverdriveConfettiFired(true)
+    }
+  }, [activeView, todayTotalMs, targetRingConfettiFired, overdriveConfettiFired, themeAccentHex])
+
   const statusText = !isClockedIn
     ? 'Not clocked in'
     : isOnBreak
@@ -3900,10 +3924,10 @@ export default function App() {
                     {!isClockedIn && (
                       <motion.button
                         onClick={handleClockIn}
-                        className="glass-btn-green px-5 py-2.5 rounded-xl font-semibold active:scale-[0.96] transition-all duration-75"
+                        className="clock-pill clock-pill--primary active:scale-[0.96]"
                         whileHover={{ scale: 1.04 }}
                         whileTap={{ scale: 0.95 }}
-                        animate={{ boxShadow: ['0 0 0px rgba(var(--accent-color-rgb),0)', '0 0 18px 4px rgba(var(--accent-color-rgb),0.35)', '0 0 0px rgba(var(--accent-color-rgb),0)'] }}
+                        animate={{ boxShadow: ['0 0 0px rgba(var(--accent-color-rgb),0)', '0 0 22px 5px rgba(var(--accent-color-rgb),0.4)', '0 0 0px rgba(var(--accent-color-rgb),0)'] }}
                         transition={{ boxShadow: { repeat: Infinity, duration: 2, ease: 'easeInOut' } }}
                       >
                         Clock in
@@ -3911,25 +3935,25 @@ export default function App() {
                     )}
                     {isClockedIn && !isOnBreak && (
                       <>
-                        <motion.button onClick={() => handleStartBreak('paid')} className="px-4 py-2.5 rounded-xl border border-white/20 hover:bg-white/5 text-sm" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                        <motion.button onClick={() => handleStartBreak('paid')} className="clock-pill clock-pill--sub" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                           15-min break
-                          <span className="block text-[10px] text-zinc-500 mt-0.5">paid</span>
+                          <span className="block text-[10px] text-zinc-400 mt-0.5">paid</span>
                         </motion.button>
-                        <motion.button onClick={() => handleStartBreak('unpaid')} className="px-4 py-2.5 rounded-xl border border-white/20 hover:bg-white/5 text-sm" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                        <motion.button onClick={() => handleStartBreak('unpaid')} className="clock-pill clock-pill--sub" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                           Lunch break
-                          <span className="block text-[10px] text-zinc-500 mt-0.5">unpaid</span>
+                          <span className="block text-[10px] text-zinc-400 mt-0.5">unpaid</span>
                         </motion.button>
-                        <motion.button onClick={handleClockOut} className="px-5 py-2.5 rounded-xl bg-red-500/80 hover:bg-red-500 text-white" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                        <motion.button onClick={handleClockOut} className="clock-pill clock-pill--danger" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                           Clock out
                         </motion.button>
                       </>
                     )}
                     {isOnBreak && (
                       <>
-                        <motion.button onClick={handleEndBreak} className="px-5 py-2.5 rounded-xl border border-white/20 hover:bg-white/5" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                        <motion.button onClick={handleEndBreak} className="clock-pill" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                           End break
                         </motion.button>
-                        <motion.button onClick={handleClockOut} className="px-5 py-2.5 rounded-xl bg-red-500/80 hover:bg-red-500 text-white" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                        <motion.button onClick={handleClockOut} className="clock-pill clock-pill--danger" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                           Clock out
                         </motion.button>
                       </>
@@ -3950,24 +3974,7 @@ export default function App() {
                         const mm = Math.floor((remainingMs % 3600000) / 60000)
                         const ss = Math.floor((remainingMs % 60000) / 1000)
                         const countdown = `${hh.toString().padStart(2,'0')}:${mm.toString().padStart(2,'0')}:${ss.toString().padStart(2,'0')}`
-
-                        // Fire confetti once at 100%
-                        if (rawProgress >= 1 && !targetRingConfettiFired) {
-                          setTimeout(() => {
-                            confetti({ particleCount: 200, spread: 100, origin: { y: 0.6 }, colors: [themeAccentHex, '#39FF14', '#00CC00'] })
-                            confetti({ particleCount: 120, spread: 70, origin: { y: 0.7 }, colors: [themeAccentHex, '#39FF14'] })
-                          }, 100)
-                          setTargetRingConfettiFired(true)
-                        }
-
-                        // Fire gold confetti on entering overdrive
-                        if (isOverdrive && !overdriveConfettiFired) {
-                          setTimeout(() => {
-                            confetti({ particleCount: 300, spread: 120, origin: { y: 0.5 }, colors: ['#FFAA00', '#FFD700', '#FFA500'] })
-                            confetti({ particleCount: 180, spread: 80, origin: { y: 0.6 }, colors: ['#FFAA00', '#FFD700'] })
-                          }, 150)
-                          setOverdriveConfettiFired(true)
-                        }
+                        // (milestone confetti fired from a useEffect, not during render)
 
                         const radius = 106
                         const circumference = 2 * Math.PI * radius
@@ -3980,9 +3987,11 @@ export default function App() {
 
                         return (
                           <div className="relative w-[200px] h-[200px] sm:w-[260px] sm:h-[260px] flex items-center justify-center">
+                            {/* Energy core — luminous accent glow when clocked in */}
+                            {isClockedIn && <div className="energy-core-glow" aria-hidden="true" />}
                             <svg viewBox="0 0 260 260" className="absolute w-full h-full" overflow="visible" style={isOverdrive ? { filter: 'drop-shadow(0 0 12px #FFAA00) drop-shadow(0 0 24px #FFD700)' } : undefined}>
                               {/* Background ring */}
-                              <circle cx="130" cy="130" r={radius} fill="none" stroke="#222" strokeWidth="12" />
+                              <circle cx="130" cy="130" r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="12" />
                               {/* Progress arc */}
                               <motion.circle
                                 cx="130" cy="130" r={radius}
@@ -4053,7 +4062,7 @@ export default function App() {
                   </div>
 
                   <div className="mt-auto pt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-                    <div className="glass rounded-2xl p-4">
+                    <div className="glass-tile p-4">
                       <div className="text-zinc-400 mb-1">Session</div>
                       <motion.div
                         key={Math.floor(sessionWorkedMs / 60000)}
@@ -4065,7 +4074,7 @@ export default function App() {
                         {formatMs(sessionWorkedMs)}
                       </motion.div>
                     </div>
-                    <div className="glass rounded-2xl p-4">
+                    <div className="glass-tile p-4">
                       <div className="text-zinc-400 mb-1">Breaks</div>
                       <div className="font-mono text-xl neon-green">{formatMs(breakMsAccum + paidBreakMsAccum + activeBreakMs)}</div>
                       {(breakMsAccum > 0 || paidBreakMsAccum > 0) && (
@@ -4076,7 +4085,7 @@ export default function App() {
                         </div>
                       )}
                     </div>
-                    <div className="glass rounded-2xl p-4">
+                    <div className="glass-tile p-4">
                       <div className="text-zinc-400 mb-1">Today</div>
                       <div className="font-mono text-xl neon-green">{formatMs(todayTotalMs)}</div>
                     </div>
@@ -4142,15 +4151,15 @@ export default function App() {
                       </div>
                     )}
                   </div>
-                  <motion.div
-                    key={Math.floor((todayTotalMs / 3600000) * clockHourlyRate * 10)}
-                    initial={isClockedIn ? { scale: 1.08, color: 'var(--accent-color)' } : false}
-                    animate={{ scale: 1, color: 'var(--accent-color)' }}
-                    transition={{ duration: 0.25 }}
-                    className="font-mono text-5xl font-bold tabular-nums neon-green mb-5"
-                  >
-                    ${((todayTotalMs / 3600000) * clockHourlyRate).toFixed(2)}
-                  </motion.div>
+                  <div className="mb-5">
+                    <Odometer
+                      value={(todayTotalMs / 3600000) * clockHourlyRate}
+                      format="currency"
+                      speed={isOvertimeOverdrive ? 1.5 : 1}
+                      color="var(--accent-color)"
+                      className="text-5xl"
+                    />
+                  </div>
                   <div className="flex items-center justify-between">
                     <button
                       onClick={navToRewardsWithHighlight}

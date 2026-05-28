@@ -516,3 +516,67 @@
 @media (max-width: 767px) {
   .ta-appearance-panel { width: 100vw; }
 }
+
+/* ============================================
+   TIME CLOCK — unified pill buttons + energy core
+   ============================================ */
+.clock-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 22px;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #fff;
+  background: var(--glass-reg-bg);
+  -webkit-backdrop-filter: blur(var(--glass-reg-blur)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-reg-blur)) saturate(var(--glass-sat));
+  border: 1px solid var(--glass-ring);
+  box-shadow: var(--shadow-1), inset 0 1px 0 var(--glass-spec-t);
+  transition: background var(--dur-2) var(--ease-standard),
+              border-color var(--dur-2) var(--ease-standard),
+              box-shadow var(--dur-2) var(--ease-standard);
+}
+.clock-pill:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.22); }
+
+.clock-pill--sub { flex-direction: column; line-height: 1.05; padding: 6px 20px; font-size: 0.9rem; }
+
+.clock-pill--primary {
+  background: var(--accent-color);
+  color: var(--accent-contrast);
+  border-color: rgba(var(--accent-color-rgb), 0.6);
+  box-shadow: var(--shadow-1), var(--accent-spill);
+}
+.clock-pill--primary:hover {
+  background: var(--accent-color);
+  border-color: rgba(var(--accent-color-rgb), 0.85);
+  box-shadow: var(--shadow-2), 0 0 26px rgba(var(--accent-color-rgb), 0.45);
+}
+
+.clock-pill--danger {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fecaca;
+  border-color: rgba(239, 68, 68, 0.40);
+}
+.clock-pill--danger:hover {
+  background: rgba(239, 68, 68, 0.30);
+  color: #fff;
+  border-color: rgba(239, 68, 68, 0.60);
+}
+
+/* Energy core — luminous accent pulse behind the Target Ring (reduced-motion safe) */
+.energy-core-glow {
+  position: absolute;
+  inset: 20%;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(var(--accent-color-rgb), 0.22), transparent 68%);
+  filter: blur(10px);
+  animation: energy-core-pulse 3.6s ease-in-out infinite;
+}
+@keyframes energy-core-pulse {
+  0%, 100% { opacity: 0.45; transform: scale(0.95); }
+  50%      { opacity: 0.85; transform: scale(1.05); }
+}
