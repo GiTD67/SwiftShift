@@ -321,15 +321,17 @@ button, [role="button"] {
    ACCESSIBILITY & CAPABILITY FALLBACKS
    ============================================ */
 
-/* No backdrop-filter support → opaque card so text never sits on raw canvas */
+/* No backdrop-filter support → opaque surface so text never sits on raw canvas */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass, .glass--thin, .glass--data, .glass--thick { background: var(--bg-2); }
+  .glass, .glass--thin, .glass--data, .glass--thick,
+  .ta-navbar, .ta-sidebar, .ta-appearance-panel { background: var(--bg-2); }
   .glass::before { display: none; }
 }
 
 /* User asked the OS to reduce transparency → fall back to solid surfaces */
 @media (prefers-reduced-transparency: reduce) {
-  .glass, .glass--thin, .glass--data, .glass--thick {
+  .glass, .glass--thin, .glass--data, .glass--thick,
+  .ta-navbar, .ta-sidebar, .ta-appearance-panel {
     background: var(--bg-2);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;

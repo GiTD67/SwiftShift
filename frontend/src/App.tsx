@@ -2239,6 +2239,10 @@ export default function App() {
   const [selectedDoc, setSelectedDoc] = useState<{ label: string; content: string } | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [managerSectionOpen, setManagerSectionOpen] = useState(false)
+  const [appearanceOpen, setAppearanceOpen] = useState(false)
+  const appearanceTriggerRef = useRef<HTMLElement | null>(null)
+  const appearancePanelRef = useRef<HTMLDivElement | null>(null)
+  const userMenuBtnRef = useRef<HTMLButtonElement | null>(null)
 
   // Profile tabs state
   const [profileTab, setProfileTab] = useState<'info' | 'schedule' | 'deposit' | 'availability'>('info')
@@ -2356,6 +2360,45 @@ export default function App() {
     setActiveView(view)
     setMobileMenuOpen(false)
   }
+
+  // Appearance slide-over: focus trap, Escape to close, restore focus on close
+  useEffect(() => {
+    if (!appearanceOpen) return
+    appearanceTriggerRef.current = document.activeElement as HTMLElement
+    const panel = appearancePanelRef.current
+    const getFocusable = () => panel
+      ? Array.from(panel.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null)
+      : []
+    getFocusable()[0]?.focus()
+    // Take the rest of the app shell out of the tab order / a11y tree while the modal is open
+    const shell = [
+      document.querySelector('.ta-navbar'),
+      document.querySelector('.ta-sidebar'),
+      document.querySelector('.ta-content'),
+    ].filter(Boolean) as HTMLElement[]
+    shell.forEach(el => el.setAttribute('inert', ''))
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); setAppearanceOpen(false); return }
+      if (e.key === 'Tab') {
+        const items = getFocusable()
+        if (items.length === 0) return
+        const first = items[0], last = items[items.length - 1]
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      shell.forEach(el => el.removeAttribute('inert'))
+      // Restore focus to the trigger if it's still visible, otherwise the always-visible user menu
+      const t = appearanceTriggerRef.current
+      if (t && t.offsetParent !== null) t.focus()
+      else userMenuBtnRef.current?.focus()
+    }
+  }, [appearanceOpen])
 
   const toggleFavorite = (id: string) => {
     setFavoriteTabs(prev => {
@@ -3411,7 +3454,7 @@ export default function App() {
           </div>
           {/* User menu dropdown */}
           <div className="relative group">
-            <span className="text-sm text-zinc-400 cursor-pointer flex items-center gap-2">
+            <button ref={userMenuBtnRef} type="button" aria-haspopup="true" className="text-sm text-zinc-400 cursor-pointer flex items-center gap-2 bg-transparent border-0 p-0">
               {profilePicUrl
                 ? <span
                     className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 inline-flex"
@@ -3425,8 +3468,8 @@ export default function App() {
                   >{user.first_name?.[0]?.toUpperCase()}</span>
               }
               Hi, {user.first_name} <span className="text-[10px] px-1.5 py-0.5 rounded-full ml-1" style={{ backgroundColor: 'var(--accent-color)', color: '#000', fontWeight: 700 }}>Lv.{appCurrentLevel.level}</span> ▾
-            </span>
-            <div className="absolute right-0 top-full w-56 bg-zinc-900 border border-white/10 rounded-xl shadow-lg hidden group-hover:block z-50 pt-1">
+            </button>
+            <div className="absolute right-0 top-full w-56 bg-zinc-900 border border-white/10 rounded-xl shadow-lg hidden group-hover:block group-focus-within:block z-50 pt-1">
               <button
                 onClick={() => navTo('profile')}
                 className="w-full text-left px-4 py-2 text-sm hover:bg-white/5 rounded-t-xl"
@@ -3447,130 +3490,14 @@ export default function App() {
                 Take tour
               </button>
               <button
-                className="w-full text-left px-4 py-2 text-sm hover:bg-white/5 text-zinc-400 cursor-not-allowed"
-                disabled
+                onClick={() => setAppearanceOpen(true)}
+                className="w-full text-left px-4 py-2 text-sm hover:bg-white/5 flex items-center justify-between"
               >
-                Settings
+                <span>Appearance</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6 }}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
               </button>
-              <div className="px-3 py-2 border-t border-white/10">
-                <div className="text-xs text-zinc-500 mb-2">Theme</div>
-                <div className="grid grid-cols-4 gap-1">
-                  {[
-                    { id: 'green', label: 'Green', color: '#D7FE51', unlock: 1 },
-                    { id: 'white', label: 'White', color: '#E5E7EB', unlock: 2 },
-                    { id: 'orange', label: 'Orange', color: '#F97316', unlock: 3 },
-                    { id: 'cyan', label: 'Ice Blue', color: '#51FEFE', unlock: 4 },
-                    { id: 'pink', label: 'Neon Pink', color: '#FE51D7', unlock: 5 },
-                    { id: 'purple', label: 'Midnight', color: '#9B51FE', unlock: 6 },
-                    { id: 'red', label: 'Red', color: '#EF4444', unlock: 7 },
-                    { id: 'gold', label: 'Gold', color: '#F59E0B', unlock: 8 },
-                    { id: 'teal', label: 'Teal', color: '#2DD4BF', unlock: 9 },
-                    { id: 'blue', label: 'Blue', color: '#60A5FA', unlock: 10 },
-                  ].map(t => {
-                    const unlocked = isMasterMode || appCurrentLevel.level >= t.unlock
-                    return (
-                      <button
-                        key={t.id}
-                        onClick={() => unlocked && setTheme(t.id as any)}
-                        title={unlocked ? t.label : `Unlocks at Level ${t.unlock}`}
-                        className={`flex flex-col items-center gap-0.5 p-1.5 rounded-lg transition-all ${theme === t.id ? 'ring-1 ring-white/40' : ''} ${!unlocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/10'}`}
-                      >
-                        <div className="relative">
-                          <span className="w-4 h-4 rounded-full border border-white/20 block" style={{ backgroundColor: t.color }} />
-                          {!unlocked && (
-                            <span className="absolute -top-1 -right-1.5">
-                              <svg width="8" height="9" viewBox="0 0 10 12" fill="currentColor" className="text-zinc-400">
-                                <rect x="1" y="5" width="8" height="7" rx="1.5" fill="currentColor"/>
-                                <path d="M3 5V3.5a2 2 0 0 1 4 0V5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                              </svg>
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[8px] text-zinc-400 leading-tight">{unlocked ? t.label : `L${t.unlock}`}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-              {(isMasterMode || appCurrentLevel.level >= 5) && (
-                <div className="px-3 py-2 border-t border-white/10">
-                  <div className="text-xs text-zinc-500 mb-1.5">Custom Color <span className="text-[9px]">(Lv.5 unlock)</span></div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={customAccentColor}
-                      onChange={e => {
-                        setCustomAccentColor(e.target.value)
-                        localStorage.setItem('swiftshift-custom-accent', e.target.value)
-                        setTheme('custom' as any)
-                      }}
-                      className="w-8 h-8 rounded cursor-pointer border border-white/20 bg-transparent"
-                    />
-                    <button
-                      onClick={() => setTheme('custom' as any)}
-                      className={`flex-1 text-[10px] px-2 py-1 rounded-lg transition-all ${theme === 'custom' ? 'ring-1 ring-white/40' : 'hover:bg-white/10'} text-zinc-300`}
-                    >
-                      {theme === 'custom' ? '✓ Active' : 'Use custom'}
-                    </button>
-                  </div>
-                </div>
-              )}
-              {/* Background Styles */}
-              <div className="px-3 py-2 border-t border-white/10">
-                <div className="text-xs text-zinc-500 mb-1.5">Background Style</div>
-                <div className="grid grid-cols-4 gap-1">
-                  {[
-                    { id: 'default', label: 'Solid', unlock: 1, preview: '#000' },
-                    { id: 'grid', label: 'Grid', unlock: 2, preview: 'repeating-linear-gradient(0deg,rgba(255,255,255,0.05) 0,rgba(255,255,255,0.05) 1px,transparent 1px,transparent 32px),repeating-linear-gradient(90deg,rgba(255,255,255,0.05) 0,rgba(255,255,255,0.05) 1px,transparent 1px,transparent 32px)' },
-                    { id: 'dots', label: 'Dots', unlock: 3, preview: 'radial-gradient(circle,rgba(255,255,255,0.15) 1px,transparent 1px)' },
-                    { id: 'gradient', label: 'Grad', unlock: 5, preview: 'linear-gradient(135deg,#000,#111,#000)' },
-                    { id: 'circuit', label: 'Circuit', unlock: 7, preview: 'linear-gradient(45deg,#000 45%,rgba(255,255,255,0.04) 45%,rgba(255,255,255,0.04) 55%,#000 55%)' },
-                    { id: 'stars', label: 'Stars', unlock: 8, preview: 'radial-gradient(circle at 20% 30%,rgba(255,255,255,0.12) 1px,transparent 1px)' },
-                    { id: 'wave', label: 'Wave', unlock: 9, preview: 'linear-gradient(60deg,#000 25%,rgba(255,255,255,0.03) 50%,#000 75%)' },
-                    { id: 'aurora', label: 'Aurora', unlock: 10, preview: 'linear-gradient(135deg,rgba(100,0,255,0.15),rgba(0,255,200,0.15))' },
-                    { id: 'gravity-grid', label: 'Gravity', unlock: 11, preview: 'radial-gradient(ellipse at 40% 60%,rgba(100,130,255,0.25),rgba(50,0,80,0.4) 60%,#000)' },
-                  ].map(bg => {
-                    const unlocked = isMasterMode || appCurrentLevel.level >= bg.unlock
-                    return (
-                      <button
-                        key={bg.id}
-                        onClick={() => unlocked && setBackgroundStyle(bg.id)}
-                        title={unlocked ? bg.label : `Unlocks at Level ${bg.unlock}`}
-                        className={`flex flex-col items-center gap-0.5 p-1.5 rounded-lg transition-all ${backgroundStyle === bg.id ? 'ring-1 ring-white/40' : ''} ${!unlocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/10'}`}
-                      >
-                        <div className="relative w-4 h-4 rounded border border-white/20 overflow-hidden" style={{ background: bg.preview, backgroundSize: '8px 8px' }} />
-                        <span className="text-[8px] text-zinc-400 leading-tight">{unlocked ? bg.label : `L${bg.unlock}`}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-              {/* Avatar Frames */}
-              {(isMasterMode || appCurrentLevel.level >= 3) && (
-                <div className="px-3 py-2 border-t border-white/10">
-                  <div className="text-xs text-zinc-500 mb-1.5">Avatar Frame</div>
-                  <div className="flex gap-1.5 flex-wrap">
-                    {[
-                      { id: 'none', label: 'None', unlock: 1 },
-                      { id: 'glow', label: 'Neon', unlock: 3 },
-                      { id: 'gold', label: 'Gold', unlock: 6 },
-                      { id: 'rainbow', label: 'Elite', unlock: 9 },
-                    ].map(frame => {
-                      const unlocked = isMasterMode || appCurrentLevel.level >= frame.unlock
-                      return (
-                        <button
-                          key={frame.id}
-                          onClick={() => unlocked && setAvatarFrame(frame.id)}
-                          title={unlocked ? frame.label : `Unlocks at Level ${frame.unlock}`}
-                          className={`text-[9px] px-2 py-1 rounded-lg transition-all ${avatarFrame === frame.id ? 'ring-1 ring-white/40 bg-white/10' : ''} ${!unlocked ? 'opacity-50 cursor-not-allowed text-zinc-600' : 'hover:bg-white/10 text-zinc-400'}`}
-                        >
-                          {unlocked ? frame.label : `L${frame.unlock}`}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
+              {/* Appearance controls (theme, custom color, background, avatar frame)
+                  now live in the Appearance slide-over — opened via the button above */}
               <button
                 onClick={() => navTo('pricing')}
                 className="w-full text-left px-4 py-2 text-sm hover:bg-white/5 text-zinc-400 border-t border-white/10"
@@ -3779,6 +3706,161 @@ export default function App() {
           </button>
         </div>
       </aside>
+
+      {appearanceOpen && (
+        <div className="ta-appearance-overlay" onMouseDown={e => { if (e.target === e.currentTarget) setAppearanceOpen(false) }}>
+          <div
+            ref={appearancePanelRef}
+            className="ta-appearance-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Appearance settings"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="ta-appearance-header">
+              <h2 className="ta-appearance-title">Appearance</h2>
+              <button className="ta-appearance-close" onClick={() => setAppearanceOpen(false)} aria-label="Close appearance settings">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div className="ta-appearance-body">
+              {/* Accent theme */}
+              <section>
+                <div className="ta-appearance-section-label">Accent theme</div>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'green', label: 'Green', color: '#D7FE51', unlock: 1 },
+                    { id: 'white', label: 'White', color: '#E5E7EB', unlock: 2 },
+                    { id: 'orange', label: 'Orange', color: '#F97316', unlock: 3 },
+                    { id: 'cyan', label: 'Ice Blue', color: '#51FEFE', unlock: 4 },
+                    { id: 'pink', label: 'Neon Pink', color: '#FE51D7', unlock: 5 },
+                    { id: 'purple', label: 'Midnight', color: '#9B51FE', unlock: 6 },
+                    { id: 'red', label: 'Red', color: '#EF4444', unlock: 7 },
+                    { id: 'gold', label: 'Gold', color: '#F59E0B', unlock: 8 },
+                    { id: 'teal', label: 'Teal', color: '#2DD4BF', unlock: 9 },
+                    { id: 'blue', label: 'Blue', color: '#60A5FA', unlock: 10 },
+                  ].map(t => {
+                    const unlocked = isMasterMode || appCurrentLevel.level >= t.unlock
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        disabled={!unlocked}
+                        aria-pressed={theme === t.id}
+                        onClick={() => unlocked && setTheme(t.id as any)}
+                        title={unlocked ? t.label : `Unlocks at Level ${t.unlock}`}
+                        className={`ta-swatch ${theme === t.id ? 'is-active' : ''} ${!unlocked ? 'is-locked' : ''}`}
+                      >
+                        <span className="ta-swatch-dot" style={{ backgroundColor: t.color }} />
+                        <span className="ta-swatch-label">{unlocked ? t.label : `Lv.${t.unlock}`}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
+
+              {/* Custom accent (Lv.5 / master) */}
+              {(isMasterMode || appCurrentLevel.level >= 5) && (
+                <section>
+                  <div className="ta-appearance-section-label">Custom accent</div>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={customAccentColor}
+                      onChange={e => {
+                        setCustomAccentColor(e.target.value)
+                        localStorage.setItem('swiftshift-custom-accent', e.target.value)
+                        setTheme('custom' as any)
+                      }}
+                      className="w-10 h-10 rounded-lg cursor-pointer border border-white/20 bg-transparent shrink-0"
+                      aria-label="Pick custom accent color"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setTheme('custom' as any)}
+                      aria-pressed={theme === 'custom'}
+                      className={`ta-swatch ${theme === 'custom' ? 'is-active' : ''}`}
+                      style={{ flex: 1, flexDirection: 'row', padding: '10px 14px' }}
+                    >
+                      <span className="ta-swatch-label">{theme === 'custom' ? 'Custom active' : 'Use custom color'}</span>
+                    </button>
+                  </div>
+                </section>
+              )}
+
+              {/* Background */}
+              <section>
+                <div className="ta-appearance-section-label">Background</div>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { id: 'default', label: 'Aurora (default)', unlock: 1, preview: 'radial-gradient(circle at 72% 18%, rgba(var(--accent-color-rgb),0.55), #06080F 68%)' },
+                    { id: 'grid', label: 'Grid', unlock: 2, preview: 'repeating-linear-gradient(0deg,rgba(255,255,255,0.12) 0,rgba(255,255,255,0.12) 1px,transparent 1px,transparent 12px),repeating-linear-gradient(90deg,rgba(255,255,255,0.12) 0,rgba(255,255,255,0.12) 1px,transparent 1px,transparent 12px)' },
+                    { id: 'dots', label: 'Dots', unlock: 3, preview: 'radial-gradient(circle,rgba(255,255,255,0.3) 1px,transparent 1px)' },
+                    { id: 'gradient', label: 'Gradient', unlock: 5, preview: 'linear-gradient(135deg,#0d1322,#1a1030,#06080F)' },
+                    { id: 'circuit', label: 'Circuit', unlock: 7, preview: 'linear-gradient(45deg,#06080F 45%,rgba(255,255,255,0.1) 45%,rgba(255,255,255,0.1) 55%,#06080F 55%)' },
+                    { id: 'stars', label: 'Stars', unlock: 8, preview: 'radial-gradient(circle at 30% 40%,rgba(255,255,255,0.4) 1px,transparent 1px)' },
+                    { id: 'wave', label: 'Wave', unlock: 9, preview: 'linear-gradient(60deg,#06080F 25%,rgba(255,255,255,0.08) 50%,#06080F 75%)' },
+                    { id: 'aurora', label: 'Aurora Glow', unlock: 10, preview: 'linear-gradient(135deg,rgba(100,0,255,0.4),rgba(0,255,200,0.4))' },
+                    { id: 'gravity-grid', label: 'Gravity Grid', unlock: 11, preview: 'radial-gradient(ellipse at 40% 60%,rgba(100,130,255,0.5),rgba(50,0,80,0.6) 60%,#06080F)' },
+                  ].map(bg => {
+                    const unlocked = isMasterMode || appCurrentLevel.level >= bg.unlock
+                    const tiled = ['grid', 'dots', 'stars'].includes(bg.id)
+                    return (
+                      <button
+                        key={bg.id}
+                        type="button"
+                        disabled={!unlocked}
+                        aria-pressed={backgroundStyle === bg.id}
+                        onClick={() => unlocked && setBackgroundStyle(bg.id)}
+                        title={unlocked ? bg.label : `Unlocks at Level ${bg.unlock}`}
+                        className={`ta-swatch ${backgroundStyle === bg.id ? 'is-active' : ''} ${!unlocked ? 'is-locked' : ''}`}
+                        style={{ padding: 8 }}
+                      >
+                        <span
+                          className="ta-bg-tile"
+                          style={{ backgroundImage: bg.preview, backgroundColor: '#0a0e1a', backgroundSize: tiled ? '12px 12px' : 'cover' }}
+                        />
+                        <span className="ta-swatch-label">{unlocked ? bg.label : `Lv.${bg.unlock}`}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
+
+              {/* Avatar frame (Lv.3 / master) */}
+              {(isMasterMode || appCurrentLevel.level >= 3) && (
+                <section>
+                  <div className="ta-appearance-section-label">Avatar frame</div>
+                  <div className="flex gap-2 flex-wrap">
+                    {[
+                      { id: 'none', label: 'None', unlock: 1 },
+                      { id: 'glow', label: 'Neon', unlock: 3 },
+                      { id: 'gold', label: 'Gold', unlock: 6 },
+                      { id: 'rainbow', label: 'Elite', unlock: 9 },
+                    ].map(frame => {
+                      const unlocked = isMasterMode || appCurrentLevel.level >= frame.unlock
+                      return (
+                        <button
+                          key={frame.id}
+                          type="button"
+                          disabled={!unlocked}
+                          aria-pressed={avatarFrame === frame.id}
+                          onClick={() => unlocked && setAvatarFrame(frame.id)}
+                          title={unlocked ? frame.label : `Unlocks at Level ${frame.unlock}`}
+                          className={`ta-swatch ${avatarFrame === frame.id ? 'is-active' : ''} ${!unlocked ? 'is-locked' : ''}`}
+                          style={{ flexDirection: 'row', padding: '8px 16px' }}
+                        >
+                          <span className="ta-swatch-label">{unlocked ? frame.label : `Lv.${frame.unlock}`}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </section>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="ta-content">
         <main className="ta-main">
