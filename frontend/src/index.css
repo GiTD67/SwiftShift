@@ -3,14 +3,65 @@
 @tailwind utilities;
 
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  /* Self-hosted Inter (loaded in main.tsx); SF Pro on Apple devices via -apple-system */
+  --font-sans: -apple-system, "SF Pro Text", "SF Pro Display", "Inter Variable", Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, monospace;
+  font-family: var(--font-sans);
   line-height: 1.5;
   font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 
   /* Global theme accent colors (defaults to green) */
   --accent-color: #d7fe51;
   --accent-color-rgb: 215, 254, 81;
   --accent-color-dim: rgba(215, 254, 81, 0.15);
+  /* Alias so semantic tokens / Tailwind can read the live accent */
+  --accent-rgb: var(--accent-color-rgb);
+
+  /* ---- Canvas & elevation (near-black layered backdrop) ---- */
+  --bg-0: #06080F;   /* page base, deepest */
+  --bg-1: #0A0E1A;   /* raised content zone */
+  --bg-2: #10162A;   /* SOLID fallback for cards (legibility fallbacks land here) */
+  --canvas: radial-gradient(120% 120% at 15% 0%, #0D1322 0%, #080B14 45%, #06080F 100%);
+
+  /* ---- Liquid Glass material tokens ---- */
+  --glass-tint: 255, 255, 255;             /* neutral cool-white, NOT accent */
+  --glass-sat: 165%;
+  --glass-ring: rgba(255, 255, 255, 0.10);
+  --glass-spec-t: rgba(255, 255, 255, 0.22); /* top specular lip (was a hot 0.45) */
+  --glass-spec-b: rgba(0, 0, 0, 0.40);       /* bottom shadow lip */
+  --glass-thin-bg: rgba(var(--glass-tint), 0.045);   --glass-thin-blur: 18px;
+  --glass-reg-bg: rgba(var(--glass-tint), 0.060);    --glass-reg-blur: 24px;
+  --glass-thick-bg: rgba(12, 18, 32, 0.92);          --glass-thick-blur: 36px;
+  --glass-data-bg: rgba(12, 18, 32, 0.88);           /* firm tier for data-of-record */
+
+  /* ---- Typography scale ---- */
+  --text-xs: .75rem;  --text-sm: .875rem; --text-base: 1rem;  --text-lg: 1.125rem;
+  --text-xl: 1.375rem; --text-2xl: 1.75rem; --text-3xl: 2.25rem; --text-4xl: 3rem;
+  --fg: #F5F7FA;
+  --fg-2: rgba(245, 247, 250, 0.72);
+  --fg-3: rgba(245, 247, 250, 0.58);
+
+  /* ---- Radius, shadow, motion ---- */
+  --radius-xs: 6px;  --radius-sm: 10px; --radius-md: 14px; --radius-lg: 20px;
+  --radius-xl: 28px; --radius-2xl: 36px; --radius-pill: 9999px;
+  --shadow-1: 0 2px 8px -2px rgba(0, 0, 0, .45);
+  --shadow-2: 0 8px 24px -6px rgba(0, 0, 0, .55);
+  --shadow-3: 0 16px 40px -10px rgba(0, 0, 0, .62);
+  --shadow-4: 0 28px 64px -16px rgba(0, 0, 0, .70);
+  --scrim: rgba(4, 6, 12, 0.55);
+  --ease-standard: cubic-bezier(.40, 0, .20, 1);
+  --ease-liquid: cubic-bezier(.32, .72, 0, 1);
+  --ease-out: cubic-bezier(.16, 1, .30, 1);
+  --dur-1: 120ms; --dur-2: 180ms; --dur-3: 260ms; --dur-4: 320ms;
+
+  /* ---- Accent helpers ---- */
+  --accent-press: #b5e63a;
+  --accent-contrast: #0A0E1A;              /* text on accent fill */
+  --accent-spill: 0 0 24px rgba(var(--accent-color-rgb), 0.18);
+  --focus-ring: 0 0 0 2px var(--accent-color), 0 0 0 5px rgba(var(--accent-color-rgb), 0.30);
 }
 
 /* ============================================
@@ -21,8 +72,9 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: #000000; /* Pure black night sky */
-  color: #ffffff;
+  background: var(--bg-0); /* near-black base; depth gradient lives on .ta-app */
+  color: var(--fg);
+  font-family: var(--font-sans);
   position: relative;
   overflow: hidden;
 }
@@ -31,6 +83,12 @@ body {
 button, [role="button"] {
   cursor: pointer;
 }
+
+/* ---- Typography helpers (opt-in) ---- */
+.tnum { font-variant-numeric: tabular-nums; }
+.t-display { font-size: var(--text-4xl); font-weight: 600; letter-spacing: -0.022em; line-height: 1.15; }
+.t-title   { font-size: var(--text-3xl); font-weight: 600; letter-spacing: -0.018em; line-height: 1.15; }
+.t-heading { font-size: var(--text-2xl); font-weight: 600; letter-spacing: -0.012em; line-height: 1.3; }
 
 /* Plain black background - no decorative overlays */
 
@@ -45,19 +103,50 @@ button, [role="button"] {
    iOS 26 LIQUID GLASS — Ultra-premium glassmorphism
    ============================================ */
 
+/* Real translucent glass — NOTE: border-radius intentionally comes from the
+   markup's rounded-* utility so the 121 call sites keep their varied corners;
+   the specular ::before inherits whatever radius the element resolves to. */
 .glass {
-  background: #000000;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 20px 60px -15px rgba(0, 0, 0, 0.75),
-    inset 0 2px 0 rgba(255, 255, 255, 0.45),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.3);
-  transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
   position: relative;
   overflow: hidden;
+  background: var(--glass-reg-bg);
+  -webkit-backdrop-filter: blur(var(--glass-reg-blur)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-reg-blur)) saturate(var(--glass-sat));
+  border: 1px solid var(--glass-ring);
+  box-shadow:
+    var(--shadow-2),
+    inset 0 1px 0 var(--glass-spec-t),
+    inset 0 -1px 0 var(--glass-spec-b);
+  transition:
+    transform var(--dur-2) var(--ease-standard),
+    box-shadow var(--dur-2) var(--ease-standard),
+    border-color var(--dur-2) var(--ease-standard),
+    background var(--dur-2) var(--ease-standard);
 }
 
-/* Layer 3: Neon green refraction edge */
+/* Living specular — a slow sheen sweep so no surface is ever inert (the #1
+   tell of fake glass is a static highlight). CSS-only, GPU-cheap, clips to radius. */
+.glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(125deg,
+    rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0) 38%,
+    rgba(255, 255, 255, 0) 62%, rgba(255, 255, 255, 0.04) 100%);
+  background-size: 220% 220%;
+  animation: glass-sheen 18s ease-in-out infinite;
+}
+
+@keyframes glass-sheen {
+  0%   { background-position: 0% 0%; }
+  50%  { background-position: 100% 100%; }
+  100% { background-position: 0% 0%; }
+}
+
+/* Dormant lime refraction edge (no .glass-edge element is rendered; kept inert) */
 .glass .glass-edge {
   content: '';
   position: absolute;
@@ -75,8 +164,8 @@ button, [role="button"] {
 .glass:focus-within {
   border-color: rgba(200, 230, 255, 0.4);
   box-shadow:
-    0 12px 48px -10px rgba(0, 0, 0, 0.6),
-    inset 0 1px 0 rgba(230, 245, 255, 0.45),
+    var(--shadow-3),
+    inset 0 1px 0 rgba(230, 245, 255, 0.42),
     0 0 0 1px rgba(160, 200, 255, 0.15);
 }
 
@@ -84,6 +173,60 @@ button, [role="button"] {
   position: relative;
   z-index: 1;
 }
+
+/* ============================================
+   GLASS TIERS — one material vocabulary
+   ============================================ */
+
+/* Thin: chrome (navbar/sidebar/sticky) */
+.glass--thin {
+  position: relative;
+  overflow: hidden;
+  background: var(--glass-thin-bg);
+  -webkit-backdrop-filter: blur(var(--glass-thin-blur)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-thin-blur)) saturate(var(--glass-sat));
+  border: 1px solid var(--glass-ring);
+  box-shadow: var(--shadow-1), inset 0 1px 0 var(--glass-spec-t);
+}
+
+/* Data: firm, contrast-safe tier for data-of-record (timesheets, KPI tables) */
+.glass--data {
+  position: relative;
+  overflow: hidden;
+  background: var(--glass-data-bg);
+  -webkit-backdrop-filter: blur(var(--glass-reg-blur)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-reg-blur)) saturate(var(--glass-sat));
+  border: 1px solid var(--glass-ring);
+  box-shadow: var(--shadow-2), inset 0 1px 0 var(--glass-spec-t);
+}
+
+/* Thick: modals, dropdowns, popovers, command palette */
+.glass--thick {
+  position: relative;
+  overflow: hidden;
+  background: var(--glass-thick-bg);
+  -webkit-backdrop-filter: blur(var(--glass-thick-blur)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-thick-blur)) saturate(var(--glass-sat));
+  border: 1px solid var(--glass-ring);
+  box-shadow: var(--shadow-4), inset 0 1px 0 var(--glass-spec-t), inset 0 -1px 0 var(--glass-spec-b);
+}
+
+/* Tile: nested rows INSIDE glass — deliberately NO blur (avoids nested-glass mud + perf) */
+.glass-tile {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--radius-md);
+}
+
+/* Interactive: Apple-style squish/lift + radius morph on hover */
+.glass--interactive:hover {
+  transform: translateY(-1px) scale(1.004);
+  box-shadow: var(--shadow-3), inset 0 1px 0 rgba(255, 255, 255, 0.30), inset 0 -1px 0 var(--glass-spec-b);
+}
+.glass--interactive:active { transform: translateY(0) scale(0.997); }
+
+/* Active/selected — the only place accent touches the material */
+.glass--active { border-color: rgba(var(--accent-color-rgb), 0.45); box-shadow: var(--shadow-2), var(--accent-spill); }
 
 /* ============================================
    CRYSTAL VARIANTS
@@ -155,11 +298,59 @@ button, [role="button"] {
 }
 
 /* ============================================
-   MUTED ACCENT (no neon glow)
+   ACCENT TEXT — glow is opt-in via .is-hero only
    ============================================ */
 
 .neon-green {
-  color: #ffffff;
+  color: var(--accent-color);
+  letter-spacing: -0.01em;
+}
+
+/* Glow reserved for deliberate single heroes (clock, earnings, page H1).
+   Data figures stay crisp — glowing text on glass hurts edge contrast. */
+.neon-green.is-hero {
+  text-shadow: 0 0 18px rgba(var(--accent-color-rgb), 0.35);
+}
+
+/* Semantic accent emitters (so future markup stops hardcoding the accent) */
+.text-accent   { color: var(--accent-color); }
+.bg-accent     { background-color: var(--accent-color); color: var(--accent-contrast); }
+.border-accent { border-color: var(--accent-color); }
+
+/* ============================================
+   ACCESSIBILITY & CAPABILITY FALLBACKS
+   ============================================ */
+
+/* No backdrop-filter support → opaque card so text never sits on raw canvas */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass, .glass--thin, .glass--data, .glass--thick { background: var(--bg-2); }
+  .glass::before { display: none; }
+}
+
+/* User asked the OS to reduce transparency → fall back to solid surfaces */
+@media (prefers-reduced-transparency: reduce) {
+  .glass, .glass--thin, .glass--data, .glass--thick {
+    background: var(--bg-2);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .glass::before { display: none; }
+}
+
+/* Mobile: cheaper blur so backdrop-filter doesn't tank frame rate */
+@media (max-width: 768px) {
+  :root { --glass-reg-blur: 14px; --glass-thick-blur: 22px; --glass-thin-blur: 12px; }
+}
+
+/* Reduce motion → stop the sheen and neutralize looping animations */
+@media (prefers-reduced-motion: reduce) {
+  .glass::before { animation: none; }
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ============================================

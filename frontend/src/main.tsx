@@ -1,5 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import '@fontsource-variable/inter/index.css'
 import App from './App.tsx'
 import './index.css'
 import 'boxicons/css/boxicons.min.css'
