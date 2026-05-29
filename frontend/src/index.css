@@ -340,6 +340,21 @@ button, [role="button"] {
    ACCESSIBILITY & CAPABILITY FALLBACKS
    ============================================ */
 
+/* Global keyboard focus indicator. The app had 50+ `focus:outline-none` inputs/
+   buttons with no replacement — a WCAG 2.4.7 failure. :focus-visible shows the ring
+   only for keyboard/AT users, never on mouse click, so it doesn't disturb pointer use.
+   !important is intentional: it must beat Tailwind's `.focus:outline-none:focus`. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent-color) !important;
+  outline-offset: 2px;
+}
+
 /* No backdrop-filter support → opaque surface so text never sits on raw canvas */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .glass, .glass--thin, .glass--data, .glass--thick,
