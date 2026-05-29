@@ -4085,8 +4085,17 @@ export default function App() {
               <div className="flex flex-col xl:flex-row gap-6 items-stretch max-w-[1200px] mx-auto">
               {/* Left: Dashboard */}
               <div className="flex-1 flex flex-col">
-                {/* Dashboard card */}
-                <div className="glass rounded-3xl p-5 sm:p-8 flex-1 flex flex-col">
+                {/* Dashboard card — hero surface with cursor-tracked specular */}
+                <div
+                  className="glass glass--hero rounded-3xl p-5 sm:p-8 flex-1 flex flex-col"
+                  onMouseMove={e => {
+                    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+                    const el = e.currentTarget
+                    const r = el.getBoundingClientRect()
+                    el.style.setProperty('--mx', `${e.clientX - r.left}px`)
+                    el.style.setProperty('--my', `${e.clientY - r.top}px`)
+                  }}
+                >
                   <div className="flex flex-col sm:flex-row items-start gap-6 sm:gap-10">
                     {/* Left: Greeting, Time, Status, Buttons */}
                     <div className="flex-1">

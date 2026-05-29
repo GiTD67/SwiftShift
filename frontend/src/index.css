@@ -243,6 +243,21 @@ button, [role="button"] {
 /* Active/selected — the only place accent touches the material */
 .glass--active { border-color: rgba(var(--accent-color-rgb), 0.45); box-shadow: var(--shadow-2), var(--accent-spill); }
 
+/* Hero glass — a cursor-tracked specular highlight (JS sets --mx/--my on pointer move).
+   Sits above the base sheen, below content (.glass > * is z-index:1). */
+.glass--hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(circle 220px at var(--mx, 70%) var(--my, 0%), rgba(255, 255, 255, 0.10), transparent 60%);
+  opacity: 0;
+  transition: opacity var(--dur-3) var(--ease-standard);
+}
+.glass--hero:hover::after { opacity: 1; }
+
 /* ============================================
    CRYSTAL VARIANTS
    ============================================ */
@@ -789,9 +804,12 @@ textarea:focus-visible,
   80%       { border-color: rgba(255, 200, 0, 0.45); }
 }
 
-[data-overdrive="true"] .glass {
-  animation: overdrive-glow-pulse 2.4s ease-in-out infinite,
-             overdrive-border-flicker 3.2s ease-in-out infinite;
+/* Overdrive pulse is scoped to the HERO surface only — it used to run a glow pulse
+   AND a border flicker on all 121 glass panels at once (a vestibular/perf hazard).
+   The gold tint still applies app-wide via the --accent-color token override, and the
+   global prefers-reduced-motion rule neutralizes this pulse. */
+[data-overdrive="true"] .glass--hero {
+  animation: overdrive-glow-pulse 2.8s ease-in-out infinite;
 }
 
 [data-overdrive="true"] .ta-navbar {
