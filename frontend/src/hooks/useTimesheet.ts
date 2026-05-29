@@ -7,11 +7,7 @@ const TIMESHEET_STORAGE_KEY = 'swiftshift-timesheet'
 
 export function useTimesheet() {
   const [state, setState] = useState<TimesheetState>(() => {
-    const saved = localStorage.getItem(TIMESHEET_STORAGE_KEY)
-    if (saved) {
-      return JSON.parse(saved)
-    }
-    return {
+    const fallback: TimesheetState = {
       entries: getSampleEntries(),
       clock: {
         isClockedIn: false,
@@ -19,6 +15,15 @@ export function useTimesheet() {
         lastActionTime: null,
       },
       submitted: false,
+    }
+    const saved = localStorage.getItem(TIMESHEET_STORAGE_KEY)
+    if (!saved) return fallback
+    try {
+      return JSON.parse(saved)
+    } catch {
+      // Corrupted persisted state — discard it rather than crashing on mount.
+      localStorage.removeItem(TIMESHEET_STORAGE_KEY)
+      return fallback
     }
   })
 

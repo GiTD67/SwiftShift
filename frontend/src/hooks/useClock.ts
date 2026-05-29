@@ -5,14 +5,19 @@ const CLOCK_STORAGE_KEY = 'swiftshift-clock'
 
 export function useClock() {
   const [clock, setClock] = useState<ClockState>(() => {
-    const saved = localStorage.getItem(CLOCK_STORAGE_KEY)
-    if (saved) {
-      return JSON.parse(saved)
-    }
-    return {
+    const fallback: ClockState = {
       isClockedIn: false,
       clockInTime: null,
       lastActionTime: null,
+    }
+    const saved = localStorage.getItem(CLOCK_STORAGE_KEY)
+    if (!saved) return fallback
+    try {
+      return JSON.parse(saved)
+    } catch {
+      // Corrupted persisted state — discard it rather than crashing on mount.
+      localStorage.removeItem(CLOCK_STORAGE_KEY)
+      return fallback
     }
   })
 

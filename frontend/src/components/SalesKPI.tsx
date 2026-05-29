@@ -335,7 +335,7 @@ export function SalesKPI({ isAdmin = true, accentColor = '#22c55e', addXP }: Sal
   }
 
   function addQuota() {
-    if (!newQuota.target) return
+    if (!(Number(newQuota.target) > 0)) return
     const idx = quotas.findIndex(q => q.repId === Number(newQuota.repId) && q.metric === newQuota.metric && q.period === newQuota.period)
     const updated: RepQuota = { repId: Number(newQuota.repId), target: Number(newQuota.target), metric: newQuota.metric, period: newQuota.period }
     const nextQuotas = idx >= 0 ? quotas.map((q, i) => i === idx ? updated : q) : [...quotas, updated]
@@ -347,7 +347,7 @@ export function SalesKPI({ isAdmin = true, accentColor = '#22c55e', addXP }: Sal
   }
 
   function addGoal() {
-    if (!newGoal.title || !newGoal.target) return
+    if (!newGoal.title || !(Number(newGoal.target) > 0)) return
     const nextGoals = [...goals, { id: `g${Date.now()}`, title: newGoal.title, target: Number(newGoal.target), current: 0, unit: newGoal.unit, period: newGoal.period }]
     setGoals(nextGoals)
     persistAll(reps, deals, snapshots, quotas, prizes, nextGoals)
@@ -356,7 +356,7 @@ export function SalesKPI({ isAdmin = true, accentColor = '#22c55e', addXP }: Sal
   }
 
   function addPrize() {
-    if (!newPrize.title || !newPrize.milestone) return
+    if (!newPrize.title || !(Number(newPrize.milestone) > 0)) return
     const nextPrizes = [...prizes, { id: `p${Date.now()}`, title: newPrize.title, description: newPrize.description, milestone: Number(newPrize.milestone), milestoneType: newPrize.milestoneType, icon: newPrize.icon, claimed: false }]
     setPrizes(nextPrizes)
     persistAll(reps, deals, snapshots, quotas, nextPrizes, goals)
@@ -564,7 +564,7 @@ export function SalesKPI({ isAdmin = true, accentColor = '#22c55e', addXP }: Sal
               const myVal = prize.milestoneType === 'closes' ? myRep.closes
                 : prize.milestoneType === 'revenue' ? myRep.revenue
                 : myRep.xp
-              const pct = Math.min(Math.round((myVal / prize.milestone) * 100), 100)
+              const pct = Math.min(Math.round((myVal / Math.max(1, prize.milestone)) * 100), 100)
               const unlocked = pct >= 100
               return (
                 <div key={prize.id} className="glass rounded-2xl p-5 transition-all" style={unlocked ? { outline: `1px solid ${accentColor}` } : {}}>
@@ -625,7 +625,7 @@ export function SalesKPI({ isAdmin = true, accentColor = '#22c55e', addXP }: Sal
 
           <div className="glass rounded-3xl p-6 space-y-5">
             {goals.map(goal => {
-              const pct = Math.min(Math.round((goal.current / goal.target) * 100), 100)
+              const pct = Math.min(Math.round((goal.current / Math.max(1, goal.target)) * 100), 100)
               const isRevenue = goal.unit === '$'
               const displayCurrent = isRevenue ? formatCurrency(goal.current) : `${goal.current} ${goal.unit}`
               const displayTarget = isRevenue ? formatCurrency(goal.target) : `${goal.target} ${goal.unit}`
@@ -882,7 +882,7 @@ export function SalesKPI({ isAdmin = true, accentColor = '#22c55e', addXP }: Sal
                     </div>
                     {repQuotas.map(q => {
                       const actual = q.metric === 'closes' ? rep.closes : q.metric === 'comps' ? rep.comps : rep.revenue
-                      const pct = Math.min(Math.round((actual / q.target) * 100), 100)
+                      const pct = Math.min(Math.round((actual / Math.max(1, q.target)) * 100), 100)
                       const color = pct >= 100 ? '#22c55e' : pct >= 70 ? 'var(--accent-color)' : pct >= 40 ? '#f59e0b' : '#ef4444'
                       const displayActual = q.metric === 'revenue' ? formatCurrency(actual) : String(actual)
                       const displayTarget = q.metric === 'revenue' ? formatCurrency(q.target) : String(q.target)
