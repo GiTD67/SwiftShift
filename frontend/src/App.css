@@ -517,6 +517,15 @@
   .ta-appearance-panel { width: 100vw; }
 }
 
+/* Pre-auth (login/signup/reset) background — near-black canvas + accent aurora,
+   matching .ta-app so glass cards float over real depth on the first impression. */
+.auth-bg {
+  background:
+    radial-gradient(46% 42% at 80% 8%, rgba(var(--accent-color-rgb), 0.16), transparent 66%),
+    radial-gradient(52% 48% at 10% 96%, rgba(120, 90, 255, 0.12), transparent 70%),
+    var(--canvas, #06080F);
+}
+
 /* ============================================
    TIME CLOCK — unified pill buttons + energy core
    ============================================ */

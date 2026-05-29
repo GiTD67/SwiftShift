@@ -1573,8 +1573,8 @@ function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white flex items-center justify-center p-4 relative">
-      <div className="absolute inset-0 bg-gradient-to-br from-black via-[#0A0F1E] to-black" />
+    <div className="min-h-screen auth-bg text-white flex items-center justify-center p-4 relative">
+      <div className="absolute inset-0 bg-[radial-gradient(#0a1629_0.8px,transparent_1px)] bg-[length:4px_4px]" />
       <div className="glass w-full max-w-[380px] rounded-3xl p-8 border border-white/10 relative z-10" style={{ boxShadow: `0 0 80px -20px ${accentHex}35, 0 28px 72px -14px rgba(0,0,0,0.85)` }}>
         <div className="flex items-center gap-3 mb-6">
           <LogoSVG className="h-8 w-auto" />
@@ -1707,17 +1707,16 @@ function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white relative flex">
-      {/* Animated background layer */}
+    <div className="min-h-screen auth-bg text-white relative flex">
+      {/* Fine dot texture over the accent aurora canvas */}
       <div className="absolute inset-0 bg-[radial-gradient(#0a1629_0.8px,transparent_1px)] bg-[length:4px_4px]" />
-      <div className="absolute inset-0 bg-gradient-to-br from-black via-[#0A0F1E] to-black" />
       {/* Subtle neural grid */}
       <div className={`absolute inset-0 transition-all duration-300 ${shockwaveActive ? 'opacity-[0.18] scale-[1.015]' : 'opacity-[0.06]'}`} style={{
         backgroundImage: 'linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)',
         backgroundSize: '48px 48px'
       }} />
-      {/* Subtle ambient glow */}
-      <div className="absolute top-1/2 right-[18%] -translate-y-1/2 w-[700px] h-[700px] rounded-full bg-white opacity-[0.015] blur-[120px]" />
+      {/* Accent ambient glow */}
+      <div className="absolute top-1/2 right-[18%] -translate-y-1/2 w-[700px] h-[700px] rounded-full blur-[120px]" style={{ background: 'rgba(var(--accent-color-rgb),0.06)' }} />
 
       {/* Shockwave ripple */}
       {shockwaveActive && (
@@ -1736,7 +1735,7 @@ function LoginPage() {
           <div className="max-w-[400px]">
             <div className="uppercase tracking-[4px] text-xs text-zinc-500 mb-3"><span style={{ color: loginAccentHex }}>AI POWERED</span> HR ENTERPRISE PLATFORM</div>
             <h1 className="text-[52px] leading-[1.05] font-semibold tracking-tighter mb-5">
-              Time is money.
+              Time is <span style={{ background: `linear-gradient(135deg, ${loginAccentHex}, #ffffff)`, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>money.</span>
             </h1>
 
             {/* Stats row */}
@@ -1752,14 +1751,14 @@ function LoginPage() {
             {/* Feature cards */}
             <div className="space-y-2.5">
               {[
-                { icon: '⏱', title: 'One-tap Clock In', desc: 'Punch in instantly. Stay logged in.' },
-                { icon: '📈', title: 'Real-Time Earnings', desc: 'Watch your pay grow live as you work.' },
-                { icon: '🤖', title: 'AI Tax Filing', desc: 'Swifty auto-fills your 1040 from your W-2, free.' },
-                { icon: '🏆', title: 'Rewards & XP', desc: 'Level up and unlock perks just for showing up.' },
-                { icon: '💼', title: 'InstaApply', desc: 'AI job matching with one-click applications.' },
+                { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={loginAccentHex} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>, title: 'One-tap Clock In', desc: 'Punch in instantly. Stay logged in.' },
+                { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={loginAccentHex} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>, title: 'Real-Time Earnings', desc: 'Watch your pay grow live as you work.' },
+                { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={loginAccentHex} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>, title: 'AI Tax Filing', desc: 'Swifty auto-fills your 1040 from your W-2, free.' },
+                { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={loginAccentHex} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.5 12.5 17 22l-5-3-5 3 1.5-9.5"/></svg>, title: 'Rewards & XP', desc: 'Level up and unlock perks just for showing up.' },
+                { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={loginAccentHex} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>, title: 'InstaApply', desc: 'AI job matching with one-click applications.' },
               ].map(({ icon, title, desc }) => (
                 <div key={title} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-base" style={{ background: `${loginAccentHex}18` }}>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${loginAccentHex}18` }}>
                     {icon}
                   </div>
                   <div>
@@ -1782,7 +1781,7 @@ function LoginPage() {
             </div>
           </div>
           <div className="flex items-center gap-3 text-sm">
-            <div className="w-2 h-2 rounded-full bg-[#D7FE51] animate-pulse" />
+            <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: 'var(--accent-color)' }} />
             <span className="text-white/60 tracking-wide">System Status: Online</span>
           </div>
         </div>
@@ -1820,7 +1819,7 @@ function LoginPage() {
         <div className="glass w-full rounded-3xl p-8 border border-white/10">
           {/* Header */}
           <div className="mb-6">
-            <div className="text-xs tracking-[2px] text-[#D7FE51] mb-1.5 uppercase">Sign In to SwiftShift</div>
+            <div className="text-xs tracking-[2px] mb-1.5 uppercase" style={{ color: 'var(--accent-color)' }}>Sign In to SwiftShift</div>
             <h2 className="text-3xl font-semibold tracking-tight mb-1.5">Welcome back</h2>
             {isReturningUser && (
               <p className="text-zinc-400 text-sm">Good to see you. Ready to clock in?</p>
@@ -1993,17 +1992,16 @@ function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white relative flex">
-      {/* Animated background layer */}
+    <div className="min-h-screen auth-bg text-white relative flex">
+      {/* Fine dot texture over the accent aurora canvas */}
       <div className="absolute inset-0 bg-[radial-gradient(#0a1629_0.8px,transparent_1px)] bg-[length:4px_4px]" />
-      <div className="absolute inset-0 bg-gradient-to-br from-black via-[#0A0F1E] to-black" />
       {/* Subtle neural grid */}
       <div className={`absolute inset-0 transition-all duration-300 ${shockwaveActive ? 'opacity-[0.18] scale-[1.015]' : 'opacity-[0.06]'}`} style={{
         backgroundImage: 'linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)',
         backgroundSize: '48px 48px'
       }} />
-      {/* Radial glow */}
-      <div className="absolute top-1/2 right-[18%] -translate-y-1/2 w-[700px] h-[700px] rounded-full bg-white opacity-[0.035] blur-[120px]" />
+      {/* Accent ambient glow */}
+      <div className="absolute top-1/2 right-[18%] -translate-y-1/2 w-[700px] h-[700px] rounded-full blur-[120px]" style={{ background: 'rgba(var(--accent-color-rgb),0.06)' }} />
 
       {/* Left: Brand + System Identity */}
       <div className="hidden lg:flex w-5/12 flex-col justify-between p-10 relative z-10">
@@ -2031,7 +2029,7 @@ function SignupPage() {
 
         {/* Signature: System Status */}
         <div className="flex items-center gap-3 text-sm">
-          <div className="w-2 h-2 rounded-full bg-[#D7FE51] animate-pulse" />
+          <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: 'var(--accent-color)' }} />
           <span className="text-white/60 tracking-wide">System Status: Online</span>
         </div>
       </div>
@@ -2068,7 +2066,7 @@ function SignupPage() {
 
         <div className="glass w-full rounded-3xl p-8 border border-white/10">
           <div className="mb-6">
-            <div className="text-xs tracking-[2px] text-[#D7FE51] mb-1.5 uppercase">Create Your Account</div>
+            <div className="text-xs tracking-[2px] mb-1.5 uppercase" style={{ color: 'var(--accent-color)' }}>Create Your Account</div>
             <h2 className="text-3xl font-semibold tracking-tight mb-1.5">Get started</h2>
             <p className="text-zinc-400 text-sm">Set up your free account in seconds.</p>
           </div>
