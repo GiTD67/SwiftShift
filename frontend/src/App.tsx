@@ -3557,7 +3557,7 @@ export default function App() {
             </button>
             {/* Hover dropdown */}
             <div
-              className="absolute right-0 top-full mt-1 w-72 bg-zinc-900 border border-white/10 rounded-2xl hidden group-hover:block z-50 overflow-hidden"
+              className="absolute right-0 top-full mt-1 w-72 bg-zinc-900 border border-white/10 rounded-2xl hidden group-hover:block group-focus-within:block z-50 overflow-hidden"
               style={{ boxShadow: '0 0 40px -10px rgba(var(--accent-color-rgb), 0.2), 0 8px 24px rgba(0,0,0,0.8)' }}
             >
               <div className="px-4 py-2.5 text-xs text-zinc-500 uppercase tracking-wider border-b border-white/10">
@@ -7242,11 +7242,11 @@ export default function App() {
                               <div className="font-semibold text-lg text-white">{job.title}</div>
                               {job.label && (
                                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                  job.label === 'Best Match' ? 'bg-emerald-600 text-white' :
-                                  job.label === 'Strong Match' ? 'bg-emerald-500/80 text-white' :
-                                  job.label === 'Good Match' ? 'bg-blue-500/80 text-white' :
-                                  job.label === 'Fair Match' ? 'bg-amber-500/80 text-white' :
-                                  'bg-zinc-700 text-zinc-300'
+                                  job.label === 'Best Match' ? 'bg-green-500/20 text-green-300' :
+                                  job.label === 'Strong Match' ? 'bg-green-500/15 text-green-300' :
+                                  job.label === 'Good Match' ? 'bg-blue-500/20 text-blue-300' :
+                                  job.label === 'Fair Match' ? 'bg-amber-500/20 text-amber-300' :
+                                  'bg-zinc-700/50 text-zinc-300'
                                 }`}>{job.label}</span>
                               )}
                               {job.score !== undefined && <span className="text-xs text-zinc-500">({job.score})</span>}

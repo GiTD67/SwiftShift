@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 
@@ -52,20 +53,37 @@ const BOSS_CHALLENGES = [
   { fromLevel: 8, toLevel: 9, req: 'Earn 1500 XP', shortReq: 'totalXP', target: 1500 },
 ]
 
+// Clean line-icon set (replaces emoji). Stroke uses currentColor.
+const svg = (paths: ReactNode, size = 24) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{paths}</svg>
+)
+const ICON: Record<string, (size?: number) => ReactNode> = {
+  code: (s) => svg(<><polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" /></>, s),
+  chart: (s) => svg(<><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></>, s),
+  pen: (s) => svg(<><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" /></>, s),
+  wrench: (s) => svg(<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2-2 2.6-2.6z" />, s),
+  coffee: (s) => svg(<><path d="M18 8h1a4 4 0 0 1 0 8h-1" /><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" /><line x1="6" y1="1" x2="6" y2="4" /><line x1="10" y1="1" x2="10" y2="4" /><line x1="14" y1="1" x2="14" y2="4" /></>, s),
+  sun: (s) => svg(<><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.2" y1="4.2" x2="5.6" y2="5.6" /><line x1="18.4" y1="18.4" x2="19.8" y2="19.8" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.2" y1="19.8" x2="5.6" y2="18.4" /><line x1="18.4" y1="5.6" x2="19.8" y2="4.2" /></>, s),
+  shirt: (s) => svg(<path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z" />, s),
+  box: (s) => svg(<><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></>, s),
+  heart: (s) => svg(<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />, s),
+  home: (s) => svg(<><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></>, s),
+}
+
 const DEPT_CHALLENGES = [
-  { dept: 'Engineering', targetHours: 400, icon: '⚙️' },
-  { dept: 'Sales', targetHours: 320, icon: '📊' },
-  { dept: 'Design', targetHours: 240, icon: '🎨' },
-  { dept: 'Operations', targetHours: 280, icon: '🔧' },
+  { dept: 'Engineering', targetHours: 400, iconKey: 'code' },
+  { dept: 'Sales', targetHours: 320, iconKey: 'chart' },
+  { dept: 'Design', targetHours: 240, iconKey: 'pen' },
+  { dept: 'Operations', targetHours: 280, iconKey: 'wrench' },
 ]
 
 const SHOP_ITEMS = [
-  { id: 'coffee', name: 'Coffee Gift Card', xpCost: 1000, icon: '☕', desc: '$10 coffee shop gift card' },
-  { id: 'extra_pto', name: '2hr PTO Bonus', xpCost: 2000, icon: '🌴', desc: '2 extra hours of PTO' },
-  { id: 'swag_shirt', name: 'Company T-Shirt', xpCost: 1500, icon: '👕', desc: 'SwiftShift branded tee' },
-  { id: 'amazon', name: 'Amazon Gift Card', xpCost: 3000, icon: '📦', desc: '$25 Amazon gift card' },
-  { id: 'charity', name: 'Charity Donation', xpCost: 500, icon: '💝', desc: '$5 donated to your chosen charity' },
-  { id: 'remote_day', name: 'Extra Remote Day', xpCost: 2500, icon: '🏠', desc: 'One additional WFH day this month' },
+  { id: 'coffee', name: 'Coffee Gift Card', xpCost: 1000, iconKey: 'coffee', desc: '$10 coffee shop gift card' },
+  { id: 'extra_pto', name: '2hr PTO Bonus', xpCost: 2000, iconKey: 'sun', desc: '2 extra hours of PTO' },
+  { id: 'swag_shirt', name: 'Company T-Shirt', xpCost: 1500, iconKey: 'shirt', desc: 'SwiftShift branded tee' },
+  { id: 'amazon', name: 'Amazon Gift Card', xpCost: 3000, iconKey: 'box', desc: '$25 Amazon gift card' },
+  { id: 'charity', name: 'Charity Donation', xpCost: 500, iconKey: 'heart', desc: '$5 donated to your chosen charity' },
+  { id: 'remote_day', name: 'Extra Remote Day', xpCost: 2500, iconKey: 'home', desc: 'One additional WFH day this month' },
 ]
 
 export function XPCenter({ gState, currentLevel, nextLevel, users, accentColor, totalHoursThisWeek }: XPCenterProps) {
@@ -230,7 +248,7 @@ export function XPCenter({ gState, currentLevel, nextLevel, users, accentColor, 
             const pct = Math.min(100, (dept.currentHours / dept.targetHours) * 100)
             return (
               <div key={dept.dept} className="glass rounded-2xl p-4">
-                <div className="text-2xl mb-2">{dept.icon}</div>
+                <div className="mb-2" style={{ color: accentColor }}>{ICON[dept.iconKey]?.(22)}</div>
                 <div className="text-sm font-semibold mb-0.5">{dept.dept}</div>
                 <div className="text-xs text-zinc-500 mb-2">{dept.currentHours}h / {dept.targetHours}h goal</div>
                 <div className="crystal-progress">
@@ -259,7 +277,7 @@ export function XPCenter({ gState, currentLevel, nextLevel, users, accentColor, 
             return (
               <div key={item.id} className={`glass rounded-2xl p-4 flex flex-col gap-2 transition-all ${canAfford ? '' : 'opacity-60'}`}
                 style={canAfford ? { border: `1px solid ${accentColor}20` } : {}}>
-                <div className="text-3xl">{item.icon}</div>
+                <div style={{ color: accentColor }}>{ICON[item.iconKey]?.(26)}</div>
                 <div className="text-sm font-semibold">{item.name}</div>
                 <div className="text-xs text-zinc-500 flex-1">{item.desc}</div>
                 <div className="flex items-center justify-between mt-1">
@@ -270,7 +288,7 @@ export function XPCenter({ gState, currentLevel, nextLevel, users, accentColor, 
                     style={canAfford ? { backgroundColor: accentColor, color: '#000' } : { backgroundColor: 'rgba(255,255,255,0.1)', color: '#666' }}
                     onClick={() => {
                       if (canAfford) {
-                        toast.success(`${item.icon} Redemption submitted!`, { description: `${item.name}. HR will process within 2 business days.` })
+                        toast.success('Redemption submitted!', { description: `${item.name}. HR will process within 2 business days.` })
                       }
                     }}
                   >
