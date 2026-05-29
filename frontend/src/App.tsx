@@ -2294,6 +2294,13 @@ export default function App() {
   const appearanceTriggerRef = useRef<HTMLElement | null>(null)
   const appearancePanelRef = useRef<HTMLDivElement | null>(null)
   const userMenuBtnRef = useRef<HTMLButtonElement | null>(null)
+  // ⌘K command palette
+  const [cmdkOpen, setCmdkOpen] = useState(false)
+  const [cmdkQuery, setCmdkQuery] = useState('')
+  const [cmdkIndex, setCmdkIndex] = useState(0)
+  const cmdkInputRef = useRef<HTMLInputElement | null>(null)
+  const cmdkTriggerRef = useRef<HTMLElement | null>(null)
+  const appearanceOpenRef = useRef(false)
 
   // Profile tabs state
   const [profileTab, setProfileTab] = useState<'info' | 'schedule' | 'deposit' | 'availability'>('info')
@@ -2450,6 +2457,49 @@ export default function App() {
       else userMenuBtnRef.current?.focus()
     }
   }, [appearanceOpen])
+
+  // Keep a ref of appearance-modal state for the (deps-[]) global shortcut handler
+  useEffect(() => { appearanceOpenRef.current = appearanceOpen }, [appearanceOpen])
+
+  // ⌘K / Ctrl-K opens the command palette (global)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+        // Don't hijack native Ctrl+K (e.g. macOS kill-to-line) inside editable fields
+        const ae = document.activeElement as HTMLElement | null
+        const editing = !!ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)
+        if (editing && !e.metaKey) return
+        // Don't stack over the appearance slide-over (it owns the shell's inert state)
+        if (appearanceOpenRef.current) return
+        e.preventDefault()
+        setCmdkOpen(o => !o)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // On open: remember trigger, reset query, mark the shell inert (focus containment),
+  // focus the input. On close: un-inert the shell and restore focus to the trigger.
+  useEffect(() => {
+    if (!cmdkOpen) return
+    const shell = [
+      document.querySelector('.ta-navbar'),
+      document.querySelector('.ta-sidebar'),
+      document.querySelector('.ta-content'),
+    ].filter(Boolean) as HTMLElement[]
+    cmdkTriggerRef.current = document.activeElement as HTMLElement
+    setCmdkQuery('')
+    setCmdkIndex(0)
+    shell.forEach(el => el.setAttribute('inert', ''))
+    const t = setTimeout(() => cmdkInputRef.current?.focus(), 20)
+    return () => {
+      clearTimeout(t)
+      shell.forEach(el => el.removeAttribute('inert'))
+      const el = cmdkTriggerRef.current
+      if (el && el.offsetParent !== null) el.focus?.()
+    }
+  }, [cmdkOpen])
 
   const toggleFavorite = (id: string) => {
     setFavoriteTabs(prev => {
@@ -3465,6 +3515,17 @@ export default function App() {
           </div>
         </div>
         <div className="ta-navbar-user">
+          {/* Command palette trigger (⌘K) */}
+          <button
+            onClick={() => setCmdkOpen(true)}
+            title="Search & jump (⌘K)"
+            aria-label="Open command palette"
+            className="hidden sm:flex items-center gap-2 pl-2.5 pr-2 py-1.5 text-xs rounded-full border border-white/10 text-white/55 hover:text-white hover:border-white/25 hover:bg-white/5 transition-all"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <span className="hidden md:inline">Search</span>
+            <kbd className="hidden md:inline text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 border border-white/10 leading-none">⌘K</kbd>
+          </button>
           {/* Upgrade CTA — prominent, left of achievements */}
           <button
             onClick={() => navTo('pricing')}
@@ -3941,6 +4002,81 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* ⌘K command palette */}
+      {cmdkOpen && (() => {
+        const cmds: { g: string; label: string; run: () => void }[] = [
+          { g: 'Go to', label: 'Time Clock', run: () => navTo('clock') },
+          { g: 'Go to', label: 'Timesheet', run: () => navTo('timesheet') },
+          { g: 'Go to', label: 'Rewards & XP', run: () => navTo('rewards') },
+          { g: 'Go to', label: 'Leaderboard', run: () => navTo('leaderboard') },
+          { g: 'Go to', label: 'Holidays', run: () => navTo('holidays') },
+          { g: 'Go to', label: 'My KPIs', run: () => navTo('kpi') },
+          { g: 'Go to', label: 'Insurance & Benefits', run: () => navTo('insurance') },
+          { g: 'Go to', label: 'Org Chart', run: () => navTo('orgchart') },
+          { g: 'Go to', label: 'Files', run: () => navTo('taxes') },
+          { g: 'Go to', label: 'AI Tax Filing', run: () => navTo('groktax') },
+          { g: 'Go to', label: 'Swifty — AI Assistant', run: () => navTo('grokky') },
+          { g: 'Go to', label: 'InstaApply', run: () => navTo('applications') },
+          { g: 'Go to', label: 'Profile', run: () => navTo('profile') },
+          { g: 'Go to', label: 'Pricing', run: () => navTo('pricing') },
+          { g: 'Go to', label: 'Alerts', run: () => navTo('alerts') },
+          { g: 'Manager', label: 'Manage Users', run: () => navTo('admin') },
+          { g: 'Manager', label: 'Schedule Management', run: () => navTo('schedules') },
+          { g: 'Manager', label: 'Payroll', run: () => navTo('payroll') },
+          { g: 'Manager', label: 'Reports & Analytics', run: () => navTo('reports') },
+          { g: 'Manager', label: 'Leave Management', run: () => navTo('leaves') },
+          { g: 'Manager', label: 'Compliance & Audit', run: () => navTo('compliance') },
+          { g: 'Manager', label: 'Hiring & Onboarding', run: () => navTo('hiring') },
+          { g: 'Manager', label: 'Team KPI Dashboard', run: () => navTo('teamkpi') },
+          { g: 'Manager', label: 'Announcements', run: () => navTo('announcements') },
+          { g: 'Manager', label: 'Audit Log', run: () => navTo('auditlog') },
+          { g: 'Manager', label: 'Enterprise Hub', run: () => navTo('enterprise') },
+          { g: 'Action', label: 'Open appearance settings', run: () => setAppearanceOpen(true) },
+          { g: 'Action', label: 'Take a tour', run: () => setShowTour(true) },
+          { g: 'Action', label: 'Log out', run: () => handleLogout() },
+        ]
+        const q = cmdkQuery.trim().toLowerCase()
+        const filtered = q ? cmds.filter(c => c.label.toLowerCase().includes(q) || c.g.toLowerCase().includes(q)) : cmds
+        const idx = Math.min(cmdkIndex, Math.max(0, filtered.length - 1))
+        const runCmd = (c?: { run: () => void }) => { if (!c) return; setCmdkOpen(false); c.run() }
+        return (
+          <div className="ta-cmdk-overlay" onMouseDown={e => { if (e.target === e.currentTarget) setCmdkOpen(false) }}>
+            <div className="ta-cmdk glass--thick" role="dialog" aria-modal="true" aria-label="Command palette" onMouseDown={e => e.stopPropagation()}>
+              <input
+                ref={cmdkInputRef}
+                value={cmdkQuery}
+                onChange={e => { setCmdkQuery(e.target.value); setCmdkIndex(0) }}
+                onKeyDown={e => {
+                  if (e.key === 'Escape') { setCmdkOpen(false) }
+                  else if (e.key === 'ArrowDown') { e.preventDefault(); setCmdkIndex(i => Math.min(i + 1, filtered.length - 1)) }
+                  else if (e.key === 'ArrowUp') { e.preventDefault(); setCmdkIndex(i => Math.max(i - 1, 0)) }
+                  else if (e.key === 'Enter') { e.preventDefault(); runCmd(filtered[idx]) }
+                }}
+                placeholder="Jump to a page, or type an action…"
+                className="ta-cmdk-input"
+                aria-label="Command palette search"
+              />
+              <div className="ta-cmdk-list">
+                {filtered.length === 0 && <div className="ta-cmdk-empty">No matches</div>}
+                {filtered.map((c, i) => (
+                  <button
+                    key={c.g + c.label}
+                    type="button"
+                    className={`ta-cmdk-item ${i === idx ? 'is-active' : ''}`}
+                    onMouseMove={() => { if (i !== cmdkIndex) setCmdkIndex(i) }}
+                    onClick={() => runCmd(c)}
+                  >
+                    <span className="ta-cmdk-item-label">{c.label}</span>
+                    <span className="ta-cmdk-item-group">{c.g}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="ta-cmdk-foot"><span><kbd>↑↓</kbd> navigate</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></div>
+            </div>
+          </div>
+        )
+      })()}
 
       <div className="ta-content">
         <main className="ta-main">
