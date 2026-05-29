@@ -110,14 +110,8 @@ export function XPCenter({ gState, currentLevel, nextLevel, users, accentColor, 
             <div className="text-xs uppercase tracking-[2px] text-zinc-400 mb-2">Weekly Challenge</div>
             <div className="text-sm font-semibold text-white mb-1">Log {weeklyTargetHours}h this week</div>
             <div className="text-xs text-zinc-500 mb-3">+{weeklyBonusXP} XP bonus · Resets Monday</div>
-            <div className="h-2 bg-white/10 rounded-full overflow-hidden mb-2">
-              <motion.div
-                className="h-full rounded-full"
-                style={{ background: accentColor }}
-                initial={{ width: 0 }}
-                animate={{ width: `${weeklyProgress}%` }}
-                transition={{ duration: 1, ease: 'easeOut' }}
-              />
+            <div className="crystal-progress mb-2">
+              <div className="crystal-progress-fill" style={{ width: `${weeklyProgress}%` }} />
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-zinc-500">{totalHoursThisWeek.toFixed(1)}h logged</span>
@@ -148,14 +142,8 @@ export function XPCenter({ gState, currentLevel, nextLevel, users, accentColor, 
               <>
                 <div className="text-xs font-semibold text-white mb-1">{bossChallenge.req}</div>
                 <div className="text-xs text-zinc-500 mb-3">Required to reach Level {bossChallenge.toLevel}</div>
-                <div className="h-2 bg-white/10 rounded-full overflow-hidden mb-2">
-                  <motion.div
-                    className="h-full rounded-full"
-                    style={{ background: accentColor }}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${Math.min(100, (bossProgress / bossChallenge.target) * 100)}%` }}
-                    transition={{ duration: 1, ease: 'easeOut' }}
-                  />
+                <div className="crystal-progress mb-2">
+                  <div className="crystal-progress-fill" style={{ width: `${Math.min(100, (bossProgress / bossChallenge.target) * 100)}%` }} />
                 </div>
                 <div className="text-xs text-zinc-500">{bossProgress} / {bossChallenge.target}</div>
               </>
@@ -191,8 +179,10 @@ export function XPCenter({ gState, currentLevel, nextLevel, users, accentColor, 
                   className={`flex items-center gap-3 p-3 rounded-2xl`}
                   style={isMe ? { background: `${accentColor}10`, border: `1px solid ${accentColor}30` } : { background: 'rgba(255,255,255,0.04)' }}
                 >
-                  <div className="w-6 text-center text-sm font-bold text-zinc-500">
-                    {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`}
+                  <div className="w-6 flex justify-center flex-shrink-0">
+                    {i < 3
+                      ? <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold" style={{ background: i === 0 ? 'linear-gradient(135deg,#FFE08A,#F5B125)' : i === 1 ? 'linear-gradient(135deg,#E8ECF2,#AEB7C2)' : 'linear-gradient(135deg,#E6A977,#C17A45)', color: '#2a2200' }}>{i + 1}</span>
+                      : <span className="text-sm font-bold text-zinc-500">#{i + 1}</span>}
                   </div>
                   <div
                     className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-sm font-bold"
@@ -243,14 +233,8 @@ export function XPCenter({ gState, currentLevel, nextLevel, users, accentColor, 
                 <div className="text-2xl mb-2">{dept.icon}</div>
                 <div className="text-sm font-semibold mb-0.5">{dept.dept}</div>
                 <div className="text-xs text-zinc-500 mb-2">{dept.currentHours}h / {dept.targetHours}h goal</div>
-                <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                  <motion.div
-                    className="h-full rounded-full"
-                    style={{ background: pct >= 100 ? accentColor : `linear-gradient(90deg, ${accentColor}80, ${accentColor})` }}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${pct}%` }}
-                    transition={{ duration: 1.2, ease: 'easeOut' }}
-                  />
+                <div className="crystal-progress">
+                  <div className="crystal-progress-fill" style={{ width: `${pct}%` }} />
                 </div>
                 <div className="text-[10px] text-zinc-500 mt-1 text-right">{Math.round(pct)}%</div>
               </div>

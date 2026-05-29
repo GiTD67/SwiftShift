@@ -208,13 +208,13 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
     return () => clearTimeout(timer)
   }, [highlightRate])
 
-  // Confetti on tab focus
+  // Subtle welcome burst on tab focus — single + reduced-motion-aware. Big
+  // celebrations are reserved for real milestones, not for opening a tab.
   useEffect(() => {
     if (onFocus && !hasFiredConfetti) {
+      const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
       const timer = setTimeout(() => {
-        confetti({ particleCount: 180, spread: 90, origin: { x: 0.5, y: 0.95 }, colors: [confettiColor, '#39FF14', '#00CC00'] })
-        setTimeout(() => confetti({ particleCount: 120, spread: 70, angle: 75, origin: { x: 0.3, y: 0.9 }, colors: [confettiColor, '#39FF14'] }), 120)
-        setTimeout(() => confetti({ particleCount: 120, spread: 70, angle: 105, origin: { x: 0.7, y: 0.9 }, colors: [confettiColor, '#00CC00'] }), 240)
+        if (!reduce) confetti({ particleCount: 60, spread: 60, origin: { x: 0.5, y: 0.9 }, colors: [confettiColor, '#ffffff'] })
         setHasFiredConfetti(true)
       }, 80)
       return () => clearTimeout(timer)
