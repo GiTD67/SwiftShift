@@ -1334,7 +1334,7 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
       {showCertModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowCertModal(false)}>
           <div className="glass rounded-2xl p-6 w-full max-w-lg mx-4 border border-white/20" onClick={e => e.stopPropagation()} style={{ boxShadow: '0 0 80px -20px rgba(var(--accent-color-rgb), 0.25), 0 28px 72px -14px rgba(0,0,0,0.85)' }}>
-            <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--accent-color)' }}>Timesheet Certification</h2>
+            <h2 className="text-lg font-semibold mb-1 text-white">Timesheet Certification</h2>
             <p className="text-xs text-zinc-500 mb-4">Pay period: {fmtRange(start, end)}</p>
 
             <div className="mb-5">
@@ -4438,7 +4438,7 @@ export default function App() {
                 {/* Add/Edit form */}
                 {(showHolidayForm || editingHoliday) && (
                   <div className="glass rounded-3xl p-6 space-y-4">
-                    <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>{editingHoliday ? 'Edit Holiday' : 'Add Holiday'}</h2>
+                    <h2 className="text-lg font-semibold text-white">{editingHoliday ? 'Edit Holiday' : 'Add Holiday'}</h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <div className="text-xs text-zinc-400 mb-1">Holiday Name</div>
@@ -4477,7 +4477,7 @@ export default function App() {
 
                 {/* Upcoming holidays */}
                 <div className="glass rounded-3xl p-6">
-                  <h2 className="text-base font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Upcoming</h2>
+                  <h2 className="text-base font-semibold mb-4 text-white">Upcoming</h2>
                   {upcoming.length === 0 ? (
                     <div className="text-sm text-zinc-500 text-center py-6">No upcoming holidays.{isAdmin ? ' Click "+ Add Holiday" to get started.' : ''}</div>
                   ) : (
@@ -4714,7 +4714,7 @@ export default function App() {
               {/* Shift Swap Request Form */}
               {showSwapForm && (
                 <div className="glass rounded-3xl p-6 space-y-4">
-                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Request Shift Swap</h2>
+                  <h2 className="text-lg font-semibold text-white">Request Shift Swap</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {[
                       { label: 'Shift Date', key: 'shift_date', type: 'date' },
@@ -4752,7 +4752,7 @@ export default function App() {
 
               {/* Shift Swaps List */}
               <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>My Shift Swaps</h2>
+                <h2 className="text-lg font-semibold mb-4 text-white">My Shift Swaps</h2>
                 {shiftSwaps.length === 0 ? (
                   <div className="text-sm text-zinc-500 text-center py-6">No shift swap requests yet.</div>
                 ) : (
@@ -4774,7 +4774,7 @@ export default function App() {
 
               {/* Timesheet Submissions */}
               <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Timesheet Submissions</h2>
+                <h2 className="text-lg font-semibold mb-4 text-white">Timesheet Submissions</h2>
                 {timesheetSubs.length === 0 ? (
                   <div className="text-sm text-zinc-500 text-center py-6">No timesheet submissions yet.</div>
                 ) : (
@@ -4797,7 +4797,7 @@ export default function App() {
                 <div className="glass rounded-3xl p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Manager: Team Swap Requests</h2>
+                      <h2 className="text-lg font-semibold text-white">Manager: Team Swap Requests</h2>
                       <p className="text-xs text-zinc-400 mt-0.5">Review your team's shift swap requests</p>
                     </div>
                     <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400">
@@ -4927,7 +4927,7 @@ export default function App() {
 
               {/* Personal Paystub */}
               <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>My Paystub - {periodLabel}</h2>
+                <h2 className="text-lg font-semibold mb-4 text-white">My Paystub - {periodLabel}</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   {/* Earnings */}
                   <div className="space-y-3">
@@ -4989,7 +4989,7 @@ export default function App() {
               {/* Tax Withholding Calculator — 2026 brackets */}
               <div className="glass rounded-3xl p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Tax Withholding Summary</h2>
+                  <h2 className="text-lg font-semibold text-white">Tax Withholding Summary</h2>
                   <span className="text-xs text-zinc-500 bg-white/5 px-2 py-1 rounded-lg">2026 Federal Brackets</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -5014,7 +5014,7 @@ export default function App() {
               {/* Employee Payroll Summary with One-Click Sign-off */}
               <div className="glass rounded-3xl p-6">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Employee Payroll Summary</h2>
+                  <h2 className="text-lg font-semibold text-white">Employee Payroll Summary</h2>
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-zinc-400">
                       {Object.values(payrollSignoffs).filter(Boolean).length}/{Object.keys(payrollSignoffs).length} signed off
@@ -5107,7 +5107,7 @@ export default function App() {
                 ))}
               </div>
               <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Department Hours Breakdown</h2>
+                <h2 className="text-lg font-semibold mb-4 text-white">Department Hours Breakdown</h2>
                 <div className="space-y-3">
                   {[['Engineering', 680, 800], ['Sales', 420, 500], ['HR', 210, 240], ['Marketing', 190, 200], ['Finance', 140, 160]].map(([dept, used, total]) => (
                     <div key={dept}>
@@ -5125,14 +5125,14 @@ export default function App() {
 
               {/* Manager Hub */}
               <div className="pt-2">
-                <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Manager Hub</h2>
+                <h2 className="text-xl font-semibold mb-4 text-white">Manager Hub</h2>
                 <p className="text-sm text-zinc-400 -mt-3 mb-5">Real-time insights and action items for team managers</p>
               </div>
 
               {/* Timesheet Approvals with Anomaly Flagging */}
               <div className="glass rounded-3xl p-6">
                 <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Timesheet Approvals</h2>
+                  <h2 className="text-lg font-semibold text-white">Timesheet Approvals</h2>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-medium">5 pending</span>
                 </div>
                 <p className="text-xs text-zinc-400 mb-4">Anomalies auto-detected from clock records. Review before approving.</p>
@@ -5168,7 +5168,7 @@ export default function App() {
               {/* Live Team Status + Top Performers */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="glass rounded-3xl p-6">
-                  <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Live Team Status</h2>
+                  <h2 className="text-lg font-semibold mb-4 text-white">Live Team Status</h2>
                   <div className="space-y-2">
                     {[
                       { name: 'Alex Rivera', role: 'Engineer', status: 'clocked-in', since: '8:02 AM' },
@@ -5191,7 +5191,7 @@ export default function App() {
                 </div>
 
                 <div className="glass rounded-3xl p-6">
-                  <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Top Performers</h2>
+                  <h2 className="text-lg font-semibold mb-4 text-white">Top Performers</h2>
                   <div className="space-y-2">
                     {[
                       { rank: 1, name: 'Alex Rivera', metric: '98% on-time', hours: '164h', badge: '🥇' },
@@ -5216,7 +5216,7 @@ export default function App() {
               {/* Labor Budget Tracker */}
               <div className="glass rounded-3xl p-6">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Labor Budget Tracker</h2>
+                  <h2 className="text-lg font-semibold text-white">Labor Budget Tracker</h2>
                   <span className="text-xs text-zinc-500">April 2026 · 27 days elapsed</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
@@ -5269,7 +5269,7 @@ export default function App() {
               {/* Schedule Gap Alerts */}
               <div className="glass rounded-3xl p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Schedule Coverage Alerts</h2>
+                  <h2 className="text-lg font-semibold text-white">Schedule Coverage Alerts</h2>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-medium">3 gaps</span>
                 </div>
                 <div className="space-y-2">
@@ -5294,7 +5294,7 @@ export default function App() {
 
               {/* Quick Export */}
               <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Quick Export</h2>
+                <h2 className="text-lg font-semibold mb-4 text-white">Quick Export</h2>
                 <div className="flex flex-wrap gap-3">
                   {['Timesheet CSV', 'Payroll Summary PDF', 'PTO Balance Report', 'Headcount Report', 'Compliance Summary'].map(label => (
                     <button key={label} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm border border-white/10 transition-colors">
@@ -5345,7 +5345,7 @@ export default function App() {
               {/* PTO Payout Calculator */}
               {ptoBalance && (
                 <div className="glass rounded-3xl p-6">
-                  <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--accent-color)' }}>PTO Payout Calculator</h2>
+                  <h2 className="text-lg font-semibold mb-3 text-white">PTO Payout Calculator</h2>
                   <div className="flex flex-wrap gap-6 text-sm">
                     <div>
                       <div className="text-zinc-400 mb-1">Available Balance</div>
@@ -5366,7 +5366,7 @@ export default function App() {
               {/* PTO Request Form */}
               {showPtoForm && (
                 <div className="glass rounded-3xl p-6 space-y-4">
-                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>New PTO Request</h2>
+                  <h2 className="text-lg font-semibold text-white">New PTO Request</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <div className="text-xs text-zinc-400 mb-1">Type</div>
@@ -5419,7 +5419,7 @@ export default function App() {
 
               {/* My PTO Requests */}
               <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>My PTO Requests</h2>
+                <h2 className="text-lg font-semibold mb-4 text-white">My PTO Requests</h2>
                 {ptoRequests.length === 0 ? (
                   <div className="text-sm text-zinc-500 text-center py-6">No PTO requests yet. Click "+ Request PTO" to get started.</div>
                 ) : (
@@ -5445,7 +5445,7 @@ export default function App() {
                 <div className="glass rounded-3xl p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Manager: Team Leave Requests</h2>
+                      <h2 className="text-lg font-semibold text-white">Manager: Team Leave Requests</h2>
                       <p className="text-xs text-zinc-400 mt-0.5">Review and approve or deny your team's PTO requests</p>
                     </div>
                     <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400">
@@ -5517,7 +5517,7 @@ export default function App() {
 
               {/* Team Leave Calendar */}
               <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Team Leave Calendar: May 2026</h2>
+                <h2 className="text-lg font-semibold mb-4 text-white">Team Leave Calendar: May 2026</h2>
                 <p className="text-xs text-zinc-400 mb-4">Visual overview of who's out to prevent coverage conflicts</p>
                 <div className="space-y-2">
                   {[
@@ -5568,7 +5568,7 @@ export default function App() {
                 ))}
               </div>
               <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Recent Audit Log</h2>
+                <h2 className="text-lg font-semibold mb-4 text-white">Recent Audit Log</h2>
                 <div className="space-y-2">
                   {[
                     { time: 'Today 09:14', event: 'User role updated', user: 'Admin', severity: 'Info' },
@@ -5587,7 +5587,7 @@ export default function App() {
                 </div>
               </div>
               <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Required Certifications</h2>
+                <h2 className="text-lg font-semibold mb-4 text-white">Required Certifications</h2>
                 <div className="space-y-2">
                   {[
                     { cert: 'Workplace Safety Training', due: 'May 1, 2026', completed: 17, total: 24 },
@@ -5610,7 +5610,7 @@ export default function App() {
               {/* Auto-compliance alerts */}
               <div className="glass rounded-3xl p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Auto-Compliance Alerts</h2>
+                  <h2 className="text-lg font-semibold text-white">Auto-Compliance Alerts</h2>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-medium">5 active</span>
                 </div>
                 <div className="space-y-3">
@@ -5673,7 +5673,7 @@ export default function App() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="glass rounded-3xl p-6">
-                  <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Hiring Pipeline</h2>
+                  <h2 className="text-lg font-semibold mb-4 text-white">Hiring Pipeline</h2>
                   <div className="space-y-3">
                     {[
                       { role: 'Senior Backend Engineer', dept: 'Engineering', stage: 'Final Interview', applicants: 12 },
@@ -5692,7 +5692,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="glass rounded-3xl p-6">
-                  <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Onboarding Queue</h2>
+                  <h2 className="text-lg font-semibold mb-4 text-white">Onboarding Queue</h2>
                   <div className="space-y-3">
                     {[
                       { name: 'Sam Carter', role: 'Frontend Engineer', start: 'May 5, 2026' },
@@ -5724,7 +5724,7 @@ export default function App() {
 
               {/* Onboarding Checklists */}
               <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Onboarding Checklists</h2>
+                <h2 className="text-lg font-semibold mb-4 text-white">Onboarding Checklists</h2>
                 <div className="space-y-6">
                   {[
                     { name: 'Sam Carter', role: 'Frontend Engineer' },
@@ -5861,12 +5861,12 @@ export default function App() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {[
                   { label: 'Avg Attendance Rate', value: '93.4%', sub: 'This month', color: 'var(--accent-color)' },
-                  { label: 'Avg Hours / Employee', value: '38.2h', sub: 'This week', color: 'var(--accent-color)' },
-                  { label: 'Overtime Employees', value: '4', sub: 'Above 40h threshold', color: '#F59E0B' },
-                  { label: 'On-Time Clock-in', value: '89%', sub: 'Within 5 min of shift', color: 'var(--accent-color)' },
+                  { label: 'Avg Hours / Employee', value: '38.2h', sub: 'This week', color: 'var(--fg)' },
+                  { label: 'Overtime Employees', value: '4', sub: 'Above 40h threshold', color: 'var(--warn)' },
+                  { label: 'On-Time Clock-in', value: '89%', sub: 'Within 5 min of shift', color: 'var(--fg)' },
                 ].map(({ label, value, sub, color }) => (
                   <div key={label} className="glass rounded-2xl p-4 text-center">
-                    <div className="text-2xl font-bold" style={{ color }}>{value}</div>
+                    <div className="text-2xl font-bold tnum" style={{ color }}>{value}</div>
                     <div className="text-xs font-medium text-white mt-1">{label}</div>
                     <div className="text-xs text-zinc-500 mt-0.5">{sub}</div>
                   </div>
@@ -5875,7 +5875,7 @@ export default function App() {
 
               {/* Per-employee KPI table */}
               <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Employee Performance Overview</h2>
+                <h2 className="text-lg font-semibold mb-4 text-white">Employee Performance Overview</h2>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm" style={{ minWidth: '640px' }}>
                     <thead>
@@ -5927,31 +5927,36 @@ export default function App() {
               {/* Streak leaderboard */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="glass rounded-3xl p-6">
-                  <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Work Streak Leaders</h2>
+                  <h2 className="text-lg font-semibold mb-4 text-white">Work Streak Leaders</h2>
                   <div className="space-y-3">
                     {[
-                      { rank: 1, name: 'Mia Thompson', streak: 15, badge: '🥇' },
-                      { rank: 2, name: 'Alex Rivera', streak: 12, badge: '🥈' },
-                      { rank: 3, name: 'Parker Kim', streak: 9, badge: '🥉' },
-                      { rank: 4, name: 'Jordan Lee', streak: 8, badge: '' },
-                      { rank: 5, name: 'Sam Carter', streak: 6, badge: '' },
-                    ].map(({ rank, name, streak, badge }) => (
+                      { rank: 1, name: 'Mia Thompson', streak: 15 },
+                      { rank: 2, name: 'Alex Rivera', streak: 12 },
+                      { rank: 3, name: 'Parker Kim', streak: 9 },
+                      { rank: 4, name: 'Jordan Lee', streak: 8 },
+                      { rank: 5, name: 'Sam Carter', streak: 6 },
+                    ].map(({ rank, name, streak }) => {
+                      const chip = rank === 1 ? 'linear-gradient(135deg,#FFE08A,#F5B125)' : rank === 2 ? 'linear-gradient(135deg,#E8ECF2,#AEB7C2)' : rank === 3 ? 'linear-gradient(135deg,#E6A977,#C17A45)' : ''
+                      return (
                       <div key={name} className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-2.5">
-                        <span className="w-6 text-center">{badge || <span className="text-xs text-zinc-500">#{rank}</span>}</span>
+                        {chip
+                          ? <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0" style={{ background: chip, color: '#2a2200' }}>{rank}</span>
+                          : <span className="w-5 text-center text-xs text-zinc-500 flex-shrink-0">#{rank}</span>}
                         <span className="flex-1 text-sm font-medium">{name}</span>
-                        <span className="flex items-center gap-1 text-sm">
-                          <svg viewBox="0 0 20 20" width="14" height="14" fill="#F97316"><path d="M10 1.5C7 6 4 8.5 4 12a6 6 0 0012 0c0-3.5-3-6-6-10.5z"/></svg>
+                        <span className="flex items-center gap-1 text-sm tnum">
+                          <svg viewBox="0 0 20 20" width="14" height="14" fill="var(--warn)"><path d="M10 1.5C7 6 4 8.5 4 12a6 6 0 0012 0c0-3.5-3-6-6-10.5z"/></svg>
                           <span style={{ color: 'var(--accent-color)' }}>{streak}d</span>
                         </span>
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
 
                 {/* Overtime flags */}
                 <div className="glass rounded-3xl p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Overtime Flags</h2>
+                    <h2 className="text-lg font-semibold text-white">Overtime Flags</h2>
                     <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-medium">4 flagged</span>
                   </div>
                   <div className="space-y-3">
@@ -5980,7 +5985,7 @@ export default function App() {
 
               {/* Attendance trend */}
               <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Department Attendance Rate</h2>
+                <h2 className="text-lg font-semibold mb-4 text-white">Department Attendance Rate</h2>
                 <div className="space-y-3">
                   {[
                     { dept: 'Engineering', rate: 95 },
@@ -6021,7 +6026,7 @@ export default function App() {
 
               {showAnnouncementForm && (
                 <div className="glass rounded-3xl p-6 space-y-4">
-                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>New Announcement</h2>
+                  <h2 className="text-lg font-semibold text-white">New Announcement</h2>
                   <div className="space-y-3">
                     <div>
                       <div className="text-xs text-zinc-400 mb-1">Title</div>
@@ -6355,7 +6360,7 @@ export default function App() {
               {/* My Paystub module */}
               <div className="glass rounded-3xl p-6">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>My Paystub - {periodLabel}</h2>
+                  <h2 className="text-lg font-semibold text-white">My Paystub - {periodLabel}</h2>
                   <button
                     onClick={() => window.print()}
                     className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm font-medium transition-colors print-hide"
@@ -6839,7 +6844,7 @@ export default function App() {
               {/* Tab: Info */}
               {profileTab === 'info' && (
                 <div className="glass rounded-3xl p-6">
-                  <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Personal Information</h2>
+                  <h2 className="text-lg font-semibold mb-4 text-white">Personal Information</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[['Email', user.email], ['Manager', user.manager_name || '-'], ['User ID', String(user.id)], ['Role', user.job_role || '-'], ['Pay Type', user.salary ? 'Salaried' : 'Hourly'], ['Rate', user.salary ? `$${user.salary.toLocaleString()}/yr` : user.pay ? `$${user.pay}/hr` : '-']].map(([label, val]) => (
                       <div key={label} className="bg-white/5 rounded-2xl p-4">
@@ -6855,7 +6860,7 @@ export default function App() {
               {/* Tab: Work Schedule */}
               {profileTab === 'schedule' && (
                 <div className="glass rounded-3xl p-6 space-y-4">
-                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Work Schedule</h2>
+                  <h2 className="text-lg font-semibold text-white">Work Schedule</h2>
                   {scheduleEdit !== null && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {[
@@ -6910,7 +6915,7 @@ export default function App() {
               {/* Tab: Direct Deposit */}
               {profileTab === 'deposit' && (
                 <div className="glass rounded-3xl p-6 space-y-4">
-                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Direct Deposit</h2>
+                  <h2 className="text-lg font-semibold text-white">Direct Deposit</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {[
                       { label: 'Bank Name', key: 'bank_name', type: 'text' },
@@ -6948,7 +6953,7 @@ export default function App() {
               {/* Tab: Availability */}
               {profileTab === 'availability' && (
                 <div className="glass rounded-3xl p-6 space-y-4">
-                  <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Weekly Availability</h2>
+                  <h2 className="text-lg font-semibold text-white">Weekly Availability</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const).map(day => (
                       <div key={day} className="bg-white/5 rounded-2xl p-3">
@@ -7349,7 +7354,7 @@ export default function App() {
 
                 {/* Security & Compliance */}
                 <div className="glass rounded-3xl p-6">
-                  <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--accent-color)' }}>Security & Compliance</h2>
+                  <h2 className="text-lg font-semibold mb-1 text-white">Security & Compliance</h2>
                   <p className="text-xs text-zinc-400 mb-5">Enterprise-grade security controls and certifications</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {[
@@ -7383,7 +7388,7 @@ export default function App() {
 
                 {/* RBAC */}
                 <div className="glass rounded-3xl p-6">
-                  <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--accent-color)' }}>Role-Based Access Control</h2>
+                  <h2 className="text-lg font-semibold mb-1 text-white">Role-Based Access Control</h2>
                   <p className="text-xs text-zinc-400 mb-5">Granular permission matrix: control exactly what each role can see and do</p>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm" style={{ minWidth: '580px' }}>
@@ -7429,7 +7434,7 @@ export default function App() {
 
                 {/* Integrations */}
                 <div className="glass rounded-3xl p-6">
-                  <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--accent-color)' }}>Integrations</h2>
+                  <h2 className="text-lg font-semibold mb-1 text-white">Integrations</h2>
                   <p className="text-xs text-zinc-400 mb-5">Connect SwiftShift to your existing enterprise stack</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {[
@@ -7580,7 +7585,7 @@ export default function App() {
 
               {/* FAQ */}
               <div className="glass rounded-3xl p-8 mt-8">
-                <h2 className="text-xl font-semibold mb-6" style={{ color: 'var(--accent-color)' }}>Frequently asked questions</h2>
+                <h2 className="text-xl font-semibold mb-6 text-white">Frequently asked questions</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {[
                     { q: 'Can I switch plans anytime?', a: 'Yes, you can upgrade or downgrade at any time. Changes take effect at the start of your next billing cycle.' },

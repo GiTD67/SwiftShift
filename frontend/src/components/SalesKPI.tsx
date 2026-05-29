@@ -136,13 +136,43 @@ function StreakFire({ count }: { count: number }) {
 
 function MiniSparkline({ values, color }: { values: number[]; color: string }) {
   const max = Math.max(...values, 1)
-  const w = 60
-  const h = 24
-  const pts = values.map((v, i) => `${(i / (values.length - 1)) * w},${h - (v / max) * h}`).join(' ')
+  const w = 96
+  const h = 32
+  const n = values.length
+  const x = (i: number) => (n <= 1 ? 0 : (i / (n - 1)) * w)
+  const y = (v: number) => h - (v / max) * (h - 4) - 2
+  const line = values.map((v, i) => `${x(i)},${y(v)}`).join(' ')
+  const area = `0,${h} ${line} ${w},${h}`
+  const last = values[n - 1] ?? 0
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: 'block' }}>
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: 'block', overflow: 'visible' }}>
+      <defs>
+        <linearGradient id="spark-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon points={area} fill="url(#spark-grad)" />
+      <polyline points={line} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={x(n - 1)} cy={y(last)} r="2.5" fill={color} />
     </svg>
+  )
+}
+
+// Gradient rank chip (replaces 🥇🥈🥉 emoji) — gold/silver/bronze for 1/2/3, else plain number
+function RankChip({ rank }: { rank: number }) {
+  const styles: Record<number, { bg: string; fg: string; ring: string }> = {
+    1: { bg: 'linear-gradient(135deg,#FFE08A,#F5B125)', fg: '#3a2a00', ring: 'rgba(245,177,37,0.5)' },
+    2: { bg: 'linear-gradient(135deg,#E8ECF2,#AEB7C2)', fg: '#2a2f36', ring: 'rgba(174,183,194,0.5)' },
+    3: { bg: 'linear-gradient(135deg,#E6A977,#C17A45)', fg: '#3a2412', ring: 'rgba(193,122,69,0.5)' },
+  }
+  const s = styles[rank]
+  if (!s) return <div className="w-6 h-6 flex items-center justify-center text-xs text-zinc-500 font-semibold flex-shrink-0">{rank}</div>
+  return (
+    <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+      style={{ background: s.bg, color: s.fg, boxShadow: `0 0 0 1px ${s.ring}, 0 2px 6px -1px rgba(0,0,0,0.5)` }}>
+      {rank}
+    </div>
   )
 }
 
@@ -403,17 +433,17 @@ export function SalesKPI({ isAdmin = true, accentColor = '#22c55e', addXP }: Sal
             ].map(({ label, value, sub, trend }) => (
               <div key={label} className="glass rounded-2xl p-4">
                 <div className="text-xs text-zinc-400 mb-1">{label}</div>
-                <div className="text-2xl font-bold mb-1" style={{ color: 'var(--accent-color)' }}>{value}</div>
+                <div className="text-2xl font-bold mb-1 tnum" style={label === 'Revenue' ? { color: 'var(--accent-color)' } : { color: 'var(--fg)' }}>{value}</div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-zinc-500">{sub}</span>
-                  <span className="text-xs text-emerald-400 font-medium">{trend}</span>
+                  <span className={`text-xs font-medium ${trend.startsWith('-') ? 'text-danger' : 'text-ok'}`}>{trend.startsWith('-') ? '▼' : '▲'} {trend.replace(/^[+-]/, '')}</span>
                 </div>
               </div>
             ))}
           </div>
 
           <div className="glass rounded-3xl p-6">
-            <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>My Performance</h2>
+            <h2 className="text-lg font-semibold mb-4 text-white">My Performance</h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
                 { val: myRep.closes, label: 'Closes' },
@@ -437,13 +467,13 @@ export function SalesKPI({ isAdmin = true, accentColor = '#22c55e', addXP }: Sal
           </div>
 
           <div className="glass rounded-3xl p-6">
-            <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--accent-color)' }}>Top Performers</h2>
+            <h2 className="text-lg font-semibold mb-4 text-white">Top Performers</h2>
             <div className="space-y-3">
               {sortedReps.slice(0, 3).map((rep, i) => {
                 const pct = Math.round((rep.closes / (sortedReps[0]?.closes || 1)) * 100)
                 return (
                   <div key={rep.id} className="flex items-center gap-3">
-                    <div className="text-xl w-6">{['🥇', '🥈', '🥉'][i]}</div>
+                    <RankChip rank={i + 1} />
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between text-sm mb-1">
                         <span className="font-medium truncate">{rep.name}</span>
@@ -466,7 +496,7 @@ export function SalesKPI({ isAdmin = true, accentColor = '#22c55e', addXP }: Sal
         <motion.div className="space-y-4" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <div className="glass rounded-3xl p-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Team Leaderboard: {PERIOD_LABELS[period]}</h2>
+              <h2 className="text-lg font-semibold text-white">Team Leaderboard: {PERIOD_LABELS[period]}</h2>
               <span className="text-xs text-zinc-500">{reps.length} reps</span>
             </div>
             <div className="space-y-2">
@@ -503,7 +533,7 @@ export function SalesKPI({ isAdmin = true, accentColor = '#22c55e', addXP }: Sal
       {activeTab === 'prizes' && (
         <motion.div className="space-y-4" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Prizes &amp; Rewards</h2>
+            <h2 className="text-lg font-semibold text-white">Prizes &amp; Rewards</h2>
             {isAdmin && (
               <button onClick={() => setShowAddPrize(v => !v)} className="px-3 py-1.5 rounded-xl text-sm font-medium text-black" style={{ backgroundColor: 'var(--accent-color)' }}>
                 {showAddPrize ? 'Cancel' : '+ Add Prize'}
@@ -569,7 +599,7 @@ export function SalesKPI({ isAdmin = true, accentColor = '#22c55e', addXP }: Sal
       {activeTab === 'goals' && (
         <motion.div className="space-y-4" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>KPI Goals &amp; Targets</h2>
+            <h2 className="text-lg font-semibold text-white">KPI Goals &amp; Targets</h2>
             <button onClick={() => setShowAddGoal(v => !v)} className="px-3 py-1.5 rounded-xl text-sm font-medium text-black" style={{ backgroundColor: 'var(--accent-color)' }}>
               {showAddGoal ? 'Cancel' : '+ Set Goal'}
             </button>
@@ -627,7 +657,7 @@ export function SalesKPI({ isAdmin = true, accentColor = '#22c55e', addXP }: Sal
       {activeTab === 'pipeline' && (
         <motion.div className="space-y-4" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Revenue Pipeline</h2>
+            <h2 className="text-lg font-semibold text-white">Revenue Pipeline</h2>
             <button onClick={() => setShowAddDeal(v => !v)} className="px-3 py-1.5 rounded-xl text-sm font-medium text-black" style={{ backgroundColor: 'var(--accent-color)' }}>
               {showAddDeal ? 'Cancel' : '+ Add Deal'}
             </button>
@@ -657,7 +687,7 @@ export function SalesKPI({ isAdmin = true, accentColor = '#22c55e', addXP }: Sal
                 <div key={stage} className="glass rounded-2xl p-4 text-center">
                   <div className="text-xl mb-1">{STAGE_ICONS[stage]}</div>
                   <div className="text-sm font-semibold">{STAGE_LABELS[stage]}</div>
-                  <div className="text-2xl font-bold mt-1" style={{ color: 'var(--accent-color)' }}>{stageDeals.length}</div>
+                  <div className="text-2xl font-bold mt-1 tnum text-white">{stageDeals.length}</div>
                   <div className="text-xs text-zinc-500">{formatCurrency(stageDeals.reduce((s, d) => s + d.value, 0))}</div>
                 </div>
               )
@@ -733,7 +763,7 @@ export function SalesKPI({ isAdmin = true, accentColor = '#22c55e', addXP }: Sal
       {activeTab === 'history' && (
         <motion.div className="space-y-4" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Historical Snapshots</h2>
+            <h2 className="text-lg font-semibold text-white">Historical Snapshots</h2>
             <button onClick={lockSnapshot} className="px-3 py-1.5 rounded-xl text-sm font-medium text-black" style={{ backgroundColor: 'var(--accent-color)' }}>
               📅 Lock This Month
             </button>
@@ -800,7 +830,7 @@ export function SalesKPI({ isAdmin = true, accentColor = '#22c55e', addXP }: Sal
       {activeTab === 'quotas' && (
         <motion.div className="space-y-4" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-color)' }}>Manager-Set Quotas</h2>
+            <h2 className="text-lg font-semibold text-white">Manager-Set Quotas</h2>
             {isAdmin && (
               <button onClick={() => setShowAddQuota(v => !v)} className="px-3 py-1.5 rounded-xl text-sm font-medium text-black" style={{ backgroundColor: 'var(--accent-color)' }}>
                 {showAddQuota ? 'Cancel' : '+ Assign Quota'}
