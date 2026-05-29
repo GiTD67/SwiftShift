@@ -61,6 +61,10 @@ function payPeriodFor(date: Date): { start: Date; end: Date } {
 }
 
 // ===== Org Tree Chart (Vertical Tree) =====
+function orgInitials(name: string): string {
+  return (name || '').split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()
+}
+
 function OctopusChart({ node, expanded, setExpanded, search, expandedAll }: {
   node: any
   expanded: Set<string>
@@ -89,8 +93,13 @@ function OctopusChart({ node, expanded, setExpanded, search, expandedAll }: {
       <div onMouseEnter={handleEnter} onMouseLeave={handleLeave} onClick={() => setSelected(n)} className={`cursor-pointer transition-all w-[170px] ${h ? 'ring-2' : ''}`} style={h ? { outline: '2px solid var(--accent-color)', borderRadius: '12px' } : undefined}>
         <div className="glass rounded-xl p-2 border hover:border-white/30 transition-all hover:-translate-y-0.5 shadow-xl" style={{ borderColor: h ? 'color-mix(in srgb, var(--accent-color) 60%, transparent)' : 'rgba(255,255,255,0.08)' }}>
           <div className="flex items-start gap-2">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-base flex-shrink-0 ${n.reportsTo === null ? 'text-black' : 'bg-white/10'}`} style={n.reportsTo === null ? { backgroundColor: 'var(--accent-color)' } : undefined}>
-              {n.reportsTo === null ? '👑' : '👤'}
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${n.reportsTo === null ? '' : 'bg-white/10 text-white/85'}`}
+              style={n.reportsTo === null
+                ? { background: 'var(--accent-color)', color: 'var(--accent-contrast)', boxShadow: '0 0 12px rgba(var(--accent-color-rgb),0.5)' }
+                : { boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.15)' }}>
+              {n.reportsTo === null
+                ? <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-label="CEO"><path d="M5 16L3 7l5.5 4L12 5l3.5 6L21 7l-2 9H5zm0 2.5h14V21H5z"/></svg>
+                : orgInitials(n.name)}
             </div>
             <div className="min-w-0 flex-1">
               <div className="font-semibold text-xs leading-tight truncate" style={{ color: h ? 'var(--accent-color)' : undefined }}>{n.name}</div>
@@ -104,7 +113,12 @@ function OctopusChart({ node, expanded, setExpanded, search, expandedAll }: {
                 {exp ? '▼' : '▶'} {n.children.length}
               </button>
             )}
-            {n.teamSize > 0 && <div className="text-[9px] text-zinc-400">👥 {n.teamSize}</div>}
+            {n.teamSize > 0 && (
+              <div className="text-[9px] text-zinc-400 flex items-center gap-1">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                {n.teamSize}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -120,15 +134,15 @@ function OctopusChart({ node, expanded, setExpanded, search, expandedAll }: {
         <NodeCard n={n} />
         {hasKids && (
           <div className="relative flex flex-col items-center mt-3">
-            {/* vertical line from parent */}
-            <div className="w-px h-4 bg-white/20" />
+            {/* vertical line from parent — glows with the accent */}
+            <div className="w-px h-4" style={{ background: 'linear-gradient(to bottom, transparent, rgba(var(--accent-color-rgb),0.55))' }} />
             {/* horizontal connector bar */}
-            <div className="h-px bg-white/20" style={{ width: (n.children.length - 1) * 190 + 80 }} />
+            <div className="h-px" style={{ width: (n.children.length - 1) * 190 + 80, background: 'rgba(var(--accent-color-rgb),0.35)', boxShadow: '0 0 6px rgba(var(--accent-color-rgb),0.3)' }} />
             <div className="flex gap-5">
               {n.children.map((child: any) => (
                 <div key={child.id} className="flex flex-col items-center relative">
                   {/* vertical line to child */}
-                  <div className="w-px h-4 bg-white/20" />
+                  <div className="w-px h-4" style={{ background: 'linear-gradient(to bottom, rgba(var(--accent-color-rgb),0.55), transparent)' }} />
                   <TreeNode n={child} />
                 </div>
               ))}
@@ -150,7 +164,7 @@ function OctopusChart({ node, expanded, setExpanded, search, expandedAll }: {
           style={{ left: Math.min(hoverPos.x + 25, (window as any).innerWidth - 280), top: Math.max(hoverPos.y - 110, 20) }}
         >
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-xl">👤</div>
+            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-sm font-bold text-white/85 flex-shrink-0">{orgInitials(hovered.name)}</div>
             <div>
               <div className="font-semibold text-base">{hovered.name}</div>
               <div className="text-xs neon-green">{hovered.title}</div>
@@ -167,10 +181,10 @@ function OctopusChart({ node, expanded, setExpanded, search, expandedAll }: {
 
       {/* Click Modal */}
       {selected && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70" onClick={() => setSelected(null)}>
-          <div className="glass rounded-2xl p-6 w-80 border border-white/20" onClick={(e) => e.stopPropagation()} style={{ boxShadow: '0 0 80px -20px rgba(var(--accent-color-rgb), 0.21), 0 28px 72px -14px rgba(0,0,0,0.85)' }}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center" onClick={() => setSelected(null)} style={{ background: 'var(--scrim)', WebkitBackdropFilter: 'blur(4px)', backdropFilter: 'blur(4px)' }}>
+          <div className="glass--thick rounded-2xl p-6 w-80" onClick={(e) => e.stopPropagation()} style={{ boxShadow: '0 0 80px -20px rgba(var(--accent-color-rgb), 0.21), 0 28px 72px -14px rgba(0,0,0,0.85)' }}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center text-3xl">👤</div>
+              <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center text-xl font-bold text-white/85 flex-shrink-0">{orgInitials(selected.name)}</div>
               <div>
                 <div className="font-semibold text-xl">{selected.name}</div>
                 <div className="text-sm neon-green">{selected.title}</div>
@@ -7152,8 +7166,8 @@ export default function App() {
                         body: JSON.stringify(data),
                       })
                         .then(r => r.json())
-                        .then(() => { alert('Job posted!'); form.reset() })
-                        .catch(() => alert('Failed to post job'))
+                        .then(() => { toast.success('Job posted!'); form.reset() })
+                        .catch(() => toast.error('Failed to post job'))
                     }}
                     className="space-y-4"
                   >
