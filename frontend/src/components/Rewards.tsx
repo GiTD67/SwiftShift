@@ -52,7 +52,10 @@ const HOURLY_RATE_KEY = 'swiftshift-hourly-rate'
 
 function computeHourlyRate(user: any): number {
   const saved = localStorage.getItem(HOURLY_RATE_KEY)
-  if (saved) return parseFloat(saved)
+  if (saved) {
+    const n = parseFloat(saved)
+    if (Number.isFinite(n) && n > 0) return n
+  }
   const salary = Number(user?.salary) || 0
   if (salary > 0) return salary / 2080
   const pay = Number(user?.pay)
@@ -391,10 +394,11 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
                 ref={rateInputRef}
                 type="number"
                 value={hourlyRate}
-                onChange={(e) => setHourlyRate(Math.max(1, parseInt(e.target.value) || 0))}
+                onChange={(e) => setHourlyRate(Math.max(1, parseFloat(e.target.value) || 0))}
                 className="w-full bg-transparent text-right font-mono text-3xl font-bold focus:outline-none"
                 style={{ color: accentColor }}
                 min="1"
+                step="0.01"
               />
               <span className="text-zinc-400 text-base">/hr</span>
             </div>

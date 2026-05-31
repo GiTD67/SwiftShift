@@ -2220,7 +2220,12 @@ function SignupPage() {
 export default function App() {
   const pathname = window.location.pathname
   const userStr = localStorage.getItem('user')
-  const user = userStr ? JSON.parse(userStr) : null
+  let user = null
+  try {
+    user = userStr ? JSON.parse(userStr) : null
+  } catch {
+    localStorage.removeItem('user')
+  }
 
   // Route: auth pages (handle subpath deployments like /hackathon/preview/doesitworkday/)
   const isRoot = pathname === '/' || pathname.endsWith('/')
@@ -2790,9 +2795,13 @@ export default function App() {
     // Quick-load from localStorage so earnings don't flash at $0 on refresh
     const saved = localStorage.getItem('swiftshift-today-ms')
     if (saved) {
-      const { ms, date } = JSON.parse(saved)
-      // Only use if it's still the same day
-      if (date === new Date().toISOString().slice(0, 10)) return Number(ms)
+      try {
+        const { ms, date } = JSON.parse(saved)
+        // Only use if it's still the same day
+        if (date === new Date().toISOString().slice(0, 10)) return Number(ms)
+      } catch {
+        localStorage.removeItem('swiftshift-today-ms')
+      }
     }
     return 0
   })
@@ -3018,7 +3027,7 @@ export default function App() {
   // Earnings milestone toasts ($50, $100, $200, $400)
   useEffect(() => {
     if (!isClockedIn) return
-    const earnings = (todayTotalMs / 3600000) * 65
+    const earnings = (todayTotalMs / 3600000) * clockHourlyRate
     const milestones = [50, 100, 200, 400]
     for (const m of milestones) {
       if (earnings >= m && !earningsMilestoneFiredRef.current.has(m)) {
@@ -3028,7 +3037,7 @@ export default function App() {
         break
       }
     }
-  }, [Math.floor((todayTotalMs / 3600000) * 65 / 50)])
+  }, [Math.floor((todayTotalMs / 3600000) * clockHourlyRate / 50)])
 
   // Overtime warning at 7.5 hours
   const overtimeWarnFiredRef = useRef(false)
@@ -7202,9 +7211,14 @@ export default function App() {
                         if (mdata.jobs) {
                           const enriched = mdata.jobs.map((r: any) => ({ ...r.job, score: r.score, label: r.label }));
                           setInstaJobs(enriched);
+                          toast.success('Resume matched against open roles.');
                         }
+                      } else {
+                        toast.error('Could not process your resume. Please try again.');
                       }
-                    } catch {}
+                    } catch {
+                      toast.error('Could not match jobs. Please try again.');
+                    }
                     setInstaUploading(false);
                     e.target.value = '';
                   }} />
@@ -7216,6 +7230,7 @@ export default function App() {
                 <h2 className="text-lg font-medium mb-4">Open Positions</h2>
                 <div className="grid grid-cols-1 gap-4">
                   {(instaJobs.length ? instaJobs : [
+                    { id: 1, title: 'Member of Technical Staff, Grok', company: 'xAI', location: 'San Francisco, CA', salary: '$320k-$420k', desc: 'Grok ML infrastructure' },
                     { id: 2, title: 'Software Engineer, X (Platform)', company: 'xAI', location: 'Palo Alto, CA', salary: '$280k-$360k', desc: 'X platform infra' },
                     { id: 3, title: 'Research Engineer, Grok Safety', company: 'xAI', location: 'San Francisco, CA', salary: '$310k-$400k', desc: 'AI safety research' },
                     { id: 4, title: 'Software Engineer, X Search', company: 'xAI', location: 'Remote (US)', salary: '$260k-$340k', desc: 'Search infra' },

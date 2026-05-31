@@ -113,9 +113,10 @@ function DigitReel({ digit, speed, isChanged, isOvertime }: DigitReelProps) {
       y.set(spinOffset)
       
       // Settle to final (spring will animate smoothly)
-      setTimeout(() => {
+      const id = setTimeout(() => {
         y.set(offset)
       }, 70)
+      return () => clearTimeout(id)
     } else {
       y.set(offset)
     }

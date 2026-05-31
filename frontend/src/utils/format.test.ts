@@ -38,6 +38,10 @@ describe('calculateDuration', () => {
   it('handles full hours', () => {
     expect(calculateDuration('08:00', '17:00')).toBe(540)
   })
+
+  it('handles overnight shifts crossing midnight', () => {
+    expect(calculateDuration('22:00', '06:00')).toBe(480)
+  })
 })
 
 describe('formatTime', () => {

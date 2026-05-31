@@ -11,7 +11,9 @@ export function formatDuration(minutes: number): string {
 export function calculateDuration(startTime: string, endTime: string): number {
   const start = parse(startTime, 'HH:mm', new Date())
   const end = parse(endTime, 'HH:mm', new Date())
-  return differenceInMinutes(end, start)
+  const mins = differenceInMinutes(end, start)
+  // End before start means the shift crossed midnight; roll into the next day.
+  return mins < 0 ? mins + 1440 : mins
 }
 
 export function formatTime(isoString: string | null): string {
