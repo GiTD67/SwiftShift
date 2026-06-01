@@ -364,7 +364,7 @@ export function SalesKPI({ isAdmin = true, accentColor = '#22c55e', addXP }: Sal
     setShowAddPrize(false)
   }
 
-  const myRep = reps[0]
+  const myRep = reps[0] ?? { id: 0, name: '—', closes: 0, comps: 0, revenue: 0, streak: 0, xp: 0 }
   const sortedReps = [...reps].sort((a, b) => b.closes - a.closes)
   const totalCloses = reps.reduce((s, r) => s + r.closes, 0)
   const totalRevenue = reps.reduce((s, r) => s + r.revenue, 0)

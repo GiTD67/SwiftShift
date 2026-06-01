@@ -193,7 +193,7 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
   useEffect(() => {
     localStorage.setItem(HOURLY_RATE_KEY, String(hourlyRate))
     onRateChange?.(hourlyRate)
-  }, [hourlyRate]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hourlyRate])
 
   // Persist daily goal hours
   useEffect(() => {

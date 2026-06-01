@@ -425,25 +425,30 @@ function getWeekMondayId(): string {
 
 function useGamification() {
   const [gState, setGState] = useState<GamificationState>(() => {
+    const defaults: GamificationState = { totalXP: 0, streak: 0, submits: 0, nlpUses: 0, maxPeriodHours: 0, perfectPeriods: 0, unlockedAchievements: [], weekSubmitStreak: 0, lastSubmitDate: '', weeklyChallenge: null, bossChallenge: null, customAccentColor: '' }
     const saved = localStorage.getItem('swiftshift-gamification')
     if (saved) {
-      const parsed = JSON.parse(saved)
-      return {
-        totalXP: parsed.totalXP || 0,
-        streak: parsed.streak || 0,
-        submits: parsed.submits || 0,
-        nlpUses: parsed.nlpUses || 0,
-        maxPeriodHours: parsed.maxPeriodHours || 0,
-        perfectPeriods: parsed.perfectPeriods || 0,
-        unlockedAchievements: parsed.unlockedAchievements || [],
-        weekSubmitStreak: parsed.weekSubmitStreak || 0,
-        lastSubmitDate: parsed.lastSubmitDate || '',
-        weeklyChallenge: parsed.weeklyChallenge || null,
-        bossChallenge: parsed.bossChallenge || null,
-        customAccentColor: parsed.customAccentColor || '',
+      try {
+        const parsed = JSON.parse(saved)
+        return {
+          totalXP: parsed.totalXP || 0,
+          streak: parsed.streak || 0,
+          submits: parsed.submits || 0,
+          nlpUses: parsed.nlpUses || 0,
+          maxPeriodHours: parsed.maxPeriodHours || 0,
+          perfectPeriods: parsed.perfectPeriods || 0,
+          unlockedAchievements: parsed.unlockedAchievements || [],
+          weekSubmitStreak: parsed.weekSubmitStreak || 0,
+          lastSubmitDate: parsed.lastSubmitDate || '',
+          weeklyChallenge: parsed.weeklyChallenge || null,
+          bossChallenge: parsed.bossChallenge || null,
+          customAccentColor: parsed.customAccentColor || '',
+        }
+      } catch {
+        localStorage.removeItem('swiftshift-gamification')
       }
     }
-    return { totalXP: 0, streak: 0, submits: 0, nlpUses: 0, maxPeriodHours: 0, perfectPeriods: 0, unlockedAchievements: [], weekSubmitStreak: 0, lastSubmitDate: '', weeklyChallenge: null, bossChallenge: null, customAccentColor: '' }
+    return defaults
   })
   const [floatingXP, setFloatingXP] = useState<{ id: number; amount: number; x: number; y: number }[]>([])
   const streakNotifiedRef = useRef(false)
@@ -2671,7 +2676,7 @@ export default function App() {
   const managerViews: View[] = ['admin', 'schedules', 'payroll', 'reports', 'leaves', 'compliance', 'hiring', 'teamkpi', 'announcements', 'auditlog', 'enterprise']
   useEffect(() => {
     if (managerViews.includes(activeView)) setManagerSectionOpen(true)
-  }, [activeView]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeView])
 
   // Load existing tax files for Grok Tax (check s3/<user_id> via fill-1040)
   useEffect(() => {
@@ -4529,7 +4534,7 @@ export default function App() {
             const today = new Date(); today.setHours(0,0,0,0)
             const enriched = holidays.map(h => {
               const base = new Date(h.date + 'T00:00:00')
-              let next = new Date(base)
+              const next = new Date(base)
               if (h.recurring) {
                 next.setFullYear(today.getFullYear())
                 if (next < today) next.setFullYear(today.getFullYear() + 1)

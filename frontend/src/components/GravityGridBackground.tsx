@@ -272,7 +272,8 @@ export function GravityGridBackground() {
     resize()
 
     let mx = 0, my = 0, tx = 0, ty = 0
-    let down = 0, clickPulse = 0
+    const down = 0
+    let clickPulse = 0
     const ripples: Ripple[] = []
     const shoots: ShootingStar[] = []
 
