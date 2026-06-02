@@ -75,6 +75,8 @@ export function useClock() {
   }, [clock.isClockedIn, clockIn, clockOut])
 
   const formatElapsed = useCallback((seconds: number): string => {
+    // Corrupted/skewed clock state can yield NaN or negative values; show zero.
+    if (!Number.isFinite(seconds) || seconds < 0) return '00:00:00'
     const h = Math.floor(seconds / 3600)
     const m = Math.floor((seconds % 3600) / 60)
     const s = seconds % 60

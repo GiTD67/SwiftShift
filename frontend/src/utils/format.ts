@@ -11,6 +11,8 @@ export function formatDuration(minutes: number): string {
 export function calculateDuration(startTime: string, endTime: string): number {
   const start = parse(startTime, 'HH:mm', new Date())
   const end = parse(endTime, 'HH:mm', new Date())
+  // Unparseable input (empty/garbage strings) yields Invalid Date → NaN diff.
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0
   const mins = differenceInMinutes(end, start)
   // End before start means the shift crossed midnight; roll into the next day.
   return mins < 0 ? mins + 1440 : mins

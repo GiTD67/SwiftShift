@@ -712,14 +712,18 @@ function TimesheetView({ user, gamification }: { user: any; gamification: Return
     const p = calcPay(sub.total_hours)
     const win = window.open('', '_blank')
     if (!win) return
-    win.document.write(`<!DOCTYPE html><html><head><title>Pay Stub ${sub.period_start}</title>
+    // Escape interpolated values so names/dates containing &, <, > render correctly.
+    const esc = (v: unknown) => String(v ?? '').replace(/[&<>"]/g, c => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string
+    ))
+    win.document.write(`<!DOCTYPE html><html><head><title>Pay Stub ${esc(sub.period_start)}</title>
 <style>body{font-family:Arial,sans-serif;max-width:600px;margin:40px auto;padding:20px}h1{font-size:22px;border-bottom:2px solid #333;padding-bottom:10px}.row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee}.bold{font-weight:bold}.section{margin:20px 0}@media print{.no-print{display:none}}</style>
 </head><body>
 <h1>SwiftShift Pay Stub</h1>
 <div class="section">
-<div class="row"><span>Employee</span><span>${user?.first_name} ${user?.last_name}</span></div>
-<div class="row"><span>Role</span><span>${user?.job_role || 'N/A'}</span></div>
-<div class="row"><span>Pay Period</span><span>${sub.period_start} to ${sub.period_end}</span></div>
+<div class="row"><span>Employee</span><span>${esc(user?.first_name)} ${esc(user?.last_name)}</span></div>
+<div class="row"><span>Role</span><span>${esc(user?.job_role || 'N/A')}</span></div>
+<div class="row"><span>Pay Period</span><span>${esc(sub.period_start)} to ${esc(sub.period_end)}</span></div>
 <div class="row"><span>Submitted</span><span>${sub.submitted_at ? new Date(sub.submitted_at).toLocaleDateString() : 'N/A'}</span></div>
 </div>
 <div class="section"><h2 style="font-size:16px">Earnings</h2>
@@ -1120,6 +1124,7 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
                       {d.toLocaleDateString([], { month: 'short', day: 'numeric' })}
                     </div>
                     <input type="text" inputMode="decimal" value={val}
+                      aria-label={`Hours worked on ${d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}`}
                       onChange={e => {
                         setDayHours(i, e.target.value)
                         const hrs = parseHours(e.target.value)

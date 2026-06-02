@@ -42,6 +42,11 @@ describe('calculateDuration', () => {
   it('handles overnight shifts crossing midnight', () => {
     expect(calculateDuration('22:00', '06:00')).toBe(480)
   })
+
+  it('returns 0 for unparseable time strings', () => {
+    expect(calculateDuration('', '17:00')).toBe(0)
+    expect(calculateDuration('09:00', 'abc')).toBe(0)
+  })
 })
 
 describe('formatTime', () => {
