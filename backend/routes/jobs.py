@@ -18,16 +18,18 @@ def list_jobs():
 def create_job():
     data = request.get_json() or {}
     description = data.get("description")
+    if not description:
+        return jsonify({"error": "description required"}), 400
     hiring_manager_id = data.get("hiring_manager_id")
     salary = data.get("salary")
     location = data.get("location")
     now = datetime.utcnow().isoformat()
     with get_db() as db:
-        cur = db.execute(
+        row = db.execute(
             """INSERT INTO jobs (description, hiring_manager_id, date_posted, date_expiry, salary, location)
-               VALUES (?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?) RETURNING *""",
             (description, hiring_manager_id, now, data.get("date_expiry"), salary, location),
-        )
-        db.commit()
-        row = db.execute("SELECT * FROM jobs WHERE job_id = ?", (cur.lastrowid,)).fetchone()
+        ).fetchone()
+    if not row:
+        return jsonify({"error": "failed to create job"}), 500
     return jsonify(dict(row)), 201

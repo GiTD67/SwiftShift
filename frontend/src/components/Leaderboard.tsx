@@ -303,11 +303,13 @@ export function Leaderboard({ gState, users, accentColor, user, totalHoursThisWe
                       onClick={() => { setEditingMetric(m); setMetricDraft({ name: m.name, description: m.description, unit: m.unit, icon: m.icon, target: m.target }); setShowMetricForm(true) }}
                       className="text-zinc-500 hover:text-zinc-300 text-xs px-1"
                       title="Edit"
+                      aria-label={`Edit ${m.name} metric`}
                     >✎</button>
                     <button
                       onClick={() => handleDeleteMetric(m.id)}
                       className="text-zinc-600 hover:text-red-400 text-xs px-1"
                       title="Delete"
+                      aria-label={`Delete ${m.name} metric`}
                     >✕</button>
                   </>
                 )}

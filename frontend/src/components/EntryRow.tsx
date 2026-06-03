@@ -174,6 +174,7 @@ export function EntryRow({ entry, onUpdate, onDelete, disabled }: EntryRowProps)
           className="text-red-500/60 hover:text-red-400 p-1 transition text-sm"
           whileHover={{ scale: 1.2 }}
           title="Delete"
+          aria-label="Delete entry"
         >
           ✕
         </motion.button>

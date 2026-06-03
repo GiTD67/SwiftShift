@@ -25,6 +25,8 @@ def create_employee():
         cur = db.execute("INSERT INTO employees (name, email) VALUES (?, ?)", (name, email))
         db.commit()
         emp = db.execute("SELECT * FROM employees WHERE id = ?", (cur.lastrowid,)).fetchone()
+    if not emp:
+        return jsonify({"error": "failed to create employee"}), 500
     return jsonify(dict(emp)), 201
 
 
