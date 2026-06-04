@@ -1,3 +1,4 @@
+import math
 from datetime import datetime
 
 from flask import Blueprint, jsonify, request
@@ -67,9 +68,15 @@ def accrue_pto():
     hours_worked = data.get("hours_worked")
     if not user_id or hours_worked is None:
         return jsonify({"error": "user_id and hours_worked required"}), 400
+    try:
+        hours_worked = float(hours_worked)
+    except (TypeError, ValueError):
+        return jsonify({"error": "hours_worked must be a number"}), 400
+    if not math.isfinite(hours_worked):
+        return jsonify({"error": "hours_worked must be a finite number"}), 400
 
     accrual_rate = 0.0385  # ~1 hr per 26 hrs worked (~10 days/year)
-    hours_accrued = round(float(hours_worked) * accrual_rate, 4)
+    hours_accrued = round(hours_worked * accrual_rate, 4)
 
     with get_db() as db:
         _ensure_tables(db)
@@ -118,6 +125,12 @@ def create_request():
     hours_requested = data.get("hours_requested")
     if not all([user_id, start_date, end_date, hours_requested is not None]):
         return jsonify({"error": "user_id, start_date, end_date, hours_requested required"}), 400
+    try:
+        hours_requested = float(hours_requested)
+    except (TypeError, ValueError):
+        return jsonify({"error": "hours_requested must be a number"}), 400
+    if not math.isfinite(hours_requested):
+        return jsonify({"error": "hours_requested must be a finite number"}), 400
 
     with get_db() as db:
         _ensure_tables(db)
@@ -126,7 +139,7 @@ def create_request():
             "SELECT hours_available FROM pto_balances WHERE user_id = ?", (user_id,)
         ).fetchone()
         available = float(balance_row["hours_available"]) if balance_row else 0
-        if available < float(hours_requested):
+        if available < hours_requested:
             return jsonify({"error": "insufficient PTO balance", "available": available}), 400
 
         row = db.execute(

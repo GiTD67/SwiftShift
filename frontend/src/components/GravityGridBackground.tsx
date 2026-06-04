@@ -296,7 +296,14 @@ export function GravityGridBackground() {
       ty = -((e.clientY / window.innerHeight) * 2 - 1)
     }
 
-    const shootInterval = setInterval(() => { if (Math.random() < 0.45) spawnShooting() }, 4800)
+    // Respect users who prefer reduced motion: render a single static frame
+    // instead of the continuous shader animation (accessibility + battery).
+    const reduceMotion = typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    const shootInterval = reduceMotion
+      ? null
+      : setInterval(() => { if (Math.random() < 0.45) spawnShooting() }, 4800)
     window.addEventListener('resize', resize)
     document.addEventListener('mousemove', onMouseMove)
 
@@ -366,13 +373,13 @@ export function GravityGridBackground() {
       gl!.uniform1f(U['u_preset']!, state.preset)
 
       gl!.drawArrays(gl!.TRIANGLE_STRIP, 0, 4)
-      animId = requestAnimationFrame(frame)
+      if (!reduceMotion) animId = requestAnimationFrame(frame)
     }
     animId = requestAnimationFrame(frame)
 
     return () => {
       cancelAnimationFrame(animId)
-      clearInterval(shootInterval)
+      if (shootInterval) clearInterval(shootInterval)
       window.removeEventListener('resize', resize)
       document.removeEventListener('mousemove', onMouseMove)
       gl.deleteProgram(prog)

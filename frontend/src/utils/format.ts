@@ -1,6 +1,10 @@
 import { format, parse, differenceInMinutes, addDays } from 'date-fns'
 
 export function formatDuration(minutes: number): string {
+  // Guard against NaN/Infinity/negative durations from corrupt data, which
+  // would otherwise render as "NaNm" / "Infinityh" / "-1h -30m".
+  if (!Number.isFinite(minutes) || minutes <= 0) return '0m'
+  minutes = Math.round(minutes)
   const hours = Math.floor(minutes / 60)
   const mins = minutes % 60
   if (hours === 0) return `${mins}m`
@@ -20,7 +24,10 @@ export function calculateDuration(startTime: string, endTime: string): number {
 
 export function formatTime(isoString: string | null): string {
   if (!isoString) return ''
-  return format(new Date(isoString), 'h:mm a')
+  const d = new Date(isoString)
+  // date-fns format() throws RangeError on an invalid Date; guard the render.
+  if (isNaN(d.getTime())) return ''
+  return format(d, 'h:mm a')
 }
 
 export function getWeekDates(): string[] {
@@ -38,9 +45,13 @@ export function getWeekDates(): string[] {
 }
 
 export function getDayName(dateStr: string): string {
-  return format(new Date(dateStr), 'EEE')
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return ''
+  return format(d, 'EEE')
 }
 
 export function getDayNumber(dateStr: string): string {
-  return format(new Date(dateStr), 'd')
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return ''
+  return format(d, 'd')
 }

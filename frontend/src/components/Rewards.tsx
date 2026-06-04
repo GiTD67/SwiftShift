@@ -68,8 +68,8 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
   const [hourlyRate, setHourlyRate] = useState(() => computeHourlyRate(user))
   const [ptoAccrualRate, setPtoAccrualRate] = useState(1 / 30)
   const [dailyGoalHours, setDailyGoalHours] = useState(() => {
-    const saved = localStorage.getItem('swiftshift-daily-goal-hours')
-    return saved ? parseFloat(saved) : 8
+    const saved = parseFloat(localStorage.getItem('swiftshift-daily-goal-hours') || '')
+    return Number.isFinite(saved) && saved > 0 ? saved : 8
   })
   const [hasFiredConfetti, setHasFiredConfetti] = useState(false)
   const [streak, setStreak] = useState(0)
@@ -97,7 +97,7 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
 
   // Gamification calculations
   const dailyGoalDollars = hourlyRate * dailyGoalHours
-  const dailyGoalProgress = Math.min(100, earnedToday > 0 ? (earnedToday / dailyGoalDollars) * 100 : 0)
+  const dailyGoalProgress = dailyGoalDollars > 0 ? Math.min(100, (earnedToday / dailyGoalDollars) * 100) : 0
 
   const totalXP = Math.floor(totalHours * 100)
   const level = Math.floor(totalXP / 500) + 1

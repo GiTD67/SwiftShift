@@ -24,6 +24,19 @@ describe('formatDuration', () => {
   it('handles zero minutes', () => {
     expect(formatDuration(0)).toBe('0m')
   })
+
+  it('clamps negative durations to 0m', () => {
+    expect(formatDuration(-30)).toBe('0m')
+  })
+
+  it('returns 0m for NaN and Infinity', () => {
+    expect(formatDuration(NaN)).toBe('0m')
+    expect(formatDuration(Infinity)).toBe('0m')
+  })
+
+  it('rounds fractional minutes', () => {
+    expect(formatDuration(90.5)).toBe('1h 31m')
+  })
 })
 
 describe('calculateDuration', () => {
@@ -59,6 +72,10 @@ describe('formatTime', () => {
   it('returns empty string for null', () => {
     expect(formatTime(null)).toBe('')
   })
+
+  it('returns empty string for an invalid date string', () => {
+    expect(formatTime('not-a-date')).toBe('')
+  })
 })
 
 describe('getWeekDates', () => {
@@ -85,10 +102,18 @@ describe('getDayName', () => {
   it('returns abbreviated day name', () => {
     expect(getDayName('2024-01-15')).toBe('Mon')
   })
+
+  it('returns empty string for an invalid date string', () => {
+    expect(getDayName('nope')).toBe('')
+  })
 })
 
 describe('getDayNumber', () => {
   it('returns day of month as string', () => {
     expect(getDayNumber('2024-01-15')).toBe('15')
+  })
+
+  it('returns empty string for an invalid date string', () => {
+    expect(getDayNumber('nope')).toBe('')
   })
 })

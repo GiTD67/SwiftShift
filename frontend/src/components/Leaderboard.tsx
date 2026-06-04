@@ -135,7 +135,7 @@ export function Leaderboard({ gState, users, accentColor, user, totalHoursThisWe
         displayValue = `${hrs.toFixed(1)} hrs`
       } else if (category === 'submissions') {
         const subs = isMe
-          ? (period === 'week' ? gState.submits % 5 : gState.submits)
+          ? (period === 'week' ? Math.min(gState.submits, 5) : gState.submits)
           : (period === 'week' ? simSubmissionsWeek(u.id) : simSubmissionsMonth(u.id))
         score = subs
         displayValue = `${subs} submitted`

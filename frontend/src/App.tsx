@@ -2757,16 +2757,16 @@ export default function App() {
   useEffect(() => {
     if (activeView !== 'profile' || !user?.id) return
     const uid = user.id
-    fetch(`${API_BASE}/api/work-schedule?user_id=${uid}`).then(r => r.json()).then(d => { setWorkSchedule(d); setScheduleEdit(d) }).catch(() => {})
-    fetch(`${API_BASE}/api/direct-deposit?user_id=${uid}`).then(r => r.json()).then(d => { setDirectDeposit(d); setDepositEdit(d) }).catch(() => {})
-    fetch(`${API_BASE}/api/availability?user_id=${uid}`).then(r => r.json()).then(d => { setWorkAvailability(d); setAvailabilityEdit(d) }).catch(() => {})
+    fetch(`${API_BASE}/api/work-schedule?user_id=${uid}`).then(r => (r.ok ? r.json() : null)).then(d => { setWorkSchedule(d); setScheduleEdit(d) }).catch(() => {})
+    fetch(`${API_BASE}/api/direct-deposit?user_id=${uid}`).then(r => (r.ok ? r.json() : null)).then(d => { setDirectDeposit(d); setDepositEdit(d) }).catch(() => {})
+    fetch(`${API_BASE}/api/availability?user_id=${uid}`).then(r => (r.ok ? r.json() : null)).then(d => { setWorkAvailability(d); setAvailabilityEdit(d) }).catch(() => {})
   }, [activeView, user?.id])
 
   // Load leave management data
   useEffect(() => {
     if (activeView !== 'leaves' || !user?.id) return
     const uid = user.id
-    fetch(`${API_BASE}/api/pto/balance?user_id=${uid}`).then(r => r.json()).then(setPtoBalance).catch(() => {})
+    fetch(`${API_BASE}/api/pto/balance?user_id=${uid}`).then(r => (r.ok ? r.json() : null)).then(setPtoBalance).catch(() => {})
     fetch(`${API_BASE}/api/pto/requests?user_id=${uid}`).then(r => r.json()).then(r => setPtoRequests(Array.isArray(r) ? r : [])).catch(() => {})
     fetch(`${API_BASE}/api/pto/requests`).then(r => r.json()).then(r => setAllPtoRequests(Array.isArray(r) ? r : [])).catch(() => {})
   }, [activeView, user?.id])

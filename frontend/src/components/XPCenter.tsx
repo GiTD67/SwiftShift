@@ -99,7 +99,7 @@ export function XPCenter({ gState, currentLevel, nextLevel, users, accentColor, 
   const bossProgress = bossChallenge
     ? bossChallenge.shortReq === 'perfectPeriods' ? gState.perfectPeriods
     : bossChallenge.shortReq === 'streak' ? gState.streak
-    : gState.totalXP - currentLevel.xpNeeded
+    : Math.max(0, gState.totalXP - currentLevel.xpNeeded)
     : 0
 
   const leaderboard = users.length > 0
