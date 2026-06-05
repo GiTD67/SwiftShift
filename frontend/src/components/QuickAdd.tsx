@@ -115,6 +115,8 @@ export function QuickAdd({ onAdd, disabled }: QuickAddProps) {
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
+                aria-label="Close new time entry form"
+                title="Close"
                 className="text-zinc-400 hover:text-white"
               >
                 ✕

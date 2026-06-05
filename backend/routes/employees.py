@@ -59,8 +59,11 @@ def exit_time():
             return jsonify({"error": "not found"}), 404
         if row["clock_out"]:
             return jsonify({"error": "already clocked out"}), 400
-        clock_in = datetime.fromisoformat(row["clock_in"])
-        duration = int((datetime.utcnow() - clock_in).total_seconds() / 60)
+        try:
+            clock_in = datetime.fromisoformat(row["clock_in"])
+        except (TypeError, ValueError):
+            return jsonify({"error": "session has an invalid clock-in time"}), 409
+        duration = max(0, int((datetime.utcnow() - clock_in).total_seconds() / 60))
         db.execute(
             "UPDATE clock_sessions SET clock_out = ?, duration_minutes = ? WHERE id = ?",
             (now, duration, session_id),

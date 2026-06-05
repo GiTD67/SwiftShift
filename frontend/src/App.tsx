@@ -674,8 +674,11 @@ function TimesheetView({ user, gamification }: { user: any; gamification: Return
 
   const dayHours = dayDates.map((_, i) => parseHours(entries[entryKey(periodId, i)] || ''))
   const totalHours = dayHours.reduce((a, b) => a + b, 0)
-  const regularHours = dayHours.reduce((sum, h) => sum + Math.min(h, 8), 0)
-  const overtimeHours = dayHours.reduce((sum, h) => sum + Math.max(0, h - 8) * 1.5, 0)
+  // Overtime is period-based (>80h per pay period) to match calcPay, the 80h
+  // progress bar, and the printed pay stub. A daily (>8h) basis showed OT the
+  // employee was never actually paid for.
+  const regularHours = Math.min(totalHours, 80)
+  const overtimeHours = Math.max(0, totalHours - 80)
   const isSubmitted = submittedPeriods.has(periodId)
 
   const todayStr = new Date().toISOString().slice(0, 10)
@@ -1060,8 +1063,8 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
             </div>
             <div>
               <div className="text-xs text-zinc-400">Approver</div>
-              <div className="font-medium text-sm">Taylor Brooks</div>
-              <div className="text-xs text-zinc-500">Engineering Manager</div>
+              <div className="font-medium text-sm">{user.manager_name || 'Unassigned'}</div>
+              <div className="text-xs text-zinc-500">Manager</div>
             </div>
             <div>
               <div className="flex flex-wrap gap-2">
