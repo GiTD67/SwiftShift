@@ -249,6 +249,9 @@ def google_auth():
                 (given_name or "Google", family_name or "User", email, "google-oauth"),
             ).fetchone()
 
+    if not row:
+        return jsonify({"error": "Failed to sign in with Google"}), 500
+
     return jsonify({
         "id": row["id"],
         "first_name": row["first_name"],

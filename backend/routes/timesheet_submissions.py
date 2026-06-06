@@ -1,3 +1,5 @@
+import math
+
 from flask import Blueprint, jsonify, request
 
 from db import get_db
@@ -49,6 +51,13 @@ def create_submission():
     if not all([user_id, period_start, period_end, total_hours is not None]):
         return jsonify({"error": "user_id, period_start, period_end, and total_hours are required"}), 400
 
+    try:
+        total_hours = float(total_hours)
+    except (TypeError, ValueError):
+        return jsonify({"error": "total_hours must be a number"}), 400
+    if not math.isfinite(total_hours):
+        return jsonify({"error": "total_hours must be a finite number"}), 400
+
     with get_db() as db:
         _ensure_table(db)
         row = db.execute(
@@ -64,4 +73,6 @@ def create_submission():
             (user_id, period_start, period_end, total_hours),
         ).fetchone()
         db.commit()
+    if not row:
+        return jsonify({"error": "failed to save submission"}), 500
     return jsonify(dict(row)), 201

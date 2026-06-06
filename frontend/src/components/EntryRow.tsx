@@ -64,12 +64,15 @@ export function EntryRow({ entry, onUpdate, onDelete, disabled }: EntryRowProps)
             {PROJECTS.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
         ) : (
-          <div
+          <button
+            type="button"
             onClick={() => startEdit('project', entry.project)}
-            className="text-sm font-medium cursor-pointer hover:text-white/70 transition"
+            disabled={disabled}
+            aria-label={`Edit project, currently ${entry.project}`}
+            className="text-sm font-medium cursor-pointer hover:text-white/70 transition text-left w-full disabled:cursor-default"
           >
             {entry.project}
-          </div>
+          </button>
         )}
       </div>
 
@@ -87,12 +90,15 @@ export function EntryRow({ entry, onUpdate, onDelete, disabled }: EntryRowProps)
             {TASKS.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         ) : (
-          <div
+          <button
+            type="button"
             onClick={() => startEdit('task', entry.task)}
-            className="text-sm text-zinc-400 cursor-pointer hover:text-white/70 transition"
+            disabled={disabled}
+            aria-label={`Edit task, currently ${entry.task}`}
+            className="text-sm text-zinc-400 cursor-pointer hover:text-white/70 transition text-left w-full disabled:cursor-default"
           >
             {entry.task}
-          </div>
+          </button>
         )}
       </div>
 
@@ -109,12 +115,15 @@ export function EntryRow({ entry, onUpdate, onDelete, disabled }: EntryRowProps)
             className="bg-zinc-800 text-sm rounded-lg px-2 py-1 w-full border border-white/20 focus:outline-none"
           />
         ) : (
-          <span
+          <button
+            type="button"
             onClick={() => startEdit('startTime', entry.startTime)}
-            className="cursor-pointer hover:text-white/70 transition"
+            disabled={disabled}
+            aria-label={`Edit start time, currently ${entry.startTime}`}
+            className="cursor-pointer hover:text-white/70 transition disabled:cursor-default"
           >
             {entry.startTime}
-          </span>
+          </button>
         )}
         <span className="text-zinc-600">to</span>
         {editing === 'endTime' ? (
@@ -128,12 +137,15 @@ export function EntryRow({ entry, onUpdate, onDelete, disabled }: EntryRowProps)
             className="bg-zinc-800 text-sm rounded-lg px-2 py-1 w-full border border-white/20 focus:outline-none"
           />
         ) : (
-          <span
+          <button
+            type="button"
             onClick={() => startEdit('endTime', entry.endTime)}
-            className="cursor-pointer hover:text-white/70 transition"
+            disabled={disabled}
+            aria-label={`Edit end time, currently ${entry.endTime}`}
+            className="cursor-pointer hover:text-white/70 transition disabled:cursor-default"
           >
             {entry.endTime}
-          </span>
+          </button>
         )}
       </div>
 
@@ -155,12 +167,15 @@ export function EntryRow({ entry, onUpdate, onDelete, disabled }: EntryRowProps)
             placeholder="Notes..."
           />
         ) : (
-          <div
+          <button
+            type="button"
             onClick={() => startEdit('description', entry.description)}
-            className="cursor-pointer hover:text-white/70 transition truncate"
+            disabled={disabled}
+            aria-label={entry.description ? `Edit description, currently ${entry.description}` : 'Add description'}
+            className="cursor-pointer hover:text-white/70 transition truncate text-left w-full disabled:cursor-default"
           >
             {entry.description || <span className="italic opacity-50">No description</span>}
-          </div>
+          </button>
         )}
       </div>
 
