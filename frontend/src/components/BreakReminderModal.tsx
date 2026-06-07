@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { StateBreakRule } from '../data/stateBreakRules'
 
@@ -28,6 +29,16 @@ export function BreakReminderModal({
     : `Meal Break Required`
 
   const urgencyColor = hoursWorked >= rule.triggerAfterHours + 0.5 ? '#ef4444' : 'var(--accent-color)'
+
+  // Allow keyboard-only users to dismiss the modal with Escape
+  useEffect(() => {
+    if (!isOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onDismiss()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isOpen, onDismiss])
 
   return (
     <AnimatePresence>

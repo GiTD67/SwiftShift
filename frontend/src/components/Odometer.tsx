@@ -84,7 +84,8 @@ function DigitReel({ digit, speed, isChanged, isOvertime }: DigitReelProps) {
   
   // The digit positions (0-9)
   const digitList = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
-  const currentIndex = digitList.indexOf(digit)
+  // Fall back to 0 for any non-digit input so the reel never offsets off-screen
+  const currentIndex = Math.max(0, digitList.indexOf(digit))
   
   // Calculate offset: each digit is 1em tall, so we offset by -currentIndex * 1em
   const offset = -currentIndex * 1.05 // slightly more than 1em for visual spacing

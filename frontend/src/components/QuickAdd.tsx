@@ -69,6 +69,14 @@ export function QuickAdd({ onAdd, disabled }: QuickAddProps) {
       return
     }
 
+    // Equal start/end is a zero-length entry. (A later end-of-day time is a
+    // valid overnight shift — calculateDuration rolls it past midnight — so we
+    // only reject the genuinely empty case here.)
+    if (form.startTime === form.endTime) {
+      toast.error('Start and end times must differ')
+      return
+    }
+
     onAdd(form)
     toast.success('Time entry added! ✅', {
       description: `${form.project} • ${form.task}`
