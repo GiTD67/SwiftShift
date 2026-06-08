@@ -1,0 +1,20 @@
+# Render Blueprint — deploys SwiftShift as a Docker web service on the FREE plan.
+# The database lives separately on Neon (free Postgres); paste its connection
+# string into DATABASE_URL when Render prompts you.
+services:
+  - type: web
+    name: swiftshift
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        sync: false        # paste your Neon connection string (Render prompts on first deploy)
+      - key: XAI_API_KEY
+        sync: false        # paste your xAI / Grok API key (Render prompts on first deploy)
+      - key: ALLOWED_ORIGINS
+        value: "*"         # tighten to https://swiftshift.work once the domain is connected
+      - key: WEB_CONCURRENCY
+        value: "1"         # one gunicorn worker fits the free 512 MB instance
