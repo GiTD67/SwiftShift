@@ -1692,6 +1692,85 @@ function ResetPasswordPage() {
 }
 
 // ===== Auth pages =====
+const AUTH_TESTIMONIALS = [
+  { quote: 'SwiftShift cut our payroll processing time in half. The real-time earnings view alone boosted team morale.', initials: 'JM', name: 'Jamie M.', role: 'HR Director' },
+  { quote: 'Clock-ins went from a daily chore to a non-event. My crew actually keeps their hours up to date now.', initials: 'DP', name: 'Dana P.', role: 'Operations Manager' },
+  { quote: 'Swifty pulled my W-2 numbers and filled out my 1040 in minutes. Tax season was painless this year.', initials: 'MR', name: 'Marcus R.', role: 'Shift Supervisor' },
+  { quote: 'Schedules, swaps, and PTO finally live in one place. My managers get hours of their week back.', initials: 'AL', name: 'Aisha L.', role: 'Store Manager' },
+]
+
+// Left-side brand panel shared by the login and signup pages (desktop only).
+function AuthSidePanel({ accentHex }: { accentHex: string }) {
+  const [quoteIndex, setQuoteIndex] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => setQuoteIndex(i => (i + 1) % AUTH_TESTIMONIALS.length), 7000)
+    return () => clearInterval(t)
+  }, [])
+  const testimonial = AUTH_TESTIMONIALS[quoteIndex]
+  return (
+    <div className="hidden lg:flex w-5/12 flex-col justify-between gap-10 p-10 relative z-10">
+      <div className="shrink-0">
+        <div className="flex items-center gap-3 mb-8">
+          <LogoSVG className="h-9 w-auto" />
+          <span className="font-semibold text-2xl tracking-[1px]">SWIFTSHIFT</span>
+        </div>
+        <div className="max-w-[400px]">
+          <div className="uppercase tracking-[4px] text-xs text-zinc-500 mb-3"><span style={{ color: accentHex }}>AI POWERED</span> HR ENTERPRISE PLATFORM</div>
+          <h1 className="text-[52px] leading-[1.05] font-semibold tracking-tighter mb-5">
+            Time is <span style={{ background: `linear-gradient(135deg, ${accentHex}, #ffffff)`, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>money.</span>
+          </h1>
+
+          {/* Stats row */}
+          <div className="flex gap-6 mb-7">
+            {[['10k+', 'Employees'], ['99.9%', 'Uptime'], ['4.9★', 'Rated']].map(([val, label]) => (
+              <div key={label}>
+                <div className="text-xl font-bold" style={{ color: accentHex }}>{val}</div>
+                <div className="text-xs text-zinc-600 mt-0.5">{label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Feature cards */}
+          <div className="space-y-2.5">
+            {[
+              { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={accentHex} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>, title: 'One-tap Clock In', desc: 'Punch in instantly. Stay logged in.' },
+              { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={accentHex} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>, title: 'Real-Time Earnings', desc: 'Watch your pay grow live as you work.' },
+              { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={accentHex} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>, title: 'AI Tax Filing', desc: 'Swifty auto-fills your 1040 from your W-2, free.' },
+              { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={accentHex} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.5 12.5 17 22l-5-3-5 3 1.5-9.5"/></svg>, title: 'Rewards & XP', desc: 'Level up and unlock perks just for showing up.' },
+              { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={accentHex} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>, title: 'InstaApply', desc: 'AI job matching with one-click applications.' },
+            ].map(({ icon, title, desc }) => (
+              <div key={title} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${accentHex}18` }}>
+                  {icon}
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-white leading-tight">{title}</div>
+                  <div className="text-xs text-zinc-500 leading-tight mt-0.5">{desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom: Rotating testimonial + Status */}
+      <div className="shrink-0 space-y-4 max-w-[400px]">
+        <div key={quoteIndex} className="p-4 rounded-2xl animate-[appearance-fade_700ms_ease]" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <p className="text-sm text-zinc-300 italic leading-relaxed mb-2 min-h-[60px]">"{testimonial.quote}"</p>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-semibold text-white">{testimonial.initials}</div>
+            <span className="text-xs text-zinc-500">{testimonial.name} · {testimonial.role}</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 text-sm">
+          <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: 'var(--accent-color)' }} />
+          <span className="text-white/60 tracking-wide">System Status: Online</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function LoginPage() {
   const [email, setEmail] = useState(() => localStorage.getItem('lastEmail') || '')
   const [password, setPassword] = useState('')
@@ -1752,66 +1831,7 @@ function LoginPage() {
       )}
 
       {/* Left: Brand + System Identity */}
-      <div className="hidden lg:flex w-5/12 flex-col justify-between p-10 relative z-10">
-        <div>
-          <div className="flex items-center gap-3 mb-8">
-            <LogoSVG className="h-9 w-auto" />
-            <span className="font-semibold text-2xl tracking-[1px]">SWIFTSHIFT</span>
-          </div>
-          <div className="max-w-[400px]">
-            <div className="uppercase tracking-[4px] text-xs text-zinc-500 mb-3"><span style={{ color: loginAccentHex }}>AI POWERED</span> HR ENTERPRISE PLATFORM</div>
-            <h1 className="text-[52px] leading-[1.05] font-semibold tracking-tighter mb-5">
-              Time is <span style={{ background: `linear-gradient(135deg, ${loginAccentHex}, #ffffff)`, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>money.</span>
-            </h1>
-
-            {/* Stats row */}
-            <div className="flex gap-6 mb-7">
-              {[['10k+', 'Employees'], ['99.9%', 'Uptime'], ['4.9★', 'Rated']].map(([val, label]) => (
-                <div key={label}>
-                  <div className="text-xl font-bold" style={{ color: loginAccentHex }}>{val}</div>
-                  <div className="text-xs text-zinc-600 mt-0.5">{label}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Feature cards */}
-            <div className="space-y-2.5">
-              {[
-                { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={loginAccentHex} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>, title: 'One-tap Clock In', desc: 'Punch in instantly. Stay logged in.' },
-                { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={loginAccentHex} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>, title: 'Real-Time Earnings', desc: 'Watch your pay grow live as you work.' },
-                { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={loginAccentHex} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>, title: 'AI Tax Filing', desc: 'Swifty auto-fills your 1040 from your W-2, free.' },
-                { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={loginAccentHex} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.5 12.5 17 22l-5-3-5 3 1.5-9.5"/></svg>, title: 'Rewards & XP', desc: 'Level up and unlock perks just for showing up.' },
-                { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={loginAccentHex} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>, title: 'InstaApply', desc: 'AI job matching with one-click applications.' },
-              ].map(({ icon, title, desc }) => (
-                <div key={title} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${loginAccentHex}18` }}>
-                    {icon}
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium text-white leading-tight">{title}</div>
-                    <div className="text-xs text-zinc-500 leading-tight mt-0.5">{desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom: Testimonial + Status */}
-        <div className="space-y-4 max-w-[380px]">
-          <div className="p-4 rounded-2xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <p className="text-sm text-zinc-300 italic leading-relaxed mb-2">"SwiftShift cut our payroll processing time in half. The real-time earnings view alone boosted team morale."</p>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-semibold text-white">JM</div>
-              <span className="text-xs text-zinc-500">Jamie M. · HR Director</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 text-sm">
-            <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: 'var(--accent-color)' }} />
-            <span className="text-white/60 tracking-wide">System Status: Online</span>
-          </div>
-        </div>
-      </div>
+      <AuthSidePanel accentHex={loginAccentHex} />
 
       {/* Right: Control Panel */}
       <div className="flex-1 flex items-center justify-center p-4 relative z-10">
@@ -2031,36 +2051,8 @@ function SignupPage() {
       {/* Accent ambient glow */}
       <div className="absolute top-1/2 right-[18%] -translate-y-1/2 w-[700px] h-[700px] rounded-full blur-[120px]" style={{ background: 'rgba(var(--accent-color-rgb),0.06)' }} />
 
-      {/* Left: Brand + System Identity */}
-      <div className="hidden lg:flex w-5/12 flex-col justify-between p-10 relative z-10">
-        <div>
-          <div className="flex items-center gap-3 mb-10">
-            <LogoSVG className="h-9 w-auto" />
-            <span className="font-semibold text-2xl tracking-[1px]">SWIFTSHIFT</span>
-          </div>
-          <div className="max-w-[380px]">
-            <div className="uppercase tracking-[4px] text-xs text-zinc-500 mb-3"><span style={{ color: signupAccentHex }}>AI POWERED</span> HR ENTERPRISE PLATFORM</div>
-            <h1 className="text-[60px] leading-[1.05] font-semibold tracking-tighter mb-5">
-              Time is money.
-            </h1>
-            <div className="text-base text-zinc-400 space-y-2">
-              <div>- Log in one time, and STAY logged in.</div>
-              <div>- Effortless navigation.</div>
-              <div>- Frictionless clock in.</div>
-              <div>- Real time visualized earnings.</div>
-              <div>- Find the best-matched jobs.</div>
-              <div>- Taxes filed instantly with AI.</div>
-              <div>- AI assisted HR support with Swifty.</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Signature: System Status */}
-        <div className="flex items-center gap-3 text-sm">
-          <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: 'var(--accent-color)' }} />
-          <span className="text-white/60 tracking-wide">System Status: Online</span>
-        </div>
-      </div>
+      {/* Left: Brand + System Identity (shared with login page) */}
+      <AuthSidePanel accentHex={signupAccentHex} />
 
       {/* Right: Control Panel */}
       <div className="flex-1 flex items-center justify-center p-4 relative z-10">
