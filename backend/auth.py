@@ -245,12 +245,9 @@ def google_auth():
             row = db.execute(
                 "INSERT INTO users (first_name, last_name, email, password_hash, is_fulltime)"
                 " VALUES (?, ?, ?, ?, 1)"
-                " RETURNING id, first_name, last_name, email, job_role, manager_name, is_fulltime, pay, salary, hourly_rate, pto_accrual_rate, streak_count, streak_last_date",
+                " RETURNING id, first_name, last_name, email, job_role, manager_name, is_fulltime, pay, salary",
                 (given_name or "Google", family_name or "User", email, "google-oauth"),
             ).fetchone()
-
-    if not row:
-        return jsonify({"error": "Failed to sign in with Google"}), 500
 
     return jsonify({
         "id": row["id"],
@@ -262,10 +259,6 @@ def google_auth():
         "is_fulltime": row.get("is_fulltime", 1),
         "pay": row.get("pay"),
         "salary": row.get("salary"),
-        "hourly_rate": row.get("hourly_rate"),
-        "pto_accrual_rate": row.get("pto_accrual_rate"),
-        "streak_count": row.get("streak_count"),
-        "streak_last_date": row.get("streak_last_date"),
     })
 
 
