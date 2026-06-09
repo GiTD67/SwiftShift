@@ -15,6 +15,8 @@ services:
       - key: XAI_API_KEY
         sync: false        # paste your xAI / Grok API key (Render prompts on first deploy)
       - key: ALLOWED_ORIGINS
-        value: "*"         # tighten to https://swiftshift.work once the domain is connected
+        value: "https://swiftshift.work,https://www.swiftshift.work"
       - key: WEB_CONCURRENCY
         value: "1"         # one gunicorn worker fits the free 512 MB instance
+      - key: SECRET_KEY
+        generateValue: true   # Render generates a stable random key used to sign login sessions
