@@ -1,10 +1,9 @@
 name: Nightly Autonomous Site Improvement
 
 # Runs every day at 03:00 America/Denver. GitHub cron is UTC, so 09:00 UTC.
-# Adjust the minute/hour below if your timezone offset changes (DST etc.).
 on:
   schedule:
-    - cron: "0 9 * * *"   # 03:00 MDT (UTC-6) — see note above
+    - cron: "0 9 * * *"   # 03:00 MDT (UTC-6)
   workflow_dispatch: {}    # lets you trigger a run manually from the Actions tab
 
 # Prevent two nightly runs from overlapping if one runs long.
@@ -15,10 +14,10 @@ concurrency:
 jobs:
   improve:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     permissions:
       contents: write        # push commits to main
-      pull-requests: write   # (not used in auto-push mode, kept for flexibility)
+      pull-requests: write
       issues: write
       id-token: write
       actions: read
@@ -55,58 +54,74 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: |
             --model claude-opus-4-8
-            --max-turns 80
+            --max-turns 200
             --allowedTools Bash,Read,Edit,Write,Glob,Grep,Task,TodoWrite
           prompt: |
             You are running fully autonomously in a GitHub Actions runner for the
             SwiftShift repository. There is NO human watching and NO one to approve
-            anything. Do not ask questions or wait for confirmation — complete the
-            entire job end to end on your own and finish by pushing to `main`.
+            anything. Do not ask questions — complete the whole job end to end and
+            finish by pushing to `main`.
 
-            ## Read the rules first
-            Read `CLAUDE.md` at the repo root and follow it exactly. In particular,
-            the deploy contract is: after a confirmed change, run `git add -A`,
-            `git commit -m "<concise message>"`, and `git push origin main`. Pushing
-            to `main` triggers the live Railway redeploy. Do NOT touch deploy/config
-            files (railway.toml, Procfile, start.sh, build.sh,
-            backend/requirements.txt, database files) and do NOT commit secrets.
+            ## Deploy contract
+            The live site (https://swiftshift.work) is hosted on RENDER, which
+            auto-deploys every push to `main`. So the final step of a successful run
+            is: `git add -A`, `git commit -m "<concise message>"`, `git push origin main`.
+            A push to main = a live deploy. Treat that seriously.
 
-            ## Your mission (do all of it)
-            1. EXPLORE: Spawn a team of sub-agents (use the Task tool, run several in
-               parallel) to comb through the SwiftShift codebase — frontend
-               (React + TypeScript + Vite under `frontend/`) and backend (Flask under
-               `backend/`). Have them hunt for concrete, high-value improvements:
-               UI/UX polish, accessibility, performance, dead code, obvious bugs,
-               error handling, copy/clarity, small feature gaps. Breadth matters —
-               cover different areas of the app.
-            2. PLAN: Consolidate findings into a short ranked plan of the specific
-               changes you will make this run. Prefer a handful of safe, genuinely
-               valuable improvements over a large risky rewrite. Make the smallest
-               change that delivers each improvement (per CLAUDE.md style).
-            3. IMPLEMENT: Make the code changes.
-            4. DOUBLE-CHECK WITH A SECOND WAVE OF AGENTS: Spawn a separate team of
-               reviewer sub-agents to independently audit the changes the first
-               agents made — correctness, regressions, scope creep, anything that
-               violates CLAUDE.md. Revert or fix anything they flag. The work is not
-               done until the reviewers are satisfied.
-            5. GATE ON BUILD/LINT/TEST — THIS IS MANDATORY: From `frontend/`, run:
+            ## Your mission (do ALL of it)
+            1. EXPLORE WITH ~30 AGENTS: Use the Task tool to spawn a team of about
+               THIRTY independent sub-agents, run in parallel batches (e.g. 6-8 at a
+               time so you don't exhaust resources). Give each agent its OWN focus
+               area so coverage is broad. Spread them across, at minimum:
+                 - Visual / UI polish (spacing, alignment, color, hierarchy)
+                 - UX & logistics (flows, navigation, confusing steps, empty/loading/error states)
+                 - Accessibility (WCAG: labels, contrast, keyboard, focus, ARIA)
+                 - Performance (bundle size, re-renders, expensive work, images)
+                 - Frontend correctness (React/TypeScript bugs, edge cases) under `frontend/`
+                 - Backend correctness (Flask) under `backend/`
+                 - Error handling & input validation
+                 - Mobile / responsive behavior
+                 - Copy, clarity, and microcopy
+                 - Dead code, duplication, and small refactors
+               Each agent independently hunts for concrete, high-value issues and
+               reports specific findings (file + line + proposed fix).
+            2. PLAN: Consolidate all findings into one ranked list. Pick a handful of
+               safe, genuinely valuable changes for tonight. Prefer several small,
+               low-risk wins over one big risky rewrite. Make the smallest change that
+               delivers each improvement.
+            3. IMPLEMENT the chosen changes.
+            4. REVIEW WITH A SECOND WAVE OF AGENTS: Spawn a separate team of reviewer
+               sub-agents to independently audit the changes — correctness,
+               regressions, scope creep, accessibility, and the SECURITY INVARIANTS
+               below. Fix or revert anything they flag. Not done until reviewers pass.
+            5. GATE ON BUILD/LINT/TEST — MANDATORY. From `frontend/`, run:
                  - `npm run lint`
-                 - `npm run build`   (this is `tsc && vite build`)
-                 - `npm run test` if a test script exists (vitest; run non-watch,
-                    e.g. `npx vitest run`)
-               ALL of these must pass. If anything fails, fix it. If you cannot get
-               them green, DO NOT COMMIT — instead revert your changes
-               (`git checkout -- .` / `git reset --hard HEAD`) so the live site is
-               left untouched, then stop and clearly report that you aborted.
-            6. COMMIT + PUSH (only if step 5 is fully green): stage, commit with a
-               clear message summarizing the improvements, and `git push origin main`.
-               Then print a concise summary of exactly what changed and that the live
-               site is redeploying.
+                 - `npm run build`         (this is `tsc && vite build`)
+                 - `npx vitest run`        (if a test script exists)
+               ALL must pass. If anything fails and you cannot fix it, REVERT
+               everything (`git reset --hard HEAD` / `git checkout -- .`) so the live
+               site is untouched, then stop and report that you aborted. A red build
+               must NEVER reach `main`.
+            6. COMMIT + PUSH only if step 5 is fully green. Then print a concise
+               summary of what changed and that the live site is redeploying.
+
+            ## SECURITY INVARIANTS — never weaken these
+            - Keep the login-session system intact: the `@app.before_request` auth
+              guard in `backend/app.py` and the session cookie set at sign in/up in
+              `backend/auth.py`. Do not remove or bypass them.
+            - Every personal-data endpoint MUST keep deriving the user identity from
+              `session["uid"]` — never from a client-supplied `user_id`/`employee_id`.
+              Never make an endpoint return or modify another user's data.
+            - Never reintroduce the password-reset token into any API response.
+            - If you genuinely improve auth, it must be strictly stronger, and the
+              reviewer agents must confirm no data-exposure regression.
 
             ## Hard safety rules
-            - Never push if the build, lint, or tests are failing. A red build must
-              never reach `main`.
+            - Never push if build/lint/tests fail.
+            - Do NOT modify deploy/config files: `Dockerfile`, `render.yaml`,
+              `.dockerignore`, `start.sh`, `build.sh`, `Procfile`, `railway.toml`,
+              `mise.toml`, `backend/requirements.txt`, `backend/init_db.py`, and
+              anything under `.github/`. Never commit secrets or `.env` files.
             - Keep total changes for one night modest and reviewable.
-            - If you find nothing worth changing, that's fine — make no commit and
-              say so. Do not invent busywork or churn files for the sake of it.
-            - Never modify the deploy/config files listed above. Never commit secrets.
+            - If you find nothing worth changing, make no commit and say so. Do not
+              invent busywork or churn files.
