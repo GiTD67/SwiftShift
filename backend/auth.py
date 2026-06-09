@@ -3,7 +3,7 @@ import time
 import uuid
 
 import requests as http_requests
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from db import get_db
@@ -50,6 +50,7 @@ def _ensure_users_table():
             "pto_accrual_rate REAL DEFAULT 0.0385",
             "streak_count INTEGER DEFAULT 0",
             "streak_last_date TEXT",
+            "is_manager BOOLEAN DEFAULT FALSE",
         ):
             col = col_def.split()[0]
             try:
@@ -60,6 +61,15 @@ def _ensure_users_table():
         # Add break_minutes to clock_sessions if upgrading from older schema
         try:
             db.execute("ALTER TABLE clock_sessions ADD COLUMN break_minutes INTEGER DEFAULT 0")
+            db.commit()
+        except Exception:
+            pass
+        # Always keep one admin: make the founder a manager if that account exists.
+        try:
+            db.execute(
+                "UPDATE users SET is_manager = TRUE WHERE LOWER(email) = LOWER(?) AND is_manager IS NOT TRUE",
+                ("trevordixon97@gmail.com",),
+            )
             db.commit()
         except Exception:
             pass
@@ -176,14 +186,17 @@ def signup():
     with get_db() as db:
         try:
             user = db.execute(
-                "INSERT INTO users (first_name, last_name, email, password_hash, is_fulltime) VALUES (?, ?, ?, ?, 1) RETURNING id, first_name, last_name, email, job_role, manager_name, is_fulltime, pay, salary, hourly_rate, pto_accrual_rate, streak_count, streak_last_date",
+                "INSERT INTO users (first_name, last_name, email, password_hash, is_fulltime) VALUES (?, ?, ?, ?, 1) RETURNING id, first_name, last_name, email, job_role, manager_name, is_fulltime, pay, salary, hourly_rate, pto_accrual_rate, streak_count, streak_last_date, is_manager",
                 (first_name, last_name, email, pw_hash),
             ).fetchone()
         except Exception as e:
             if "duplicate" in str(e).lower() or "unique" in str(e).lower():
                 return jsonify({"error": "email already registered"}), 409
             raise
-    return jsonify(dict(user)), 201
+    user = dict(user)
+    session.permanent = True
+    session["uid"] = user["id"]
+    return jsonify(user), 201
 
 
 @bp.route("/signin", methods=["POST"])
@@ -197,6 +210,8 @@ def signin():
         row = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     if not row or not check_password_hash(row["password_hash"], password):
         return jsonify({"error": "invalid credentials"}), 401
+    session.permanent = True
+    session["uid"] = row["id"]
     return jsonify({
         "id": row["id"],
         "first_name": row["first_name"],
@@ -211,6 +226,7 @@ def signin():
         "pto_accrual_rate": row.get("pto_accrual_rate"),
         "streak_count": row.get("streak_count"),
         "streak_last_date": row.get("streak_last_date"),
+        "is_manager": bool(row.get("is_manager")),
     })
 
 
@@ -249,6 +265,8 @@ def google_auth():
                 (given_name or "Google", family_name or "User", email, "google-oauth"),
             ).fetchone()
 
+    session.permanent = True
+    session["uid"] = row["id"]
     return jsonify({
         "id": row["id"],
         "first_name": row["first_name"],
@@ -259,6 +277,7 @@ def google_auth():
         "is_fulltime": row.get("is_fulltime", 1),
         "pay": row.get("pay"),
         "salary": row.get("salary"),
+        "is_manager": bool(row.get("is_manager")),
     })
 
 
@@ -269,10 +288,14 @@ def forgot_password():
     if not email:
         return jsonify({"error": "email required"}), 400
 
+    # Always respond with the same generic message so the endpoint can't be used
+    # to discover which emails are registered, and never return the reset token.
+    generic = {"message": "If that email is registered, a reset link has been sent."}
+
     with get_db() as db:
         row = db.execute("SELECT id FROM users WHERE LOWER(email) = ?", (email,)).fetchone()
         if not row:
-            return jsonify({"message": "If that email is registered, a reset link has been generated."})
+            return jsonify(generic)
 
         token = str(uuid.uuid4())
         expires_at = int(time.time()) + 3600  # 1 hour expiry
@@ -282,11 +305,14 @@ def forgot_password():
         )
         db.commit()
 
-    reset_url = f"reset-password?token={token}"
-    return jsonify({
-        "message": "Reset link generated.",
-        "reset_url": reset_url,
-    })
+    # NOTE: token is stored, not returned. Email delivery wires up the reset link.
+    return jsonify(generic)
+
+
+@bp.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return jsonify({"ok": True})
 
 
 @bp.route("/reset-password", methods=["POST"])

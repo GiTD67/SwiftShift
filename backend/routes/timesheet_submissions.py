@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from db import get_db
+from permissions import current_uid
 
 bp = Blueprint("timesheet_submissions", __name__)
 
@@ -23,7 +24,7 @@ def _ensure_table(db):
 
 @bp.route("/api/timesheet-submissions", methods=["GET"])
 def list_submissions():
-    user_id = request.args.get("user_id")
+    user_id = current_uid()  # only ever your own submissions
     with get_db() as db:
         _ensure_table(db)
         if user_id:
@@ -41,7 +42,7 @@ def list_submissions():
 @bp.route("/api/timesheet-submissions", methods=["POST"])
 def create_submission():
     data = request.get_json() or {}
-    user_id = data.get("user_id")
+    user_id = current_uid()
     period_start = data.get("period_start")
     period_end = data.get("period_end")
     total_hours = data.get("total_hours")

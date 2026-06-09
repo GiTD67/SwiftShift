@@ -8,6 +8,8 @@ from openai import OpenAI
 import chromadb
 from werkzeug.utils import secure_filename
 
+from permissions import current_uid
+
 bp = Blueprint("grok", __name__)
 
 
@@ -85,7 +87,7 @@ def upload():
     if f.filename == "":
         return jsonify({"error": "empty filename"}), 400
 
-    user_id = request.form.get("user_id", "").strip()
+    user_id = str(current_uid() or "")
     api_key = os.environ.get("XAI_API_KEY")
     if not api_key:
         return jsonify({"error": "XAI_API_KEY not configured"}), 500
@@ -120,8 +122,7 @@ def chat():
     data = request.get_json() or {}
     message = data.get("message", "").strip()
     file_id = data.get("file_id", "").strip()
-    uid = data.get("user_id", "")
-    user_id = str(uid).strip() if uid else ""
+    user_id = str(current_uid() or "")
     if not message and not file_id:
         return jsonify({"error": "message or file_id required"}), 400
 
@@ -195,7 +196,7 @@ def chat():
 
 @bp.route("/api/grok/tax/upload", methods=["POST"])
 def tax_upload():
-    user_id = request.form.get("user_id", "").strip()
+    user_id = str(current_uid() or "")
     if not user_id:
         return jsonify({"error": "user_id required"}), 400
     if "file" not in request.files:
@@ -253,7 +254,7 @@ def extract_resume_text(user_id: str) -> str:
 def match_jobs():
     """Semantic match: given user_id (resume) and jobs list, return sorted jobs with scores."""
     data = request.get_json() or {}
-    user_id = str(data.get("user_id", "")).strip()
+    user_id = str(current_uid() or "")
     jobs = data.get("jobs", [])
     if not user_id:
         return jsonify({"error": "user_id required"}), 400
@@ -372,8 +373,7 @@ def tax_extract():
 def fill_1040():
     """Agentic 1040 filler: Grok uses tools to extract, reconcile, search, calculate."""
     data = request.get_json() or {}
-    uid = data.get("user_id", "")
-    user_id = str(uid).strip() if uid else ""
+    user_id = str(current_uid() or "")
     if not user_id:
         return jsonify({"error": "user_id required"}), 400
 

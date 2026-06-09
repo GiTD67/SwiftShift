@@ -3,6 +3,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 from db import get_db
+from permissions import current_uid
 
 bp = Blueprint("employees", __name__)
 
@@ -33,9 +34,9 @@ def create_employee():
 @bp.route("/api/employees/enter_time", methods=["POST"])
 def enter_time():
     data = request.get_json() or {}
-    employee_id = data.get("employee_id")
+    employee_id = current_uid()  # always clock in as yourself
     if not employee_id:
-        return jsonify({"error": "employee_id required"}), 400
+        return jsonify({"error": "authentication required"}), 401
     now = datetime.utcnow().isoformat()
     with get_db() as db:
         row = db.execute(
@@ -57,6 +58,8 @@ def exit_time():
         row = db.execute("SELECT * FROM clock_sessions WHERE id = ?", (session_id,)).fetchone()
         if not row:
             return jsonify({"error": "not found"}), 404
+        if row["employee_id"] != current_uid():
+            return jsonify({"error": "forbidden"}), 403
         if row["clock_out"]:
             return jsonify({"error": "already clocked out"}), 400
         try:

@@ -2239,6 +2239,9 @@ export default function App() {
   } catch {
     localStorage.removeItem('user')
   }
+  // Manager/admin role — drives which manager-only UI is shown. Refreshed at each
+  // login (the signin response includes is_manager). The backend is the real gate.
+  const isManager = !!(user && user.is_manager)
 
   // Route: auth pages (handle subpath deployments like /hackathon/preview/doesitworkday/)
   const isRoot = pathname === '/' || pathname.endsWith('/')
@@ -3778,6 +3781,7 @@ export default function App() {
               )}
               {mainItems.map(item => renderNavBtn(item, 'main'))}
 
+              {isManager && (<>
               {/* ── Manager collapsible section ── */}
               <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '10px 14px 6px' }} />
               <button
@@ -3852,6 +3856,7 @@ export default function App() {
                   </button>
                 </>
               )}
+              </>)}
             </nav>
           )
         })()}
@@ -4735,7 +4740,7 @@ export default function App() {
               </div>
             )
           })()}
-          {activeView === 'admin' && (
+          {activeView === 'admin' && isManager && (
             <div className="max-w-5xl mx-auto">
               <div className="glass rounded-3xl p-8">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
@@ -4972,7 +4977,7 @@ export default function App() {
               </div>
 
               {/* Manager: Shift Swap Approvals */}
-              {allShiftSwaps.length > 0 && (
+              {isManager && allShiftSwaps.length > 0 && (
                 <div className="glass rounded-3xl p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div>
@@ -5620,7 +5625,7 @@ export default function App() {
               </div>
 
               {/* Manager: Approve / Deny Team Requests */}
-              {allPtoRequests.length > 0 && (
+              {isManager && allPtoRequests.length > 0 && (
                 <div className="glass rounded-3xl p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div>

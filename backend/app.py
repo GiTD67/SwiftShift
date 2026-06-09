@@ -1,7 +1,9 @@
 import os
+from datetime import timedelta
+
 import requests
 
-from flask import Flask, jsonify, send_from_directory, request
+from flask import Flask, jsonify, send_from_directory, request, session
 from flask_cors import CORS
 
 from db import get_db  # noqa: F401  # ensure db module is loaded
@@ -13,9 +15,39 @@ frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 
 app = Flask(__name__, static_folder=None)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB uploads
+
+# Login sessions: sign the cookie with SECRET_KEY (falls back to a random key so
+# the app still boots locally; set SECRET_KEY in production so sessions survive
+# restarts). The cookie is http-only, SameSite=Lax, Secure (HTTPS only), 30 days.
+app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(32)
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=True,
+    PERMANENT_SESSION_LIFETIME=timedelta(days=30),
+)
+
 _allowed_origins = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
-CORS(app, origins=_allowed_origins)
+CORS(app, origins=_allowed_origins, supports_credentials=True)
 limiter.init_app(app)
+
+# Routes that don't require a logged-in session.
+_PUBLIC_API_PREFIXES = ("/api/health", "/api/auth/", "/api/kalshi/")
+
+
+@app.before_request
+def _require_login_for_api():
+    """Require a valid login session on every /api/* route except the public ones."""
+    path = request.path
+    if not path.startswith("/api/"):
+        return None  # frontend SPA + static assets
+    if request.method == "OPTIONS":
+        return None  # let CORS preflight through
+    if any(path.startswith(prefix) for prefix in _PUBLIC_API_PREFIXES):
+        return None
+    if not session.get("uid"):
+        return jsonify({"error": "authentication required"}), 401
+    return None
 
 
 @app.route("/api/kalshi/markets")

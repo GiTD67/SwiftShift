@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from db import get_db
+from permissions import current_uid
 
 bp = Blueprint("availability", __name__)
 
@@ -57,9 +58,9 @@ def _ensure_tables(db):
 
 @bp.route("/api/availability", methods=["GET"])
 def get_availability():
-    user_id = request.args.get("user_id")
+    user_id = current_uid()
     if not user_id:
-        return jsonify({"error": "user_id required"}), 400
+        return jsonify({"error": "authentication required"}), 401
     with get_db() as db:
         _ensure_tables(db)
         row = db.execute(
@@ -71,9 +72,9 @@ def get_availability():
 @bp.route("/api/availability", methods=["PUT"])
 def upsert_availability():
     data = request.get_json() or {}
-    user_id = data.get("user_id")
+    user_id = current_uid()
     if not user_id:
-        return jsonify({"error": "user_id required"}), 400
+        return jsonify({"error": "authentication required"}), 401
 
     allowed = {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
                "preferred_start", "preferred_end", "notes"}
@@ -110,9 +111,9 @@ def upsert_availability():
 
 @bp.route("/api/direct-deposit", methods=["GET"])
 def get_direct_deposit():
-    user_id = request.args.get("user_id")
+    user_id = current_uid()
     if not user_id:
-        return jsonify({"error": "user_id required"}), 400
+        return jsonify({"error": "authentication required"}), 401
     with get_db() as db:
         _ensure_tables(db)
         row = db.execute(
@@ -125,9 +126,9 @@ def get_direct_deposit():
 @bp.route("/api/direct-deposit", methods=["PUT"])
 def upsert_direct_deposit():
     data = request.get_json() or {}
-    user_id = data.get("user_id")
+    user_id = current_uid()
     if not user_id:
-        return jsonify({"error": "user_id required"}), 400
+        return jsonify({"error": "authentication required"}), 401
 
     allowed = {"bank_name", "routing_number", "account_number", "account_type"}
     fields = {k: v for k, v in data.items() if k in allowed}
@@ -164,9 +165,9 @@ def upsert_direct_deposit():
 
 @bp.route("/api/work-schedule", methods=["GET"])
 def get_work_schedule():
-    user_id = request.args.get("user_id")
+    user_id = current_uid()
     if not user_id:
-        return jsonify({"error": "user_id required"}), 400
+        return jsonify({"error": "authentication required"}), 401
     with get_db() as db:
         _ensure_tables(db)
         row = db.execute(
@@ -178,9 +179,9 @@ def get_work_schedule():
 @bp.route("/api/work-schedule", methods=["PUT"])
 def upsert_work_schedule():
     data = request.get_json() or {}
-    user_id = data.get("user_id")
+    user_id = current_uid()
     if not user_id:
-        return jsonify({"error": "user_id required"}), 400
+        return jsonify({"error": "authentication required"}), 401
 
     allowed = {"schedule_type", "hours_per_week", "shift_start", "shift_end", "work_days"}
     fields = {k: v for k, v in data.items() if k in allowed}

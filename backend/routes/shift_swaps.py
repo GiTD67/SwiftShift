@@ -3,6 +3,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 from db import get_db
+from permissions import current_uid, manager_required
 
 bp = Blueprint("shift_swaps", __name__)
 
@@ -85,6 +86,9 @@ def create_swap():
 # PUT /api/shift-swaps/:id
 @bp.route("/api/shift-swaps/<int:swap_id>", methods=["PUT"])
 def update_swap(swap_id):
+    err = manager_required()
+    if err:
+        return err
     data = request.get_json() or {}
     status = data.get("status")
     if status not in ("open", "accepted", "denied", "cancelled"):
@@ -98,7 +102,7 @@ def update_swap(swap_id):
             return jsonify({"error": "not found"}), 404
         db.execute(
             "UPDATE shift_swaps SET status = ?, reviewed_by = ?, reviewed_at = ? WHERE id = ?",
-            (status, data.get("reviewed_by"), now, swap_id),
+            (status, current_uid(), now, swap_id),
         )
         db.commit()
         row = db.execute("SELECT * FROM shift_swaps WHERE id = ?", (swap_id,)).fetchone()

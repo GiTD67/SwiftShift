@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from db import get_db
+from permissions import manager_required
 
 bp = Blueprint("holidays", __name__)
 
@@ -37,6 +38,9 @@ def list_holidays():
 # POST /api/holidays
 @bp.route("/api/holidays", methods=["POST"])
 def create_holiday():
+    err = manager_required()
+    if err:
+        return err
     data = request.get_json() or {}
     name = data.get("name", "").strip()
     date = data.get("date", "").strip()
@@ -60,6 +64,9 @@ def create_holiday():
 # PUT /api/holidays/:id
 @bp.route("/api/holidays/<int:holiday_id>", methods=["PUT"])
 def update_holiday(holiday_id):
+    err = manager_required()
+    if err:
+        return err
     data = request.get_json() or {}
     name = data.get("name", "").strip()
     date = data.get("date", "").strip()
@@ -87,6 +94,9 @@ def update_holiday(holiday_id):
 # DELETE /api/holidays/:id
 @bp.route("/api/holidays/<int:holiday_id>", methods=["DELETE"])
 def delete_holiday(holiday_id):
+    err = manager_required()
+    if err:
+        return err
     with get_db() as db:
         _ensure_tables(db)
         existing = db.execute(

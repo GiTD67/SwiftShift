@@ -3,6 +3,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 from db import get_db
+from permissions import manager_required
 
 bp = Blueprint("jobs", __name__, url_prefix="/api/jobs")
 
@@ -16,6 +17,9 @@ def list_jobs():
 
 @bp.route("", methods=["POST"])
 def create_job():
+    err = manager_required()
+    if err:
+        return err
     data = request.get_json() or {}
     description = data.get("description")
     if not description:

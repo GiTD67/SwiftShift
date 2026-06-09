@@ -3,13 +3,14 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 from db import get_db
+from permissions import current_uid
 
 bp = Blueprint("time_entries", __name__)
 
 
 @bp.route("/api/time-entries", methods=["GET"])
 def list_time_entries():
-    employee_id = request.args.get("employee_id")
+    employee_id = current_uid()  # only ever your own entries
     with get_db() as db:
         if employee_id:
             rows = db.execute(
@@ -42,7 +43,7 @@ def create_time_entry():
     for f in required:
         if not data.get(f):
             return jsonify({"error": f"{f} required"}), 400
-    employee_id = data.get("employee_id")
+    employee_id = current_uid()
     duration = data.get("duration_minutes")
     if duration is None:
         duration = _compute_duration(data["start_time"], data["end_time"])

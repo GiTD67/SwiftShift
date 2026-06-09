@@ -3,6 +3,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 from db import get_db
+from permissions import current_uid, is_manager, manager_required
 
 bp = Blueprint("pto", __name__)
 
@@ -42,9 +43,9 @@ def _ensure_tables(db):
 # GET /api/pto/balance?user_id=X
 @bp.route("/api/pto/balance", methods=["GET"])
 def get_balance():
-    user_id = request.args.get("user_id")
+    user_id = current_uid()
     if not user_id:
-        return jsonify({"error": "user_id required"}), 400
+        return jsonify({"error": "authentication required"}), 401
     with get_db() as db:
         _ensure_tables(db)
         row = db.execute(
@@ -63,10 +64,10 @@ def get_balance():
 @bp.route("/api/pto/balance/accrue", methods=["POST"])
 def accrue_pto():
     data = request.get_json() or {}
-    user_id = data.get("user_id")
+    user_id = current_uid()
     hours_worked = data.get("hours_worked")
     if not user_id or hours_worked is None:
-        return jsonify({"error": "user_id and hours_worked required"}), 400
+        return jsonify({"error": "hours_worked required"}), 400
 
     accrual_rate = 0.0385  # ~1 hr per 26 hrs worked (~10 days/year)
     hours_accrued = round(float(hours_worked) * accrual_rate, 4)
@@ -93,17 +94,18 @@ def accrue_pto():
 # GET /api/pto/requests?user_id=X
 @bp.route("/api/pto/requests", methods=["GET"])
 def list_requests():
-    user_id = request.args.get("user_id")
+    uid = current_uid()
     with get_db() as db:
         _ensure_tables(db)
-        if user_id:
+        if is_manager(uid):
+            # Managers see everyone's requests so they can review them.
             rows = db.execute(
-                "SELECT * FROM pto_requests WHERE user_id = ? ORDER BY created_at DESC",
-                (user_id,),
+                "SELECT * FROM pto_requests ORDER BY created_at DESC"
             ).fetchall()
         else:
             rows = db.execute(
-                "SELECT * FROM pto_requests ORDER BY created_at DESC"
+                "SELECT * FROM pto_requests WHERE user_id = ? ORDER BY created_at DESC",
+                (uid,),
             ).fetchall()
     return jsonify([dict(r) for r in rows])
 
@@ -112,12 +114,12 @@ def list_requests():
 @bp.route("/api/pto/requests", methods=["POST"])
 def create_request():
     data = request.get_json() or {}
-    user_id = data.get("user_id")
+    user_id = current_uid()
     start_date = data.get("start_date")
     end_date = data.get("end_date")
     hours_requested = data.get("hours_requested")
     if not all([user_id, start_date, end_date, hours_requested is not None]):
-        return jsonify({"error": "user_id, start_date, end_date, hours_requested required"}), 400
+        return jsonify({"error": "start_date, end_date, hours_requested required"}), 400
 
     with get_db() as db:
         _ensure_tables(db)
@@ -151,6 +153,9 @@ def create_request():
 # PUT /api/pto/requests/:id  — approve or deny
 @bp.route("/api/pto/requests/<int:req_id>", methods=["PUT"])
 def update_request(req_id):
+    err = manager_required()
+    if err:
+        return err
     data = request.get_json() or {}
     status = data.get("status")
     if status not in ("approved", "denied", "pending"):
@@ -165,7 +170,7 @@ def update_request(req_id):
 
         db.execute(
             "UPDATE pto_requests SET status = ?, reviewed_by = ?, reviewed_at = ? WHERE id = ?",
-            (status, data.get("reviewed_by"), now, req_id),
+            (status, current_uid(), now, req_id),
         )
 
         # Deduct hours from balance when approved
