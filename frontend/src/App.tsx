@@ -1527,12 +1527,13 @@ function ForgotPasswordModal({ onClose, accentHex }: { onClose: () => void; acce
                 onChange={e => setEmail(e.target.value)}
                 className="glass-input w-full rounded-2xl px-4 py-3 text-sm placeholder:text-zinc-600 border border-white/10 focus:border-white/40 outline-none transition-all"
                 placeholder="you@company.com"
+                autoComplete="email"
                 required
                 autoFocus
               />
             </div>
             {error && (
-              <div className="text-sm text-red-400 flex items-center gap-2 bg-red-950/40 border border-red-900/60 rounded-xl px-4 py-2">
+              <div role="alert" className="text-sm text-red-400 flex items-center gap-2 bg-red-950/40 border border-red-900/60 rounded-xl px-4 py-2">
                 ⚠ {error}
               </div>
             )}
@@ -1625,6 +1626,7 @@ function ResetPasswordPage() {
                     onChange={e => setPassword(e.target.value)}
                     className="glass-input w-full rounded-2xl px-4 py-3 text-sm placeholder:text-zinc-600 border border-white/10 focus:border-white/40 outline-none transition-all pr-12"
                     placeholder="Min 8 characters"
+                    autoComplete="new-password"
                     required
                     minLength={8}
                     autoFocus
@@ -1652,11 +1654,13 @@ function ResetPasswordPage() {
                   onChange={e => setConfirm(e.target.value)}
                   className="glass-input w-full rounded-2xl px-4 py-3 text-sm placeholder:text-zinc-600 border border-white/10 focus:border-white/40 outline-none transition-all"
                   placeholder="Repeat password"
+                  autoComplete="new-password"
                   required
+                  minLength={8}
                 />
               </div>
               {error && (
-                <div className="text-sm text-red-400 flex items-center gap-2 bg-red-950/40 border border-red-900/60 rounded-xl px-4 py-2">
+                <div role="alert" className="text-sm text-red-400 flex items-center gap-2 bg-red-950/40 border border-red-900/60 rounded-xl px-4 py-2">
                   ⚠ {error}
                 </div>
               )}
@@ -1852,6 +1856,7 @@ function LoginPage() {
                   onBlur={() => setFocusedField(null)}
                   className="glass-input w-full rounded-2xl px-4 py-3 text-sm placeholder:text-zinc-600 border border-white/10 focus:border-white/40 focus:shadow-[0_0_0_3px_rgba(255,255,255,0.08)] outline-none transition-all"
                   placeholder="you@company.com"
+                  autoComplete="email"
                   required
                   autoFocus={!isReturningUser}
                 />
@@ -1870,6 +1875,7 @@ function LoginPage() {
                   onBlur={() => setFocusedField(null)}
                   className="glass-input w-full rounded-2xl px-4 py-3 text-sm placeholder:text-zinc-600 border border-white/10 focus:border-white/40 focus:shadow-[0_0_0_3px_rgba(255,255,255,0.08)] outline-none pr-12 transition-all"
                   placeholder="••••••••"
+                  autoComplete="current-password"
                   required
                 />
                 <button
@@ -1896,7 +1902,7 @@ function LoginPage() {
 
             {/* Error */}
             {error && (
-              <div className="text-sm text-red-400 flex items-center gap-2 bg-red-950/40 border border-red-900/60 rounded-xl px-4 py-2">
+              <div role="alert" className="text-sm text-red-400 flex items-center gap-2 bg-red-950/40 border border-red-900/60 rounded-xl px-4 py-2">
                 ⚠ {error}
               </div>
             )}
@@ -2097,6 +2103,7 @@ function SignupPage() {
                   onBlur={() => setFocusedField(null)}
                   className={`glass-input w-full rounded-2xl px-4 py-3 text-sm placeholder:text-zinc-600 border border-white/10 focus:border-white/40 focus:shadow-[0_0_0_3px_rgba(255,255,255,0.08)] outline-none transition-all ${focusedField === 'first' ? 'scale-[1.01]' : ''}`}
                   placeholder="Alex"
+                  autoComplete="given-name"
                   required
                   autoFocus
                 />
@@ -2111,6 +2118,7 @@ function SignupPage() {
                   onBlur={() => setFocusedField(null)}
                   className={`glass-input w-full rounded-2xl px-4 py-3 text-sm placeholder:text-zinc-600 border border-white/10 focus:border-white/40 focus:shadow-[0_0_0_3px_rgba(255,255,255,0.08)] outline-none transition-all ${focusedField === 'last' ? 'scale-[1.01]' : ''}`}
                   placeholder="Rivera"
+                  autoComplete="family-name"
                   required
                 />
               </div>
@@ -2128,6 +2136,7 @@ function SignupPage() {
                   onBlur={() => setFocusedField(null)}
                   className="glass-input w-full rounded-2xl px-4 py-3 text-sm placeholder:text-zinc-600 border border-white/10 focus:border-white/40 focus:shadow-[0_0_0_3px_rgba(255,255,255,0.08)] outline-none transition-all"
                   placeholder="you@company.com"
+                  autoComplete="email"
                   required
                 />
               </div>
@@ -2145,7 +2154,9 @@ function SignupPage() {
                   onBlur={() => setFocusedField(null)}
                   className="glass-input w-full rounded-2xl px-4 py-3 text-sm placeholder:text-zinc-600 border border-white/10 focus:border-white/40 focus:shadow-[0_0_0_3px_rgba(255,255,255,0.08)] outline-none pr-12 transition-all"
                   placeholder="Min 8 characters"
+                  autoComplete="new-password"
                   required
+                  minLength={8}
                 />
                 <button
                   type="button"
@@ -2170,7 +2181,7 @@ function SignupPage() {
             </div>
 
             {error && (
-              <div className="text-sm text-red-400 flex items-center gap-2 bg-red-950/40 border border-red-900/60 rounded-xl px-4 py-2">
+              <div role="alert" className="text-sm text-red-400 flex items-center gap-2 bg-red-950/40 border border-red-900/60 rounded-xl px-4 py-2">
                 ⚠ {error}
               </div>
             )}
@@ -2777,10 +2788,10 @@ export default function App() {
     fetch(`${API_BASE}/api/pto/requests`).then(r => r.json()).then(r => setAllPtoRequests(Array.isArray(r) ? r : [])).catch(() => {})
   }, [activeView, user?.id])
 
-  // Load company holidays (always fetch, accessible to all)
+  // Load company holidays once (static company-wide data, accessible to all)
   useEffect(() => {
     fetch(`${API_BASE}/api/holidays`).then(r => r.json()).then(r => setHolidays(Array.isArray(r) ? r : [])).catch(() => {})
-  }, [activeView])
+  }, [])
 
   // Load schedules data
   useEffect(() => {
@@ -3448,7 +3459,11 @@ export default function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('user')
-    window.location.href = 'login'
+    // Clear the server-side session too, so the auth cookie can't outlive logout.
+    // Redirect regardless of the request outcome (relative path keeps subpath deploys working).
+    fetch(`${API_BASE}/api/auth/logout`, { method: 'POST' })
+      .catch(() => {})
+      .finally(() => { window.location.href = 'login' })
   }
 
   async function handleAddHire() {
@@ -6306,7 +6321,7 @@ export default function App() {
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1.5 text-xs text-zinc-400">
                           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                          <span>{a.read_by.length === 0 ? 'No reads yet' : `${a.read_by.length} read`}</span>
+                          <span>{a.read_by.length === 0 ? 'No reads yet' : `${a.read_by.length} read${a.read_by.length === 1 ? '' : 's'}`}</span>
                         </div>
                         <button
                           onClick={() => {

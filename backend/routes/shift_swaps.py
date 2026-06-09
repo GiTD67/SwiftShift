@@ -31,15 +31,19 @@ def _ensure_table(db):
 # GET /api/shift-swaps?user_id=X&status=open
 @bp.route("/api/shift-swaps", methods=["GET"])
 def list_swaps():
-    user_id = request.args.get("user_id")
+    # A `user_id` query param means "scope to me" — but the identity always comes
+    # from the session, never the client-supplied value, so you can't read another
+    # user's swaps by changing the id. Omitting it lists all (for the manager hub).
+    scope_to_me = request.args.get("user_id") is not None
+    uid = current_uid()
     status = request.args.get("status")
     with get_db() as db:
         _ensure_table(db)
         where = []
         params = []
-        if user_id:
+        if scope_to_me:
             where.append("(requester_id = ? OR target_id = ?)")
-            params.extend([user_id, user_id])
+            params.extend([uid, uid])
         if status:
             where.append("status = ?")
             params.append(status)
@@ -55,12 +59,12 @@ def list_swaps():
 @bp.route("/api/shift-swaps", methods=["POST"])
 def create_swap():
     data = request.get_json() or {}
-    requester_id = data.get("requester_id")
+    requester_id = current_uid()  # identity from the session, never the client body
     shift_date = data.get("shift_date")
     shift_start = data.get("shift_start")
     shift_end = data.get("shift_end")
     if not all([requester_id, shift_date, shift_start, shift_end]):
-        return jsonify({"error": "requester_id, shift_date, shift_start, shift_end required"}), 400
+        return jsonify({"error": "shift_date, shift_start, shift_end required"}), 400
 
     with get_db() as db:
         _ensure_table(db)
