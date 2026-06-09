@@ -64,6 +64,4 @@ def create_time_entry():
         )
         db.commit()
         row = db.execute("SELECT * FROM time_entries WHERE id = ?", (cur.lastrowid,)).fetchone()
-    if not row:
-        return jsonify({"error": "failed to create time entry"}), 500
     return jsonify(dict(row)), 201
