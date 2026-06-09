@@ -1726,7 +1726,7 @@ function LoginPage() {
         window.location.href = '.'
       }
     } catch {
-      setError('Connection to Grok system failed')
+      setError('Could not reach the server. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -2013,7 +2013,7 @@ function SignupPage() {
         window.location.href = '.'
       }
     } catch {
-      setError('Connection to Grok system failed')
+      setError('Could not reach the server. Please try again.')
     } finally {
       setLoading(false)
     }

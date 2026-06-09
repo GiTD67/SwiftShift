@@ -29,41 +29,28 @@ def _ensure_users_table():
             )
             """
         )
-        # Add columns if upgrading from older schema
-        for col in ("job_role", "manager_name"):
-            try:
-                db.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
-                db.commit()
-            except Exception:
-                pass  # column already exists or other error, ignore
-        for col in ("is_fulltime", "pay", "salary"):
-            try:
-                if col == "is_fulltime":
-                    db.execute(f"ALTER TABLE users ADD COLUMN {col} INTEGER DEFAULT 1")
-                else:
-                    db.execute(f"ALTER TABLE users ADD COLUMN {col} REAL")
-                db.commit()
-            except Exception:
-                pass  # column already exists or other error, ignore
+        # Add columns if upgrading from older schema. Must use IF NOT EXISTS:
+        # in Postgres a failed statement aborts the whole transaction, so a
+        # raised "column already exists" error would make every statement after
+        # it fail too, leaving the later columns missing and breaking signup.
         for col_def in (
+            "job_role TEXT",
+            "manager_name TEXT",
+            "is_fulltime INTEGER DEFAULT 1",
+            "pay REAL",
+            "salary REAL",
             "hourly_rate REAL DEFAULT 20.0",
             "pto_accrual_rate REAL DEFAULT 0.0385",
             "streak_count INTEGER DEFAULT 0",
             "streak_last_date TEXT",
             "is_manager BOOLEAN DEFAULT FALSE",
         ):
-            col = col_def.split()[0]
-            try:
-                db.execute(f"ALTER TABLE users ADD COLUMN {col_def}")
-                db.commit()
-            except Exception:
-                pass  # column already exists
+            db.execute(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col_def}")
         # Add break_minutes to clock_sessions if upgrading from older schema
-        try:
-            db.execute("ALTER TABLE clock_sessions ADD COLUMN break_minutes INTEGER DEFAULT 0")
-            db.commit()
-        except Exception:
-            pass
+        # (IF EXISTS: on a fresh database this table is created later, with the
+        # column already included).
+        db.execute("ALTER TABLE IF EXISTS clock_sessions ADD COLUMN IF NOT EXISTS break_minutes INTEGER DEFAULT 0")
+        db.commit()
         # Always keep one admin: make the founder a manager if that account exists.
         try:
             db.execute(
@@ -146,6 +133,7 @@ def _ensure_clock_sessions_table():
               clock_in TEXT,
               clock_out TEXT,
               duration_minutes INTEGER,
+              break_minutes INTEGER DEFAULT 0,
               notes TEXT
             )
             """
