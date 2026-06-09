@@ -10,6 +10,10 @@ from db import get_db
 
 bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
+# The founder's account is always a manager, whether it already exists at boot
+# (see _ensure_users_table) or gets created later via signup/Google.
+FOUNDER_EMAIL = "trevordixon97@gmail.com"
+
 
 def _ensure_users_table():
     with get_db() as db:
@@ -55,7 +59,7 @@ def _ensure_users_table():
         try:
             db.execute(
                 "UPDATE users SET is_manager = TRUE WHERE LOWER(email) = LOWER(?) AND is_manager IS NOT TRUE",
-                ("trevordixon97@gmail.com",),
+                (FOUNDER_EMAIL,),
             )
             db.commit()
         except Exception:
@@ -171,11 +175,12 @@ def signup():
     if not first_name or not last_name or not email or not password:
         return jsonify({"error": "first_name, last_name, email, password required"}), 400
     pw_hash = generate_password_hash(password)
+    is_founder = email.strip().lower() == FOUNDER_EMAIL
     with get_db() as db:
         try:
             user = db.execute(
-                "INSERT INTO users (first_name, last_name, email, password_hash, is_fulltime) VALUES (?, ?, ?, ?, 1) RETURNING id, first_name, last_name, email, job_role, manager_name, is_fulltime, pay, salary, hourly_rate, pto_accrual_rate, streak_count, streak_last_date, is_manager",
-                (first_name, last_name, email, pw_hash),
+                "INSERT INTO users (first_name, last_name, email, password_hash, is_fulltime, is_manager) VALUES (?, ?, ?, ?, 1, ?) RETURNING id, first_name, last_name, email, job_role, manager_name, is_fulltime, pay, salary, hourly_rate, pto_accrual_rate, streak_count, streak_last_date, is_manager",
+                (first_name, last_name, email, pw_hash, is_founder),
             ).fetchone()
         except Exception as e:
             if "duplicate" in str(e).lower() or "unique" in str(e).lower():
@@ -247,10 +252,11 @@ def google_auth():
         row = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
         if not row:
             row = db.execute(
-                "INSERT INTO users (first_name, last_name, email, password_hash, is_fulltime)"
-                " VALUES (?, ?, ?, ?, 1)"
-                " RETURNING id, first_name, last_name, email, job_role, manager_name, is_fulltime, pay, salary",
-                (given_name or "Google", family_name or "User", email, "google-oauth"),
+                "INSERT INTO users (first_name, last_name, email, password_hash, is_fulltime, is_manager)"
+                " VALUES (?, ?, ?, ?, 1, ?)"
+                " RETURNING id, first_name, last_name, email, job_role, manager_name, is_fulltime, pay, salary, is_manager",
+                (given_name or "Google", family_name or "User", email, "google-oauth",
+                 email.strip().lower() == FOUNDER_EMAIL),
             ).fetchone()
 
     session.permanent = True
