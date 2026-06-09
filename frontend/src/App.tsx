@@ -5002,7 +5002,7 @@ export default function App() {
                               <button
                                 onClick={() => {
                                   fetch(`${API_BASE}/api/shift-swaps/${sw.id}`, {
-                                    method: 'PATCH',
+                                    method: 'PUT',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ status: 'accepted' }),
                                   }).then(() => {
@@ -5018,7 +5018,7 @@ export default function App() {
                               <button
                                 onClick={() => {
                                   fetch(`${API_BASE}/api/shift-swaps/${sw.id}`, {
-                                    method: 'PATCH',
+                                    method: 'PUT',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ status: 'denied' }),
                                   }).then(() => {
@@ -5655,7 +5655,7 @@ export default function App() {
                                 onClick={() => {
                                   setPtoApprovalLoading(req.id)
                                   fetch(`${API_BASE}/api/pto/requests/${req.id}`, {
-                                    method: 'PATCH',
+                                    method: 'PUT',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ status: 'approved' }),
                                   }).then(r => r.json()).then(() => {
@@ -5673,7 +5673,7 @@ export default function App() {
                                 onClick={() => {
                                   setPtoApprovalLoading(req.id)
                                   fetch(`${API_BASE}/api/pto/requests/${req.id}`, {
-                                    method: 'PATCH',
+                                    method: 'PUT',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ status: 'denied' }),
                                   }).then(r => r.json()).then(() => {
