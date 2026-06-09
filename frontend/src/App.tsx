@@ -532,9 +532,11 @@ function useGamification() {
       const now = new Date().toISOString()
       const lastDate = prev.lastSubmitDate ? new Date(prev.lastSubmitDate).getTime() : 0
       const daysSinceLastSubmit = lastDate > 0 ? (Date.now() - lastDate) / (1000 * 60 * 60 * 24) : 999
+      // 7-14 days since last submit = on-schedule biweekly submit -> streak grows.
+      // <7 days is a resubmission/correction -> keep the streak instead of resetting it.
       const newWeekSubmitStreak = daysSinceLastSubmit >= 7 && daysSinceLastSubmit <= 14
         ? prev.weekSubmitStreak + 1
-        : 1
+        : daysSinceLastSubmit < 7 ? Math.max(prev.weekSubmitStreak, 1) : 1
       return {
         ...prev,
         submits: prev.submits + 1,
@@ -816,11 +818,17 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
           total_hours: totalHours,
         }),
       }).then(r => r.ok ? r.json() : null).then(row => {
-        if (row) setAllSubmissions(prev => {
-          const exists = prev.find(s => s.period_start === row.period_start)
-          return exists ? prev.map(s => s.period_start === row.period_start ? row : s) : [row, ...prev]
-        })
-      }).catch(() => {})
+        if (row) {
+          setAllSubmissions(prev => {
+            const exists = prev.find(s => s.period_start === row.period_start)
+            return exists ? prev.map(s => s.period_start === row.period_start ? row : s) : [row, ...prev]
+          })
+        } else {
+          toast.error('Submitted locally, but saving to the server failed. Pay history may not update — please resubmit.')
+        }
+      }).catch(() => {
+        toast.error('Submitted locally, but saving to the server failed. Pay history may not update — please resubmit.')
+      })
     }
   }
 
@@ -1128,8 +1136,9 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
                     </div>
                     <input type="text" inputMode="decimal" value={val}
                       aria-label={`Hours worked on ${d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}`}
-                      onChange={e => {
-                        setDayHours(i, e.target.value)
+                      onChange={e => setDayHours(i, e.target.value)}
+                      onBlur={e => {
+                        // Award XP once per completed entry, not on every keystroke
                         const hrs = parseHours(e.target.value)
                         if (hrs > 0) addXP(Math.round(hrs), 20 + (i / 14) * 60, 50)
                       }}
@@ -1508,7 +1517,7 @@ function ForgotPasswordModal({ onClose, accentHex }: { onClose: () => void; acce
                   className="text-xs break-all underline underline-offset-4 transition-colors"
                   style={{ color: accentHex }}
                 >
-                  {window.location.origin}/{resetUrl}
+                  {window.location.origin}{resetUrl.startsWith('/') ? '' : '/'}{resetUrl}
                 </a>
               </div>
             )}

@@ -48,7 +48,7 @@ def create_submission():
     total_hours = data.get("total_hours")
 
     if not all([user_id, period_start, period_end, total_hours is not None]):
-        return jsonify({"error": "user_id, period_start, period_end, and total_hours are required"}), 400
+        return jsonify({"error": "period_start, period_end, and total_hours are required"}), 400
 
     with get_db() as db:
         _ensure_table(db)

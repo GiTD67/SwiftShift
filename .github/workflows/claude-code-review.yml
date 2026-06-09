@@ -20,11 +20,11 @@ jobs:
 
     runs-on: ubuntu-latest
     permissions:
-  contents: write        # change from 'read' to 'write'
-  pull-requests: write   # change from 'read' to 'write'
-  issues: write          # change from 'read' to 'write'
-  id-token: write
-  actions: read
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
 
     steps:
       - name: Checkout repository

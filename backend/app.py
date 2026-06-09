@@ -50,6 +50,22 @@ def _require_login_for_api():
     return None
 
 
+@app.after_request
+def _security_and_cache_headers(resp):
+    """Baseline security headers + sensible caching for the SPA."""
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    if request.path.startswith("/assets/"):
+        # Vite emits content-hashed filenames, so these are safe to cache forever.
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif not request.path.startswith("/api/") and resp.mimetype == "text/html":
+        # Never cache the SPA shell, so new deploys are picked up immediately.
+        resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
 @app.route("/api/kalshi/markets")
 def kalshi_markets():
     try:

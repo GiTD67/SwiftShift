@@ -272,7 +272,7 @@ export function GravityGridBackground() {
     resize()
 
     let mx = 0, my = 0, tx = 0, ty = 0
-    const down = 0
+    let down = 0
     let clickPulse = 0
     const ripples: Ripple[] = []
     const shoots: ShootingStar[] = []
@@ -296,6 +296,20 @@ export function GravityGridBackground() {
       ty = -((e.clientY / window.innerHeight) * 2 - 1)
     }
 
+    // Wire up the shader's (previously dormant) click interactions:
+    // press = lens distortion (u_mouseDown), click = pulse + ripple.
+    function onPointerDown(e: MouseEvent) {
+      down = 1
+      clickPulse = 1
+      ripples.push({
+        x: (e.clientX / window.innerWidth) * 2 - 1,
+        y: -((e.clientY / window.innerHeight) * 2 - 1),
+        born: (performance.now() - t0) / 1000,
+      })
+      if (ripples.length > MAX_R) ripples.shift()
+    }
+    function onPointerUp() { down = 0 }
+
     // Respect users who prefer reduced motion: render a single static frame
     // instead of the continuous shader animation (accessibility + battery).
     const reduceMotion = typeof window.matchMedia === 'function' &&
@@ -306,6 +320,13 @@ export function GravityGridBackground() {
       : setInterval(() => { if (Math.random() < 0.45) spawnShooting() }, 4800)
     window.addEventListener('resize', resize)
     document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mousedown', onPointerDown)
+    document.addEventListener('mouseup', onPointerUp)
+
+    // Pre-allocated uniform buffers — reused every frame to avoid GC churn.
+    const rData = new Float32Array(MAX_R * 3)
+    const sData = new Float32Array(MAX_S * 4)
+    const ages = new Float32Array(MAX_S)
 
     let animId: number
     const t0 = performance.now()
@@ -327,7 +348,7 @@ export function GravityGridBackground() {
       gl!.uniform1f(U['u_mouseDown']!, down)
       gl!.uniform1f(U['u_clickPulse']!, clickPulse)
 
-      const rData = new Float32Array(MAX_R * 3)
+      rData.fill(0)
       let rCount = 0
       for (let i = 0; i < ripples.length && rCount < MAX_R; i++) {
         const age = t - ripples[i].born
@@ -343,8 +364,8 @@ export function GravityGridBackground() {
       gl!.uniform3fv(U['u_ripples[0]']!, rData)
       gl!.uniform1i(U['u_rippleCount']!, rCount)
 
-      const sData = new Float32Array(MAX_S * 4)
-      const ages = new Float32Array(MAX_S)
+      sData.fill(0)
+      ages.fill(0)
       let sCount = 0
       for (let i = 0; i < shoots.length && sCount < MAX_S; i++) {
         const age = (t - shoots[i].born) / shoots[i].life
@@ -382,6 +403,10 @@ export function GravityGridBackground() {
       if (shootInterval) clearInterval(shootInterval)
       window.removeEventListener('resize', resize)
       document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mousedown', onPointerDown)
+      document.removeEventListener('mouseup', onPointerUp)
+      gl.deleteShader(vert)
+      gl.deleteShader(frag)
       gl.deleteProgram(prog)
       gl.deleteBuffer(buf)
     }

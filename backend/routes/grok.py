@@ -27,6 +27,16 @@ def chunk_text(text: str, chunk_size: int = 4000, overlap: int = 400) -> list[st
 
 S3_ROOT = Path(__file__).parent.parent / "s3"
 
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10MB per uploaded file
+
+
+def _file_too_large(f) -> bool:
+    """True if an uploaded werkzeug FileStorage exceeds MAX_UPLOAD_BYTES."""
+    f.stream.seek(0, 2)
+    size = f.stream.tell()
+    f.stream.seek(0)
+    return size > MAX_UPLOAD_BYTES
+
 
 def get_user_dir(user_id: str) -> Path:
     """Get or create user's S3 proxy folder."""
@@ -64,7 +74,7 @@ def reindex_user_chroma(user_id: str):
     metadatas = []
     ids = []
     for f in user_dir.iterdir():
-        if f.is_file() and f.name != "chroma":
+        if f.is_file() and f.name != "chroma" and not f.name.startswith("."):
             try:
                 content = f.read_text(errors="ignore")
             except Exception:
@@ -86,6 +96,8 @@ def upload():
     f = request.files["file"]
     if f.filename == "":
         return jsonify({"error": "empty filename"}), 400
+    if _file_too_large(f):
+        return jsonify({"error": "file too large (max 10MB)"}), 413
 
     user_id = str(current_uid() or "")
     api_key = os.environ.get("XAI_API_KEY")
@@ -204,6 +216,8 @@ def tax_upload():
     f = request.files["file"]
     if f.filename == "":
         return jsonify({"error": "empty filename"}), 400
+    if _file_too_large(f):
+        return jsonify({"error": "file too large (max 10MB)"}), 413
 
     try:
         user_dir = get_user_dir(user_id)
@@ -320,6 +334,8 @@ def tax_extract():
     f = request.files["file"]
     if f.filename == "":
         return jsonify({"error": "empty filename"}), 400
+    if _file_too_large(f):
+        return jsonify({"error": "file too large (max 10MB)"}), 413
 
     api_key = os.environ.get("XAI_API_KEY")
     if not api_key:

@@ -64,6 +64,11 @@ export function QuickAdd({ onAdd, disabled }: QuickAddProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
+    if (!form.date) {
+      toast.error('Please select a date')
+      return
+    }
+
     if (!form.startTime || !form.endTime) {
       toast.error('Please set start and end times')
       return
