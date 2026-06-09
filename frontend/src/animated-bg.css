@@ -1,0 +1,39 @@
+/* ============================================================
+   Ambient background motion (Claude-style subtle drift)
+   ------------------------------------------------------------
+   A pair of soft, accent-tinted glows that drift very slowly behind
+   the app — like the gentle motion on Anthropic's site.
+
+   - Scoped to the DEFAULT background only, so it never fights the
+     other "Appearance" background styles (grid/dots/stars/aurora/…).
+   - Uses ::before so it paints BEHIND your glass panels and text.
+   - Tints with the live theme accent (and Overdrive gold) automatically.
+   - Honors "Reduce Motion" (it simply holds still).
+   ============================================================ */
+
+.ta-app:not([data-bg])::before,
+.ta-app[data-bg="default"]::before {
+  content: "";
+  position: fixed;
+  inset: -15%;                 /* oversize so the drift never reveals an edge */
+  pointer-events: none;
+  z-index: 0;                  /* same layer as the other background overlays */
+  background:
+    radial-gradient(40% 40% at 20% 25%, rgba(var(--accent-color-rgb), 0.10), transparent 60%),
+    radial-gradient(44% 44% at 82% 75%, rgba(120, 90, 255, 0.08), transparent 62%);
+  filter: blur(6px);
+  will-change: transform;
+  animation: ta-ambient-drift 34s ease-in-out infinite alternate;
+}
+
+@keyframes ta-ambient-drift {
+  0%   { transform: translate3d(-1.5%, -1%, 0) scale(1.03); }
+  50%  { transform: translate3d(2%, 1.5%, 0)  scale(1.07); }
+  100% { transform: translate3d(-1%, 2%, 0)   scale(1.04); }
+}
+
+/* Belt-and-suspenders: stop the drift if the user asked for reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  .ta-app:not([data-bg])::before,
+  .ta-app[data-bg="default"]::before { animation: none; }
+}
