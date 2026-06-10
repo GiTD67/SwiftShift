@@ -11,16 +11,13 @@ bp = Blueprint("time_entries", __name__)
 @bp.route("/api/time-entries", methods=["GET"])
 def list_time_entries():
     employee_id = current_uid()  # only ever your own entries
+    if not employee_id:
+        return jsonify({"error": "authentication required"}), 401
     with get_db() as db:
-        if employee_id:
-            rows = db.execute(
-                "SELECT * FROM time_entries WHERE employee_id = ? ORDER BY date DESC, start_time DESC",
-                (employee_id,),
-            ).fetchall()
-        else:
-            rows = db.execute(
-                "SELECT * FROM time_entries ORDER BY date DESC, start_time DESC"
-            ).fetchall()
+        rows = db.execute(
+            "SELECT * FROM time_entries WHERE employee_id = ? ORDER BY date DESC, start_time DESC",
+            (employee_id,),
+        ).fetchall()
     return jsonify([dict(r) for r in rows])
 
 

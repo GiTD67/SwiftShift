@@ -68,9 +68,17 @@ def accrue_pto():
     hours_worked = data.get("hours_worked")
     if not user_id or hours_worked is None:
         return jsonify({"error": "hours_worked required"}), 400
+    try:
+        hours_worked = float(hours_worked)
+    except (TypeError, ValueError):
+        return jsonify({"error": "hours_worked must be a number"}), 400
+    if hours_worked < 0:
+        return jsonify({"error": "hours_worked cannot be negative"}), 400
+    # Cap at one day so a forgotten clock-out can't accrue a runaway balance.
+    hours_worked = min(hours_worked, 24)
 
     accrual_rate = 0.0385  # ~1 hr per 26 hrs worked (~10 days/year)
-    hours_accrued = round(float(hours_worked) * accrual_rate, 4)
+    hours_accrued = round(hours_worked * accrual_rate, 4)
 
     with get_db() as db:
         _ensure_tables(db)
@@ -120,6 +128,17 @@ def create_request():
     hours_requested = data.get("hours_requested")
     if not all([user_id, start_date, end_date, hours_requested is not None]):
         return jsonify({"error": "start_date, end_date, hours_requested required"}), 400
+    try:
+        hours_requested = float(hours_requested)
+    except (TypeError, ValueError):
+        return jsonify({"error": "hours_requested must be a number"}), 400
+    if hours_requested <= 0:
+        return jsonify({"error": "hours_requested must be greater than 0"}), 400
+    try:
+        if datetime.fromisoformat(start_date) > datetime.fromisoformat(end_date):
+            return jsonify({"error": "start_date must be on or before end_date"}), 400
+    except (TypeError, ValueError):
+        return jsonify({"error": "start_date and end_date must be valid dates (YYYY-MM-DD)"}), 400
 
     with get_db() as db:
         _ensure_tables(db)
@@ -128,7 +147,7 @@ def create_request():
             "SELECT hours_available FROM pto_balances WHERE user_id = ?", (user_id,)
         ).fetchone()
         available = float(balance_row["hours_available"]) if balance_row else 0
-        if available < float(hours_requested):
+        if available < hours_requested:
             return jsonify({"error": "insufficient PTO balance", "available": available}), 400
 
         row = db.execute(
@@ -167,6 +186,17 @@ def update_request(req_id):
         row = db.execute("SELECT * FROM pto_requests WHERE id = ?", (req_id,)).fetchone()
         if not row:
             return jsonify({"error": "not found"}), 404
+
+        # Re-check the balance at approval time, before any writes: several pending
+        # requests can each pass the check at creation, but they can't all be approved.
+        if status == "approved" and row["status"] != "approved":
+            balance_row = db.execute(
+                "SELECT hours_available FROM pto_balances WHERE user_id = ?",
+                (row["user_id"],),
+            ).fetchone()
+            available = float(balance_row["hours_available"]) if balance_row else 0
+            if available < float(row["hours_requested"]):
+                return jsonify({"error": "insufficient PTO balance", "available": available}), 400
 
         db.execute(
             "UPDATE pto_requests SET status = ?, reviewed_by = ?, reviewed_at = ? WHERE id = ?",

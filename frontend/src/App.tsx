@@ -3157,9 +3157,11 @@ export default function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ employee_id: user.id }),
         })
-          .then(r => r.json())
+          .then(r => { if (!r.ok) throw new Error('clock-in not saved'); return r.json() })
           .then(row => { if (row?.id) setActiveSessionId(row.id) })
-          .catch(() => {})
+          .catch(() => toast.error("Couldn't sync your clock-in to the server", {
+            description: 'Your time is still tracked on this device.',
+          }))
       }
 
       // Update daily streak (freeze over weekends)
@@ -3343,13 +3345,19 @@ export default function App() {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ break_minutes: unpaidBreakMin }),
-        }).catch(() => {})
+        })
+          .then(r => { if (!r.ok) throw new Error('clock-out not saved') })
+          .catch(() => toast.error("Couldn't save your session to the server", {
+            description: 'Your hours may be missing from the timesheet — please double-check.',
+          }))
         // Accrue PTO to DB
         fetch(`${API_BASE}/api/pto/balance/accrue`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ user_id: user.id, hours_worked: hoursWorked }),
-        }).catch(() => {})
+        })
+          .then(r => { if (!r.ok) throw new Error('accrual not saved') })
+          .catch(() => toast.error("Couldn't record your PTO accrual for this session"))
       }
     }
   }
@@ -4856,6 +4864,7 @@ export default function App() {
                           <input
                             type="number"
                             step="0.01"
+                            min="0"
                             className="bg-black/40 border border-white/10 rounded px-2 py-0.5 w-16"
                             value={u.pay ?? ''}
                             onChange={(e) => setUsers(users.map(x => x.id === u.id ? { ...x, pay: e.target.value ? parseFloat(e.target.value) : null } : x))}
@@ -4865,6 +4874,7 @@ export default function App() {
                           <input
                             type="number"
                             step="0.01"
+                            min="0"
                             className="bg-black/40 border border-white/10 rounded px-2 py-0.5 w-20"
                             value={u.salary ?? ''}
                             onChange={(e) => setUsers(users.map(x => x.id === u.id ? { ...x, salary: e.target.value ? parseFloat(e.target.value) : null } : x))}
@@ -5605,6 +5615,12 @@ export default function App() {
                     if (!user?.id || !ptoRequestForm.start_date || !ptoRequestForm.end_date || !ptoRequestForm.hours_requested) {
                       toast.error('Please fill in all required fields'); return
                     }
+                    if (!(parseFloat(ptoRequestForm.hours_requested) > 0)) {
+                      toast.error('Hours requested must be greater than 0'); return
+                    }
+                    if (ptoRequestForm.start_date > ptoRequestForm.end_date) {
+                      toast.error('Start date must be on or before end date'); return
+                    }
                     fetch(`${API_BASE}/api/pto/requests`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
@@ -5679,7 +5695,8 @@ export default function App() {
                                     method: 'PUT',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ status: 'approved' }),
-                                  }).then(r => r.json()).then(() => {
+                                  }).then(r => r.json().then(row => ({ ok: r.ok, row }))).then(({ ok, row }) => {
+                                    if (!ok || row?.error) { toast.error(row?.error || 'Failed to approve'); return }
                                     setAllPtoRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'approved' } : r))
                                     setPtoRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'approved' } : r))
                                     toast.success('Leave approved')
@@ -5697,7 +5714,8 @@ export default function App() {
                                     method: 'PUT',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ status: 'denied' }),
-                                  }).then(r => r.json()).then(() => {
+                                  }).then(r => r.json().then(row => ({ ok: r.ok, row }))).then(({ ok, row }) => {
+                                    if (!ok || row?.error) { toast.error(row?.error || 'Failed to deny'); return }
                                     setAllPtoRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'denied' } : r))
                                     setPtoRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'denied' } : r))
                                     toast.success('Leave denied')
@@ -5996,7 +6014,7 @@ export default function App() {
                       </div>
                       <div>
                         <label className="text-xs text-zinc-400 block mb-1">Hourly Rate ($)</label>
-                        <input type="number" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm" value={addHireForm.hourly_rate} onChange={e => setAddHireForm(f => ({ ...f, hourly_rate: e.target.value }))} placeholder="25.00" />
+                        <input type="number" min="0" step="0.01" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm" value={addHireForm.hourly_rate} onChange={e => setAddHireForm(f => ({ ...f, hourly_rate: e.target.value }))} placeholder="25.00" />
                       </div>
                       <div className="col-span-2">
                         <label className="text-xs text-zinc-400 block mb-1">Temporary Password *</label>

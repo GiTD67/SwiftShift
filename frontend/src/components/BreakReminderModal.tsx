@@ -19,8 +19,10 @@ export function BreakReminderModal({
   onStartBreak,
   onDismiss,
 }: BreakReminderModalProps) {
-  const hh = Math.floor(hoursWorked)
-  const mm = Math.round((hoursWorked - hh) * 60)
+  // Round total minutes first so e.g. 4.999h renders as "5h 0m", never "4h 60m"
+  const totalMinutes = Math.round(hoursWorked * 60)
+  const hh = Math.floor(totalMinutes / 60)
+  const mm = totalMinutes % 60
   const workedLabel = hh > 0 ? `${hh}h ${mm}m` : `${mm}m`
 
   const breakOrdinal = isSecondBreak ? 'second' : 'first'
@@ -58,6 +60,9 @@ export function BreakReminderModal({
             exit={{ scale: 0.92, opacity: 0, y: 16 }}
             transition={{ type: 'spring', stiffness: 320, damping: 28 }}
             onClick={e => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
             className="glass rounded-3xl p-8 max-w-md w-full"
             style={{
               border: `1px solid ${urgencyColor}44`,

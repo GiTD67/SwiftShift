@@ -119,6 +119,7 @@ def upload():
         client = OpenAI(
             api_key=api_key,
             base_url="https://api.x.ai/v1",
+            timeout=60,
         )
         uploaded = client.files.create(
             file=(f.filename, f.stream, f.content_type or "application/octet-stream"),
@@ -146,6 +147,7 @@ def chat():
         client = OpenAI(
             api_key=api_key,
             base_url="https://api.x.ai/v1",
+            timeout=60,
         )
 
         # RAG: retrieve relevant context from user's ChromaDB if user_id provided
@@ -284,7 +286,7 @@ def match_jobs():
     if not api_key:
         return jsonify({"error": "XAI_API_KEY not configured"}), 500
 
-    client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1")
+    client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1", timeout=60)
 
     # Build prompt: ask Grok to score each job against resume
     job_list = "\n".join(f"{i+1}. {j.get('title','')} at {j.get('company','')}: {j.get('desc','')[:800]}" for i, j in enumerate(jobs))
@@ -346,7 +348,7 @@ def tax_extract():
         content = f.read()
         text = content.decode("utf-8", errors="ignore")[:8000]  # limit
 
-        client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1")
+        client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1", timeout=60)
         prompt = (
             "You are a tax document extractor. Read the following document text and extract:\n"
             "- type: one of W-2, 1099-NEC, 1099-MISC, 1099-B, 1099-INT, 1099-DIV, receipt, other\n"
@@ -413,7 +415,7 @@ def fill_1040():
             if not fpath.exists():
                 return {"error": "file not found"}
             text = fpath.read_text(errors="ignore")[:8000]
-            client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1")
+            client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1", timeout=60)
             resp = client.chat.completions.create(
                 model="grok-4.20-0309-reasoning",
                 messages=[{"role": "user", "content": (
@@ -434,7 +436,7 @@ def fill_1040():
         def tool_web_search(args):
             q = args.get("query", "2024 federal tax brackets single filer")
             # Simple: use Grok to "search" (it knows recent info). In prod use real search API.
-            client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1")
+            client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1", timeout=60)
             resp = client.chat.completions.create(
                 model="grok-4.20-0309-reasoning",
                 messages=[{"role": "user", "content": f"Briefly state current info for: {q}"}],
@@ -484,7 +486,7 @@ def fill_1040():
         }
 
         # ---- Agent loop ----
-        client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1")
+        client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1", timeout=60)
         system = (
             "You are a tax-filing agent. Use tools to: list files, extract each, reconcile totals, "
             "search web for current brackets if needed, then calculate final 1040. "

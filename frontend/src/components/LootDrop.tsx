@@ -72,6 +72,16 @@ export function LootDrop({ isOpen, onClose, earnings, ptoHours, durationMin, the
     }
   }, [isOpen])
 
+  // Allow keyboard-only users to dismiss with Escape
+  useEffect(() => {
+    if (!isOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isOpen, onClose])
+
   // Theme-aware accent color
   const themeColors: Record<'green' | 'white' | 'orange' | 'cyan' | 'pink' | 'purple', string> = {
     green: '#D7FE51',
@@ -127,7 +137,7 @@ export function LootDrop({ isOpen, onClose, earnings, ptoHours, durationMin, the
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90" onClick={onClose}>
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90" onClick={onClose} role="dialog" aria-modal="true" aria-label="Shift summary">
         {/* Background glow particles */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           {[...Array(12)].map((_, i) => (

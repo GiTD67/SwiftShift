@@ -52,7 +52,10 @@ def _compute_session_duration(clock_in_str: str) -> int:
 @bp.route("/api/clock-sessions/<int:session_id>", methods=["PUT"])
 def clock_out(session_id):
     data = request.get_json() or {}
-    unpaid_break_minutes = int(data.get("break_minutes", 0) or 0)
+    try:
+        unpaid_break_minutes = max(0, int(data.get("break_minutes", 0) or 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "break_minutes must be a number"}), 400
     now = datetime.utcnow().isoformat()
     with get_db() as db:
         row = db.execute("SELECT * FROM clock_sessions WHERE id = ?", (session_id,)).fetchone()

@@ -32,7 +32,8 @@ CORS(app, origins=_allowed_origins, supports_credentials=True)
 limiter.init_app(app)
 
 # Routes that don't require a logged-in session.
-_PUBLIC_API_PREFIXES = ("/api/health", "/api/auth/", "/api/kalshi/")
+_PUBLIC_API_PREFIXES = ("/api/auth/", "/api/kalshi/")
+_PUBLIC_API_PATHS = ("/api/health",)
 
 
 @app.before_request
@@ -43,7 +44,7 @@ def _require_login_for_api():
         return None  # frontend SPA + static assets
     if request.method == "OPTIONS":
         return None  # let CORS preflight through
-    if any(path.startswith(prefix) for prefix in _PUBLIC_API_PREFIXES):
+    if path in _PUBLIC_API_PATHS or any(path.startswith(prefix) for prefix in _PUBLIC_API_PREFIXES):
         return None
     if not session.get("uid"):
         return jsonify({"error": "authentication required"}), 401
@@ -79,8 +80,9 @@ def kalshi_markets():
             params["event_ticker"] = et
         r = requests.get(url, params=params, timeout=10)
         return jsonify(r.json())
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        app.logger.exception("kalshi markets proxy failed")
+        return jsonify({"error": "market data unavailable"}), 502
 
 @app.route("/api/kalshi/events")
 def kalshi_events():
@@ -92,8 +94,9 @@ def kalshi_events():
         }
         r = requests.get(url, params=params, timeout=10)
         return jsonify(r.json())
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        app.logger.exception("kalshi events proxy failed")
+        return jsonify({"error": "market data unavailable"}), 502
 
 # Register API blueprints
 app.register_blueprint(health_bp)
