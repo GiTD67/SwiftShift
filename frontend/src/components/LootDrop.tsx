@@ -120,6 +120,11 @@ export function LootDrop({ isOpen, onClose, earnings, ptoHours, durationMin, the
 
   if (!isOpen) return null
 
+  // Ring fill: fraction of an 8-hour day, with a minimum visible sliver
+  const progress = Math.max(Math.min(durationMin / 480, 1), 0.02)
+  const ringRadius = 57
+  const circumference = 2 * Math.PI * ringRadius
+
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90" onClick={onClose}>
@@ -155,35 +160,59 @@ export function LootDrop({ isOpen, onClose, earnings, ptoHours, durationMin, the
         >
           {/* Vault container */}
           <div
-            className="glass rounded-3xl p-6 text-center relative overflow-hidden border border-white/20"
+            className="glass rounded-3xl px-6 pb-6 pt-5 text-center relative overflow-hidden border border-white/20"
             style={{ boxShadow: `0 0 80px -20px ${accentColor}35, 0 28px 72px -14px rgba(0,0,0,0.85)` }}
           >
             {/* Close X — absolute top-right corner */}
             <button
               onClick={onClose}
-              className="absolute top-2 right-3 w-8 h-8 flex items-center justify-center text-zinc-400 hover:text-white text-2xl leading-none z-10 rounded-lg hover:bg-white/10 transition-colors"
+              className="absolute top-1.5 right-1.5 w-8 h-8 flex items-center justify-center text-zinc-400 hover:text-white text-2xl leading-none z-10 rounded-lg hover:bg-white/10 transition-colors"
               aria-label="Close"
             >
               ×
             </button>
             {/* Funny message */}
-            <div className="text-xl font-semibold tracking-tight text-center leading-tight mb-4" style={{ color: accentColor }}>
+            <div className="text-xl font-semibold tracking-tight text-center leading-tight px-4 mb-6" style={{ color: accentColor }}>
               {dailyMessage}
             </div>
 
-            <div className="mb-1 text-xs uppercase tracking-[2px] text-white/60">END OF DAY</div>
+            <div className="mb-2 text-xs uppercase tracking-[2px] text-white/60">END OF DAY</div>
 
             {/* The Vault */}
             <div className="relative mx-auto w-32 h-32 mb-6">
               <motion.div
-                className="absolute inset-0 rounded-full border-[14px] border-white/30"
-                animate={{ 
-                  boxShadow: stage === 'settled' 
-                    ? '0 0 80px 20px rgba(255,255,255,0.3)' 
-                    : '0 0 40px 10px rgba(255,255,255,0.2)' 
+                className="absolute inset-0 rounded-full"
+                animate={{
+                  boxShadow: stage === 'settled'
+                    ? '0 0 80px 20px rgba(255,255,255,0.3)'
+                    : '0 0 40px 10px rgba(255,255,255,0.2)'
                 }}
                 transition={{ duration: 0.6 }}
               />
+              <svg className="absolute inset-0 w-32 h-32" viewBox="0 0 128 128">
+                <circle
+                  cx={64}
+                  cy={64}
+                  r={ringRadius}
+                  fill="none"
+                  stroke="rgba(255,255,255,0.12)"
+                  strokeWidth={12}
+                />
+                <motion.circle
+                  cx={64}
+                  cy={64}
+                  r={ringRadius}
+                  fill="none"
+                  stroke={accentColor}
+                  strokeWidth={12}
+                  strokeLinecap="round"
+                  transform="rotate(-90 64 64)"
+                  strokeDasharray={circumference}
+                  initial={{ strokeDashoffset: circumference }}
+                  animate={{ strokeDashoffset: circumference * (1 - progress) }}
+                  transition={{ duration: 1.4, ease: 'easeOut' }}
+                />
+              </svg>
               <div className="absolute inset-3 rounded-full border-4 border-white/10 flex items-center justify-center">
                 <div className="text-center">
                   <div className="font-mono text-3xl font-semibold tabular-nums text-white">

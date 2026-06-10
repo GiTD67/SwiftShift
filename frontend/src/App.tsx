@@ -1692,10 +1692,10 @@ function ResetPasswordPage() {
 
 // ===== Auth pages =====
 const AUTH_TESTIMONIALS = [
-  { quote: 'SwiftShift cut our payroll processing time in half. The real-time earnings view alone boosted team morale.', initials: 'JM', name: 'Jamie M.', role: 'HR Director' },
-  { quote: 'Clock-ins went from a daily chore to a non-event. My crew actually keeps their hours up to date now.', initials: 'DP', name: 'Dana P.', role: 'Operations Manager' },
-  { quote: 'Swifty pulled my W-2 numbers and filled out my 1040 in minutes. Tax season was painless this year.', initials: 'MR', name: 'Marcus R.', role: 'Shift Supervisor' },
-  { quote: 'Schedules, swaps, and PTO finally live in one place. My managers get hours of their week back.', initials: 'AL', name: 'Aisha L.', role: 'Store Manager' },
+  { quote: 'SwiftShift cut our payroll processing time in half. The real-time earnings view alone boosted team morale.', initials: 'JM', name: 'Jamie M.', role: 'HR Director', location: 'Austin, TX' },
+  { quote: 'Clock-ins went from a daily chore to a non-event. My crew actually keeps their hours up to date now.', initials: 'DP', name: 'Dana P.', role: 'Operations Manager', location: 'Columbus, OH' },
+  { quote: 'Swifty pulled my W-2 numbers and filled out my 1040 in minutes. Tax season was painless this year.', initials: 'MR', name: 'Marcus R.', role: 'Shift Supervisor', location: 'Phoenix, AZ' },
+  { quote: 'Schedules, swaps, and PTO finally live in one place. My managers get hours of their week back.', initials: 'AL', name: 'Aisha L.', role: 'Store Manager', location: 'Chicago, IL' },
 ]
 
 // Left-side brand panel shared by the login and signup pages (desktop only).
@@ -1710,8 +1710,8 @@ function AuthSidePanel({ accentHex }: { accentHex: string }) {
     <div className="hidden lg:flex w-5/12 flex-col justify-between gap-10 p-10 relative z-10">
       <div className="shrink-0">
         <div className="flex items-center gap-3 mb-8">
-          <LogoSVG className="h-9 w-auto" />
-          <span className="font-semibold text-2xl tracking-[1px]">SWIFTSHIFT</span>
+          <LogoSVG className="h-14 w-auto" />
+          <span className="font-semibold text-[56px] leading-none tracking-tight whitespace-nowrap">SWIFTSHIFT</span>
         </div>
         <div className="max-w-[400px]">
           <div className="uppercase tracking-[4px] text-xs text-zinc-500 mb-3"><span style={{ color: accentHex }}>AI POWERED</span> HR ENTERPRISE PLATFORM</div>
@@ -1758,7 +1758,7 @@ function AuthSidePanel({ accentHex }: { accentHex: string }) {
           <p className="text-sm text-zinc-300 italic leading-relaxed mb-2 min-h-[60px]">"{testimonial.quote}"</p>
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-semibold text-white">{testimonial.initials}</div>
-            <span className="text-xs text-zinc-500">{testimonial.name} · {testimonial.role}</span>
+            <span className="text-xs text-zinc-500">{testimonial.name} · {testimonial.role} · {testimonial.location}</span>
           </div>
         </div>
         <div className="flex items-center gap-3 text-sm">
@@ -1837,8 +1837,8 @@ function LoginPage() {
         <div className="w-full max-w-[420px] space-y-4">
           {/* Mobile-only brand header */}
           <div className="lg:hidden flex items-center justify-center gap-3 pt-2 pb-1">
-            <LogoSVG className="h-12 w-auto" />
-            <span className="font-semibold text-3xl tracking-[1px]">SWIFTSHIFT</span>
+            <LogoSVG className="h-14 w-auto" />
+            <span className="font-semibold text-4xl tracking-[1px]">SWIFTSHIFT</span>
           </div>
           {/* Mobile-only feature highlights */}
           <div className="lg:hidden glass rounded-3xl p-5 border border-white/10">
@@ -1990,7 +1990,6 @@ function LoginPage() {
       {showLoginTour && (
         <Tour
           onClose={() => setShowLoginTour(false)}
-          onNavigate={() => setShowLoginTour(false)}
           onComplete={() => setShowLoginTour(false)}
           accentHex={loginAccentHex}
         />
@@ -2058,8 +2057,8 @@ function SignupPage() {
         <div className="w-full max-w-[420px] space-y-4">
           {/* Mobile-only brand header */}
           <div className="lg:hidden flex items-center justify-center gap-3 pt-2 pb-1">
-            <LogoSVG className="h-12 w-auto" />
-            <span className="font-semibold text-3xl tracking-[1px]">SWIFTSHIFT</span>
+            <LogoSVG className="h-14 w-auto" />
+            <span className="font-semibold text-4xl tracking-[1px]">SWIFTSHIFT</span>
           </div>
           {/* Mobile-only feature highlights */}
           <div className="lg:hidden glass rounded-3xl p-5 border border-white/10">
@@ -2231,7 +2230,6 @@ function SignupPage() {
       {showSignupTour && (
         <Tour
           onClose={() => setShowSignupTour(false)}
-          onNavigate={() => setShowSignupTour(false)}
           onComplete={() => setShowSignupTour(false)}
           accentHex={signupAccentHex}
         />
