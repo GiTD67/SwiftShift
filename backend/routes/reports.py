@@ -4,7 +4,7 @@ from datetime import date, datetime
 from flask import Blueprint, jsonify, request
 
 from db import get_db
-from permissions import manager_required
+from permissions import current_uid, manager_required
 
 bp = Blueprint("reports", __name__)
 
@@ -25,6 +25,33 @@ def _parse_range():
     except ValueError:
         return None, None
     return start, end
+
+
+def _viewer_company_id(db, uid):
+    """The viewer's own company_id (NULL for legacy pre-company accounts).
+    Copied from users.py per convention (no cross-blueprint imports)."""
+    if not uid:
+        return None
+    row = db.execute("SELECT company_id FROM users WHERE id = ?", (uid,)).fetchone()
+    return row["company_id"] if row else None
+
+
+def _company_scope(db, daily, users):
+    """Restrict daily hours + users to the viewer's company, mirroring
+    payments._compute_items. Legacy viewers (company_id NULL) keep the
+    original global behavior."""
+    viewer_company = _viewer_company_id(db, current_uid())
+    if viewer_company is None:
+        return daily, users
+    company_uids = {
+        r["id"]
+        for r in db.execute(
+            "SELECT id FROM users WHERE company_id = ?", (viewer_company,)
+        ).fetchall()
+    }
+    daily = {k: v for k, v in daily.items() if k[0] in company_uids}
+    users = {uid: u for uid, u in users.items() if uid in company_uids}
+    return daily, users
 
 
 def _daily_hours(db, start, end):
@@ -130,6 +157,7 @@ def reports_summary():
     with get_db() as db:
         daily = _daily_hours(db, start, end)
         users = _load_users(db)
+        daily, users = _company_scope(db, daily, users)
 
     ot_by_user = _overtime_by_user(daily)
     hours_by_user = {}
@@ -183,6 +211,7 @@ def reports_hours():
     with get_db() as db:
         daily = _daily_hours(db, start, end)
         users = _load_users(db)
+        daily, users = _company_scope(db, daily, users)
 
     ot_by_day = _overtime_by_user_day(daily)
     rows = []

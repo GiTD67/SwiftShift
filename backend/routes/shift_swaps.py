@@ -30,6 +30,14 @@ def _ensure_table(db):
     db.execute(_DDL)
 
 
+def _viewer_company_id(db, uid):
+    """The viewer's own company_id (NULL for legacy pre-company accounts)."""
+    if not uid:
+        return None
+    row = db.execute("SELECT company_id FROM users WHERE id = ?", (uid,)).fetchone()
+    return row["company_id"] if row else None
+
+
 # GET /api/shift-swaps?user_id=X&status=open
 @bp.route("/api/shift-swaps", methods=["GET"])
 def list_swaps():
@@ -46,6 +54,18 @@ def list_swaps():
         if scope_to_me:
             where.append("(requester_id = ? OR target_id = ?)")
             params.extend([uid, uid])
+        else:
+            # Company-scope the global list: a non-legacy viewer only sees swaps
+            # involving users of their own company (requester or target — same
+            # membership rule as export.py). Legacy viewers (company_id NULL)
+            # keep the global list.
+            viewer_company = _viewer_company_id(db, uid)
+            if viewer_company is not None:
+                where.append(
+                    "(requester_id IN (SELECT id FROM users WHERE company_id = ?)"
+                    " OR target_id IN (SELECT id FROM users WHERE company_id = ?))"
+                )
+                params.extend([viewer_company, viewer_company])
         if status:
             where.append("status = ?")
             params.append(status)
@@ -70,12 +90,22 @@ def create_swap():
 
     status = "open"
     reviewed_at = None
+    target_id = data.get("target_id")
     with get_db() as db:
         _ensure_table(db)
+        requester_company = _viewer_company_id(db, requester_id)
+        # A non-legacy requester may only name a target inside their own company.
+        # Legacy requesters (company_id NULL) keep the original unscoped behavior.
+        if target_id and requester_company is not None:
+            target = db.execute(
+                "SELECT company_id FROM users WHERE id = ?", (target_id,)
+            ).fetchone()
+            if not target or target["company_id"] != requester_company:
+                return jsonify({"error": "target user not found"}), 404
         # Auto-approve when the org setting is on, both employees agreed (a target
         # was named), and the shift starts far enough in the future.
-        if data.get("target_id"):
-            min_hours = get_org_settings(db).get("auto_approve_swap_hours")
+        if target_id:
+            min_hours = get_org_settings(db, requester_company).get("auto_approve_swap_hours")
             if min_hours is not None:
                 try:
                     shift_dt = datetime.fromisoformat(f"{shift_date}T{shift_start}")
@@ -92,7 +122,7 @@ def create_swap():
             """,
             (
                 requester_id,
-                data.get("target_id"),
+                target_id,
                 shift_date,
                 shift_start,
                 shift_end,
@@ -122,9 +152,21 @@ def update_swap(swap_id):
     now = datetime.utcnow().isoformat()
     with get_db() as db:
         _ensure_table(db)
-        row = db.execute("SELECT id FROM shift_swaps WHERE id = ?", (swap_id,)).fetchone()
+        row = db.execute("SELECT id, requester_id, target_id FROM shift_swaps WHERE id = ?", (swap_id,)).fetchone()
         if not row:
             return jsonify({"error": "not found"}), 404
+        # A non-legacy manager can only act on swaps involving their own
+        # company (requester or target — same membership rule as list_swaps
+        # and export.py); cross-company swaps look like 404. Legacy callers
+        # (company_id NULL) keep the original global behavior.
+        caller_company = _viewer_company_id(db, current_uid())
+        if caller_company is not None:
+            member = db.execute(
+                "SELECT 1 FROM users WHERE id IN (?, ?) AND company_id = ?",
+                (row["requester_id"], row["target_id"], caller_company),
+            ).fetchone()
+            if not member:
+                return jsonify({"error": "not found"}), 404
         db.execute(
             "UPDATE shift_swaps SET status = ?, reviewed_by = ?, reviewed_at = ? WHERE id = ?",
             (status, current_uid(), now, swap_id),

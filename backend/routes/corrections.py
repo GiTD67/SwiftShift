@@ -28,6 +28,14 @@ def _ensure_table(db):
     db.execute(_DDL)
 
 
+def _viewer_company_id(db, uid):
+    """The viewer's own company_id (NULL for legacy pre-company accounts)."""
+    if not uid:
+        return None
+    row = db.execute("SELECT company_id FROM users WHERE id = ?", (uid,)).fetchone()
+    return row["company_id"] if row else None
+
+
 def _parse_iso(value):
     """Parse an ISO timestamp string, returning a datetime or None."""
     try:
@@ -98,15 +106,31 @@ def pending_corrections():
         return err
     with get_db() as db:
         _ensure_table(db)
-        rows = db.execute(
-            """
-            SELECT c.*, s.clock_in AS current_clock_in, s.clock_out AS current_clock_out
-            FROM clock_correction_requests c
-            LEFT JOIN clock_sessions s ON s.id = c.session_id
-            WHERE c.status = 'pending'
-            ORDER BY c.created_at DESC
-            """
-        ).fetchall()
+        viewer_company = _viewer_company_id(db, current_uid())
+        if viewer_company is not None:
+            # Company managers only see their own company's correction requests.
+            rows = db.execute(
+                """
+                SELECT c.*, s.clock_in AS current_clock_in, s.clock_out AS current_clock_out
+                FROM clock_correction_requests c
+                LEFT JOIN clock_sessions s ON s.id = c.session_id
+                JOIN users u ON u.id = c.user_id
+                WHERE c.status = 'pending' AND u.company_id = ?
+                ORDER BY c.created_at DESC
+                """,
+                (viewer_company,),
+            ).fetchall()
+        else:
+            # Legacy pre-company managers keep the original global behavior.
+            rows = db.execute(
+                """
+                SELECT c.*, s.clock_in AS current_clock_in, s.clock_out AS current_clock_out
+                FROM clock_correction_requests c
+                LEFT JOIN clock_sessions s ON s.id = c.session_id
+                WHERE c.status = 'pending'
+                ORDER BY c.created_at DESC
+                """
+            ).fetchall()
     return jsonify([dict(r) for r in rows])
 
 
@@ -122,6 +146,16 @@ def approve_correction(req_id):
         row = db.execute("SELECT * FROM clock_correction_requests WHERE id = ?", (req_id,)).fetchone()
         if not row:
             return jsonify({"error": "not found"}), 404
+        # Company managers may only review their own company's requests
+        # (same scoping as users.py update_user); legacy NULL-company
+        # callers keep the original global behavior.
+        viewer_company = _viewer_company_id(db, current_uid())
+        if viewer_company is not None:
+            owner = db.execute(
+                "SELECT company_id FROM users WHERE id = ?", (row["user_id"],)
+            ).fetchone()
+            if not owner or owner["company_id"] != viewer_company:
+                return jsonify({"error": "not found"}), 404
         if row["status"] != "pending":
             return jsonify({"error": "only pending requests can be reviewed"}), 400
         sess = db.execute("SELECT * FROM clock_sessions WHERE id = ?", (row["session_id"],)).fetchone()
@@ -164,6 +198,16 @@ def deny_correction(req_id):
         row = db.execute("SELECT * FROM clock_correction_requests WHERE id = ?", (req_id,)).fetchone()
         if not row:
             return jsonify({"error": "not found"}), 404
+        # Same cross-company guard as approve_correction: company managers
+        # may only review their own company's requests; legacy NULL-company
+        # callers keep the original global behavior.
+        viewer_company = _viewer_company_id(db, current_uid())
+        if viewer_company is not None:
+            owner = db.execute(
+                "SELECT company_id FROM users WHERE id = ?", (row["user_id"],)
+            ).fetchone()
+            if not owner or owner["company_id"] != viewer_company:
+                return jsonify({"error": "not found"}), 404
         if row["status"] != "pending":
             return jsonify({"error": "only pending requests can be reviewed"}), 400
         db.execute(

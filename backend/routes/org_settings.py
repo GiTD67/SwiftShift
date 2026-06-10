@@ -19,26 +19,62 @@ CREATE TABLE IF NOT EXISTS org_settings (
 """
 
 
-def get_org_settings(db):
-    """Return the single org-wide settings row as a dict, creating it with
-    defaults on first use. Also used by shift_swaps for swap auto-approval."""
+def _viewer_company_id(db, uid):
+    """The viewer's own company_id (NULL for legacy pre-company accounts)."""
+    if not uid:
+        return None
+    row = db.execute("SELECT company_id FROM users WHERE id = ?", (uid,)).fetchone()
+    return row["company_id"] if row else None
+
+
+def get_org_settings(db, company_id=None):
+    """Return the company's settings row as a dict, creating it with defaults
+    on first use. company_id None = the legacy pre-company tenant (the
+    original id=1 row). Also used by shift_swaps for swap auto-approval."""
     db.execute(_DDL)
-    row = db.execute("SELECT * FROM org_settings WHERE id = 1").fetchone()
-    if not row:
+    # One settings row per company (company_id NULL = the legacy
+    # pre-company deployment, mapped to 0 so it is unique too).
+    db.execute("ALTER TABLE org_settings ADD COLUMN IF NOT EXISTS company_id INTEGER")
+    db.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS org_settings_company_uniq
+        ON org_settings ((COALESCE(company_id, 0)))
+        """
+    )
+    row = db.execute(
+        "SELECT * FROM org_settings WHERE company_id IS NOT DISTINCT FROM ?",
+        (company_id,),
+    ).fetchone()
+    # Bare ON CONFLICT DO NOTHING also absorbs a PRIMARY KEY collision (two
+    # first-time requests for different companies can compute the same
+    # MAX(id)+1); in that case the fallback SELECT finds nothing for our
+    # company, so retry with a freshly computed id.
+    attempts = 0
+    while not row and attempts < 3:
+        attempts += 1
         row = db.execute(
-            "INSERT INTO org_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING RETURNING *"
+            """
+            INSERT INTO org_settings (id, company_id)
+            VALUES ((SELECT COALESCE(MAX(id), 0) + 1 FROM org_settings), ?)
+            ON CONFLICT DO NOTHING
+            RETURNING *
+            """,
+            (company_id,),
         ).fetchone()
         db.commit()
         if not row:  # lost a race with a concurrent request
-            row = db.execute("SELECT * FROM org_settings WHERE id = 1").fetchone()
+            row = db.execute(
+                "SELECT * FROM org_settings WHERE company_id IS NOT DISTINCT FROM ?",
+                (company_id,),
+            ).fetchone()
     return dict(row)
 
 
-# GET /api/org-settings — any signed-in user can read the workflow settings
+# GET /api/org-settings — any signed-in user can read their company's settings
 @bp.route("/api/org-settings", methods=["GET"])
 def get_settings():
     with get_db() as db:
-        settings = get_org_settings(db)
+        settings = get_org_settings(db, _viewer_company_id(db, current_uid()))
     return jsonify(settings)
 
 
@@ -50,7 +86,7 @@ def update_settings():
         return err
     data = request.get_json() or {}
     with get_db() as db:
-        current = get_org_settings(db)
+        current = get_org_settings(db, _viewer_company_id(db, current_uid()))
 
         # null disables swap auto-approval entirely
         auto_hours = data.get("auto_approve_swap_hours", current["auto_approve_swap_hours"])
@@ -70,11 +106,13 @@ def update_settings():
             return jsonify({"error": "ot_alert_daily_hours and missed_clockout_hours must be positive"}), 400
 
         db.execute(
-            "UPDATE org_settings SET auto_approve_swap_hours = ?, ot_alert_daily_hours = ?, missed_clockout_hours = ?, updated_at = ? WHERE id = 1",
-            (auto_hours, ot_hours, missed_hours, datetime.utcnow().isoformat()),
+            "UPDATE org_settings SET auto_approve_swap_hours = ?, ot_alert_daily_hours = ?, missed_clockout_hours = ?, updated_at = ? WHERE id = ?",
+            (auto_hours, ot_hours, missed_hours, datetime.utcnow().isoformat(), current["id"]),
         )
         db.commit()
-        row = db.execute("SELECT * FROM org_settings WHERE id = 1").fetchone()
+        row = db.execute(
+            "SELECT * FROM org_settings WHERE id = ?", (current["id"],)
+        ).fetchone()
     log_event(
         current_uid(), None, "org_settings_update",
         f"Workflow settings: auto-approve swaps {auto_hours if auto_hours is not None else 'off'}"
@@ -103,21 +141,37 @@ def get_flags():
         return err
     now = datetime.utcnow()
     with get_db() as db:
-        settings = get_org_settings(db)
+        viewer_company = _viewer_company_id(db, current_uid())
+        settings = get_org_settings(db, viewer_company)
         missed_after = float(settings["missed_clockout_hours"] or 12)
         ot_daily = float(settings["ot_alert_daily_hours"] or 10)
         cutoff = (now - timedelta(days=30)).isoformat()
-        rows = db.execute(
-            """
-            SELECT cs.id, cs.employee_id, cs.clock_in, cs.clock_out, cs.duration_minutes,
-                   u.first_name, u.last_name
-            FROM clock_sessions cs
-            LEFT JOIN users u ON u.id = cs.employee_id
-            WHERE cs.clock_out IS NULL OR cs.clock_in >= ?
-            ORDER BY cs.clock_in DESC
-            """,
-            (cutoff,),
-        ).fetchall()
+        if viewer_company is not None:
+            # Company managers only see their own company's sessions.
+            rows = db.execute(
+                """
+                SELECT cs.id, cs.employee_id, cs.clock_in, cs.clock_out, cs.duration_minutes,
+                       u.first_name, u.last_name
+                FROM clock_sessions cs
+                LEFT JOIN users u ON u.id = cs.employee_id
+                WHERE (cs.clock_out IS NULL OR cs.clock_in >= ?) AND u.company_id = ?
+                ORDER BY cs.clock_in DESC
+                """,
+                (cutoff, viewer_company),
+            ).fetchall()
+        else:
+            # Legacy pre-company viewers keep the original global behavior.
+            rows = db.execute(
+                """
+                SELECT cs.id, cs.employee_id, cs.clock_in, cs.clock_out, cs.duration_minutes,
+                       u.first_name, u.last_name
+                FROM clock_sessions cs
+                LEFT JOIN users u ON u.id = cs.employee_id
+                WHERE cs.clock_out IS NULL OR cs.clock_in >= ?
+                ORDER BY cs.clock_in DESC
+                """,
+                (cutoff,),
+            ).fetchall()
 
     missed = []
     daily = {}  # (employee_id, date) -> [minutes, name]

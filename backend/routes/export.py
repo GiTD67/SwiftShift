@@ -25,6 +25,14 @@ def _ensure_tables(db):
     _ensure_audit_table(db)
 
 
+def _viewer_company_id(db, uid):
+    """The viewer's own company_id (NULL for legacy pre-company accounts)."""
+    if not uid:
+        return None
+    row = db.execute("SELECT company_id FROM users WHERE id = ?", (uid,)).fetchone()
+    return row["company_id"] if row else None
+
+
 def _rows(db, sql, params=()):
     return [dict(r) for r in db.execute(sql, params).fetchall()]
 
@@ -111,16 +119,35 @@ def export_company():
         return err
     with get_db() as db:
         _ensure_tables(db)
-        tables = {
-            "users": [_strip_password(r) for r in db.execute("SELECT * FROM users ORDER BY id").fetchall()],
-            "clock_sessions": _rows(db, "SELECT * FROM clock_sessions ORDER BY id"),
-            "time_entries": _rows(db, "SELECT * FROM time_entries ORDER BY id"),
-            "pto_balances": _rows(db, "SELECT * FROM pto_balances ORDER BY user_id"),
-            "pto_requests": _rows(db, "SELECT * FROM pto_requests ORDER BY id"),
-            "shift_swaps": _rows(db, "SELECT * FROM shift_swaps ORDER BY id"),
-            "timesheet_submissions": _rows(db, "SELECT * FROM timesheet_submissions ORDER BY id"),
-            "audit_events": _rows(db, "SELECT * FROM audit_events ORDER BY id"),
-        }
+        viewer_company = _viewer_company_id(db, current_uid())
+        if viewer_company is not None:
+            # Company managers only export their own company's data.
+            member_ids = "(SELECT id FROM users WHERE company_id = ?)"
+            tables = {
+                "users": [
+                    _strip_password(r)
+                    for r in db.execute("SELECT * FROM users WHERE company_id = ? ORDER BY id", (viewer_company,)).fetchall()
+                ],
+                "clock_sessions": _rows(db, f"SELECT * FROM clock_sessions WHERE employee_id IN {member_ids} ORDER BY id", (viewer_company,)),
+                "time_entries": _rows(db, f"SELECT * FROM time_entries WHERE employee_id IN {member_ids} ORDER BY id", (viewer_company,)),
+                "pto_balances": _rows(db, f"SELECT * FROM pto_balances WHERE user_id IN {member_ids} ORDER BY user_id", (viewer_company,)),
+                "pto_requests": _rows(db, f"SELECT * FROM pto_requests WHERE user_id IN {member_ids} ORDER BY id", (viewer_company,)),
+                "shift_swaps": _rows(db, f"SELECT * FROM shift_swaps WHERE requester_id IN {member_ids} OR target_id IN {member_ids} ORDER BY id", (viewer_company, viewer_company)),
+                "timesheet_submissions": _rows(db, f"SELECT * FROM timesheet_submissions WHERE user_id IN {member_ids} ORDER BY id", (viewer_company,)),
+                "audit_events": _rows(db, f"SELECT * FROM audit_events WHERE user_id IN {member_ids} ORDER BY id", (viewer_company,)),
+            }
+        else:
+            # Legacy pre-company managers keep the original global export.
+            tables = {
+                "users": [_strip_password(r) for r in db.execute("SELECT * FROM users ORDER BY id").fetchall()],
+                "clock_sessions": _rows(db, "SELECT * FROM clock_sessions ORDER BY id"),
+                "time_entries": _rows(db, "SELECT * FROM time_entries ORDER BY id"),
+                "pto_balances": _rows(db, "SELECT * FROM pto_balances ORDER BY user_id"),
+                "pto_requests": _rows(db, "SELECT * FROM pto_requests ORDER BY id"),
+                "shift_swaps": _rows(db, "SELECT * FROM shift_swaps ORDER BY id"),
+                "timesheet_submissions": _rows(db, "SELECT * FROM timesheet_submissions ORDER BY id"),
+                "audit_events": _rows(db, "SELECT * FROM audit_events ORDER BY id"),
+            }
     zip_buf = io.BytesIO()
     with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for name, rows in tables.items():

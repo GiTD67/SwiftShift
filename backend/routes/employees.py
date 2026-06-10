@@ -8,10 +8,50 @@ from permissions import current_uid, manager_required
 bp = Blueprint("employees", __name__)
 
 
+def _ensure_schema():
+    # Idempotent DDL run on every worker boot (same pattern as payments.py):
+    # every statement must be IF NOT EXISTS so a re-run can't abort the
+    # Postgres transaction. CREATE TABLE mirrors auth.py so the ALTER below
+    # is safe regardless of import order.
+    with get_db() as db:
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS employees (
+              id SERIAL PRIMARY KEY,
+              name TEXT NOT NULL,
+              email TEXT
+            )
+            """
+        )
+        # NULL company_id = the legacy pre-company tenant.
+        db.execute("ALTER TABLE employees ADD COLUMN IF NOT EXISTS company_id INTEGER")
+        db.commit()
+
+
+_ensure_schema()
+
+
+def _viewer_company_id(db, uid):
+    """The viewer's own company_id (NULL for legacy pre-company accounts)."""
+    if not uid:
+        return None
+    row = db.execute("SELECT company_id FROM users WHERE id = ?", (uid,)).fetchone()
+    return row["company_id"] if row else None
+
+
 @bp.route("/api/employees", methods=["GET"])
 def list_employees():
     with get_db() as db:
-        rows = db.execute("SELECT * FROM employees ORDER BY id").fetchall()
+        viewer_company = _viewer_company_id(db, current_uid())
+        if viewer_company is not None:
+            # Company accounts only ever see their own company's employees.
+            rows = db.execute(
+                "SELECT * FROM employees WHERE company_id IS NOT DISTINCT FROM ? ORDER BY id",
+                (viewer_company,),
+            ).fetchall()
+        else:
+            # Legacy pre-company viewers keep the original global behavior.
+            rows = db.execute("SELECT * FROM employees ORDER BY id").fetchall()
     return jsonify([dict(r) for r in rows])
 
 
@@ -26,7 +66,13 @@ def create_employee():
     if not name:
         return jsonify({"error": "name required"}), 400
     with get_db() as db:
-        cur = db.execute("INSERT INTO employees (name, email) VALUES (?, ?)", (name, email))
+        # Stamp the new row with the creating manager's company so it never
+        # leaks into other companies' lists (NULL = legacy pre-company tenant).
+        company_id = _viewer_company_id(db, current_uid())
+        cur = db.execute(
+            "INSERT INTO employees (name, email, company_id) VALUES (?, ?, ?)",
+            (name, email, company_id),
+        )
         db.commit()
         emp = db.execute("SELECT * FROM employees WHERE id = ?", (cur.lastrowid,)).fetchone()
     if not emp:

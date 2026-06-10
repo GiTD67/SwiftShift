@@ -18,6 +18,10 @@ import { SalesKPI } from './components/SalesKPI'
 import { GravityGridBackground } from './components/GravityGridBackground'
 import { STATE_BREAK_RULES, STATE_CODES } from './data/stateBreakRules'
 import { Leaderboard } from './components/Leaderboard'
+import ManagerOnboarding, { InviteManagerPanel } from './components/ManagerOnboarding'
+import EmployeeOnboarding from './components/EmployeeOnboarding'
+import PayrollRunsPanel from './components/PayrollRunsPanel'
+import PayoutSetupCard from './components/PayoutSetupCard'
 import { queuePunch, hasQueuedPunches, flushQueuedPunches } from './utils/offlineQueue'
 
 const API_BASE = ''
@@ -1738,7 +1742,7 @@ function ForgotPasswordModal({ onClose, accentHex }: { onClose: () => void; acce
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="glass w-full max-w-[360px] rounded-3xl p-8 border border-white/10 mx-4" onClick={e => e.stopPropagation()} style={{ boxShadow: `0 0 80px -20px ${accentHex}35, 0 28px 72px -14px rgba(0,0,0,0.85)` }}>
+      <div className="glass w-full max-w-[360px] max-h-[85dvh] !overflow-y-auto rounded-3xl p-8 border border-white/10 mx-4" onClick={e => e.stopPropagation()} style={{ boxShadow: `0 0 80px -20px ${accentHex}35, 0 28px 72px -14px rgba(0,0,0,0.85)` }}>
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-xl font-semibold">Reset Password</h2>
           <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors" aria-label="Close">
@@ -1840,8 +1844,9 @@ function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen auth-bg text-white flex items-center justify-center p-4 relative">
-      <div className="absolute inset-0 bg-[radial-gradient(#0a1629_0.8px,transparent_1px)] bg-[length:4px_4px]" />
+    <div className="h-[100dvh] overflow-y-auto auth-bg text-white relative">
+      <div className="min-h-full flex items-center justify-center p-4 relative">
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(#0a1629_0.8px,transparent_1px)] bg-[length:4px_4px]" />
       <div className="glass w-full max-w-[380px] rounded-3xl p-8 border border-white/10 relative z-10" style={{ boxShadow: `0 0 80px -20px ${accentHex}35, 0 28px 72px -14px rgba(0,0,0,0.85)` }}>
         <div className="flex items-center gap-3 mb-6">
           <LogoSVG className="h-8 w-auto" />
@@ -1930,6 +1935,7 @@ function ResetPasswordPage() {
             </form>
           </>
         )}
+      </div>
       </div>
     </div>
   )
@@ -2056,11 +2062,12 @@ function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen auth-bg text-white relative flex">
+    <div className="h-[100dvh] overflow-y-auto auth-bg text-white relative">
+      <div className="min-h-full relative flex">
       {/* Fine dot texture over the accent aurora canvas */}
-      <div className="absolute inset-0 bg-[radial-gradient(#0a1629_0.8px,transparent_1px)] bg-[length:4px_4px]" />
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(#0a1629_0.8px,transparent_1px)] bg-[length:4px_4px]" />
       {/* Subtle neural grid */}
-      <div className={`absolute inset-0 transition-all duration-300 ${shockwaveActive ? 'opacity-[0.18] scale-[1.015]' : 'opacity-[0.06]'}`} style={{
+      <div className={`absolute inset-0 pointer-events-none transition-all duration-300 ${shockwaveActive ? 'opacity-[0.18] scale-[1.015]' : 'opacity-[0.06]'}`} style={{
         backgroundImage: 'linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)',
         backgroundSize: '48px 48px'
       }} />
@@ -2219,6 +2226,7 @@ function LoginPage() {
       <div className="absolute bottom-6 right-0 p-4 text-[10px] text-zinc-600">
         © 2026 SwiftShift. All rights reserved.
       </div>
+      </div>
 
       {showFeaturePreview && (
         <FeaturePreview
@@ -2255,7 +2263,24 @@ function SignupPage() {
   const [shockwaveActive] = useState(false)
   const [showFeaturePreview, setShowFeaturePreview] = useState(false)
   const [showSignupTour, setShowSignupTour] = useState(false)
+  // Optional invite code (prefilled from invite links like /signup?invite=SW-XXXXXXXX)
+  const [inviteCode, setInviteCode] = useState(() => (new URLSearchParams(window.location.search).get('invite') ?? '').toUpperCase())
+  const [inviteInfo, setInviteInfo] = useState<any | null>(null)
   const signupAccentHex = getThemeAccentHex(localStorage.getItem('theme') || 'green')
+
+  // Debounced invite lookup (public endpoint) — previews the company before signup.
+  useEffect(() => {
+    const code = inviteCode.trim()
+    if (code.length < 6) { setInviteInfo(null); return }
+    const t = setTimeout(() => {
+      fetch(`${API_BASE}/api/onboarding/invites/lookup?code=${encodeURIComponent(code)}`)
+        .then(r => r.json())
+        .then(d => setInviteInfo(d))
+        .catch(() => setInviteInfo(null))
+    }, 400)
+    return () => clearTimeout(t)
+  }, [inviteCode])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -2273,6 +2298,38 @@ function SignupPage() {
         localStorage.setItem('user', JSON.stringify(data))
         localStorage.setItem('lastEmail', email)
         localStorage.setItem('swiftshift-tour-pending', '1')
+        const code = inviteCode.trim().toUpperCase()
+        if (code) {
+          // Link the new account to its company right away (the signup response
+          // already set the session cookie). If this fails, stash the code so
+          // the in-app invite prompt prefills it.
+          try {
+            const acceptRes = await fetch(`${API_BASE}/api/onboarding/invites/accept`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code }),
+            })
+            if (!acceptRes.ok) {
+              localStorage.setItem('swiftshift-pending-invite', code)
+            } else {
+              // Merge the accept response (manager, role, rate) into the cached
+              // user so the welcome wizard greets with the real manager instead
+              // of a placeholder.
+              try {
+                const acc = await acceptRes.json()
+                const managerName = acc?.manager ? `${acc.manager.first_name ?? ''} ${acc.manager.last_name ?? ''}`.trim() : ''
+                localStorage.setItem('user', JSON.stringify({
+                  ...data,
+                  manager_name: managerName || data.manager_name,
+                  job_role: acc?.job_role ?? data.job_role,
+                  hourly_rate: acc?.hourly_rate ?? data.hourly_rate,
+                }))
+              } catch { /* keep the plain signup payload */ }
+            }
+          } catch {
+            localStorage.setItem('swiftshift-pending-invite', code)
+          }
+        }
         window.location.href = '.'
       }
     } catch {
@@ -2283,11 +2340,12 @@ function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen auth-bg text-white relative flex">
+    <div className="h-[100dvh] overflow-y-auto auth-bg text-white relative">
+      <div className="min-h-full relative flex">
       {/* Fine dot texture over the accent aurora canvas */}
-      <div className="absolute inset-0 bg-[radial-gradient(#0a1629_0.8px,transparent_1px)] bg-[length:4px_4px]" />
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(#0a1629_0.8px,transparent_1px)] bg-[length:4px_4px]" />
       {/* Subtle neural grid */}
-      <div className={`absolute inset-0 transition-all duration-300 ${shockwaveActive ? 'opacity-[0.18] scale-[1.015]' : 'opacity-[0.06]'}`} style={{
+      <div className={`absolute inset-0 pointer-events-none transition-all duration-300 ${shockwaveActive ? 'opacity-[0.18] scale-[1.015]' : 'opacity-[0.06]'}`} style={{
         backgroundImage: 'linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)',
         backgroundSize: '48px 48px'
       }} />
@@ -2368,6 +2426,41 @@ function SignupPage() {
               </div>
             </div>
 
+            {/* Invite code (optional) — links the new account to its company */}
+            <div>
+              <label className="block text-sm text-zinc-400 mb-1 tracking-wide">INVITE CODE <span className="text-zinc-600">— OPTIONAL</span></label>
+              <div className={`relative transition-all ${focusedField === 'invite' ? 'scale-[1.01]' : ''}`}>
+                <input
+                  type="text"
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                  onFocus={() => setFocusedField('invite')}
+                  onBlur={() => setFocusedField(null)}
+                  className="glass-input w-full rounded-2xl px-4 py-3 text-sm placeholder:text-zinc-600 border border-white/10 focus:border-white/40 focus:shadow-[0_0_0_3px_rgba(255,255,255,0.08)] outline-none transition-all font-mono tracking-[1px]"
+                  placeholder="SW-XXXXXXXX from your manager"
+                  autoComplete="off"
+                />
+              </div>
+              {inviteInfo && inviteCode.trim().length >= 6 && (
+                inviteInfo.valid ? (
+                  <div
+                    className="mt-2 text-sm rounded-xl px-4 py-2"
+                    style={{
+                      backgroundColor: 'rgba(var(--accent-color-rgb),0.08)',
+                      border: '1px solid rgba(var(--accent-color-rgb),0.35)',
+                      color: 'var(--accent-color)',
+                    }}
+                  >
+                    ✓ Joining <span className="font-semibold">{inviteInfo.company_name}</span> as {inviteInfo.name}{inviteInfo.job_role ? ` — ${inviteInfo.job_role}` : ''}
+                  </div>
+                ) : (
+                  <div className="mt-2 text-sm text-red-400 bg-red-950/40 border border-red-900/60 rounded-xl px-4 py-2">
+                    ⚠ Invalid or expired invite code — double-check it or leave this blank.
+                  </div>
+                )
+              )}
+            </div>
+
             {/* Email */}
             <div>
               <label className="block text-sm text-zinc-400 mb-1 tracking-wide">WORK EMAIL</label>
@@ -2432,7 +2525,7 @@ function SignupPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || inviteInfo?.valid === false}
               className="glass-btn-green w-full py-3.5 rounded-2xl text-base font-semibold tracking-[0.5px] mt-1 transition-all active:scale-[0.985] disabled:opacity-60 disabled:cursor-not-allowed hover:shadow-[0_0_30px_-8px_#D7FE51]"
             >
               {loading ? 'Creating account…' : 'Create Account'}
@@ -2464,6 +2557,7 @@ function SignupPage() {
       {/* Footer: bottom right corner */}
       <div className="absolute bottom-6 right-0 p-4 text-[10px] text-zinc-600">
         © 2026 SwiftShift. All rights reserved.
+      </div>
       </div>
 
       {showFeaturePreview && (
@@ -2535,6 +2629,18 @@ export default function App() {
   })
   const [highlightRate, setHighlightRate] = useState(false)
   const [showTour, setShowTour] = useState(() => localStorage.getItem('swiftshift-tour-pending') === '1')
+  // First-run onboarding: GET /api/onboarding/status decides which wizard (if any)
+  // this account still needs. null = still loading (no prompt yet). Dismissal is
+  // session-memory only, so legacy accounts are re-prompted on next login.
+  const [onboardingStatus, setOnboardingStatus] = useState<any | null>(null)
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false)
+  // 'create-company' swaps the employee invite prompt for the manager wizard
+  // (set by the "Create a company →" link; persisted so a mid-wizard reload resumes).
+  const [onboardingIntent, setOnboardingIntent] = useState<string | null>(() => localStorage.getItem('swiftshift-onboarding-intent'))
+  const onboardingNeeds: string | null = onboardingStatus?.needs ?? null
+  const onboardingMode = onboardingNeeds === 'employee_link' && onboardingIntent === 'create-company' ? 'manager_setup' : onboardingNeeds
+  const onboardingActive = !onboardingDismissed && onboardingNeeds != null
+  const [inviteListRefresh, setInviteListRefresh] = useState(0)
   const [chatMessage, setChatMessage] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
   const [chatHistory, setChatHistory] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([])
@@ -2698,29 +2804,25 @@ export default function App() {
   const announcementDraft = useFormDraft('announcement', announcementForm, setAnnouncementForm, showAnnouncementForm)
   const holidayDraft = useFormDraft('holiday', holidayForm, setHolidayForm, showHolidayForm && !editingHoliday)
 
-  // Onboarding tasks state
-  const [onboardingTasks, setOnboardingTasks] = useState<Record<string, boolean[]>>({
-    'Sam Carter': [true, true, false, false, false, false],
-    'Mia Thompson': [false, false, false, false, false, false],
-    'Leo Kim': [true, true, true, true, false, false],
-  })
-
-  // New hire onboarding modal state
+  // New hire onboarding modal state (creates company invites — no temp passwords)
   const [showAddHireModal, setShowAddHireModal] = useState(false)
-  const [addHireForm, setAddHireForm] = useState({ first_name: '', last_name: '', email: '', job_role: '', hourly_rate: '', temp_password: '' })
+  const [addHireForm, setAddHireForm] = useState({ first_name: '', last_name: '', email: '', job_role: '', hourly_rate: '' })
   const [addHireLoading, setAddHireLoading] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [importCsv, setImportCsv] = useState('')
   const [importLoading, setImportLoading] = useState(false)
   const [importResult, setImportResult] = useState<{ success: number; errors: string[] } | null>(null)
 
-  // Payroll sign-off state
-  const [payrollSignoffs, setPayrollSignoffs] = useState<Record<string, boolean>>({
-    'Alex Rivera': true,
-    'Jordan Lee': true,
-    'Dana Morales': false,
-    'Casey Morgan': false,
-  })
+  // Payments (Stripe) status — single source of truth for whether real payments
+  // are configured; threaded into PayrollRunsPanel + PayoutSetupCard so neither
+  // ever shows payment UI without the backend confirming it's real.
+  const [paymentsStatus, setPaymentsStatus] = useState<any | null>(null)
+  const refreshPaymentsStatus = useCallback(() => {
+    fetch(`${API_BASE}/api/payments/status`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => setPaymentsStatus((prev: any) => (d && !d.error ? d : (prev ?? { configured: false }))))
+      .catch(() => setPaymentsStatus((prev: any) => (prev ?? { configured: false })))
+  }, [])
 
   // Enterprise: ROI Calculator state
   const [roiHeadcount, setRoiHeadcount] = useState(150)
@@ -3074,6 +3176,59 @@ export default function App() {
   // Load company holidays once (static company-wide data, accessible to all)
   useEffect(() => {
     fetch(`${API_BASE}/api/holidays`).then(r => r.json()).then(r => setHolidays(Array.isArray(r) ? r : [])).catch(() => {})
+  }, [])
+
+  // First-run detection: ask the backend which onboarding wizard (if any) this
+  // account still needs — the single source of truth (not the signin response).
+  useEffect(() => {
+    if (!user?.id) return
+    fetch(`${API_BASE}/api/onboarding/status`)
+      .then(r => (r.ok ? r.json() : null))
+      // A {needs: null} sentinel on failure keeps onboardingStatus === null
+      // meaning strictly "still loading", so the tour isn't blocked forever.
+      .then(d => setOnboardingStatus(d && !d.error ? d : { needs: null }))
+      .catch(() => setOnboardingStatus({ needs: null }))
+  }, [user?.id])
+
+  // Payments status: fetched once after login, refreshed on return from Stripe.
+  useEffect(() => {
+    if (!user?.id) return
+    refreshPaymentsStatus()
+  }, [user?.id, refreshPaymentsStatus])
+
+  // Return-from-Stripe handling: funding=success|cancel (company bank Checkout)
+  // and payouts=return|refresh (Express onboarding links). Refetch status, toast,
+  // and strip the params so a reload doesn't replay the message.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const funding = params.get('funding')
+    const payouts = params.get('payouts')
+    if (!funding && !payouts) return
+    params.delete('funding')
+    params.delete('payouts')
+    const qs = params.toString()
+    window.history.replaceState({}, '', `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`)
+    if (funding === 'success') {
+      toast.success('Company bank connected', { description: 'Verification may take a moment — micro-deposits can take 1–2 days.' })
+      refreshPaymentsStatus()
+    } else if (funding === 'cancel') {
+      toast.info('Bank connection canceled — nothing was saved')
+    }
+    if (payouts === 'return') {
+      toast.success('Payout setup submitted', { description: 'Stripe is confirming your details.' })
+      refreshPaymentsStatus()
+    } else if (payouts === 'refresh') {
+      // Stripe account links are single-use and expire — mint a fresh one and continue.
+      toast.info('Resuming payout setup…')
+      fetch(`${API_BASE}/api/payments/me/payout-account/onboard`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
+        .then(r => r.json().then(d => ({ ok: r.ok, d })))
+        .then(({ ok, d }) => {
+          if (ok && d?.url) window.location.href = d.url
+          else toast.error(d?.error || 'Could not resume payout setup')
+        })
+        .catch(() => toast.error('Could not resume payout setup'))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Load schedules data
@@ -3840,26 +3995,38 @@ export default function App() {
       .finally(() => { window.location.href = 'login' })
   }
 
+  // Onboarding wizard finished: refresh the cached user (the complete response
+  // returns the updated names/role/company), clear the wizard keys, and stop
+  // prompting. App() re-reads localStorage 'user' on the next render.
+  const handleOnboardingComplete = (updatedUser: any) => {
+    if (updatedUser) localStorage.setItem('user', JSON.stringify({ ...user, ...updatedUser }))
+    localStorage.removeItem('swiftshift-onboarding-intent')
+    localStorage.removeItem('swiftshift-pending-invite')
+    setOnboardingIntent(null)
+    setOnboardingStatus((s: any) => ({ ...(s || {}), needs: null, onboarding_complete: true }))
+  }
+  // Session-memory dismissal only — no persistence, so the prompt returns next login.
+  const handleOnboardingSkip = () => setOnboardingDismissed(true)
+
   async function handleAddHire() {
-    const { first_name, last_name, email, job_role, hourly_rate, temp_password } = addHireForm
-    if (!first_name.trim() || !last_name.trim() || !email.trim() || !temp_password.trim()) {
-      toast.error('First name, last name, email, and temporary password are required.')
+    const { first_name, last_name, email, job_role, hourly_rate } = addHireForm
+    if (!first_name.trim() || !last_name.trim()) {
+      toast.error('First and last name are required.')
       return
     }
     setAddHireLoading(true)
     try {
-      const res = await fetch(`${API_BASE}/api/users`, {
+      const res = await fetch(`${API_BASE}/api/onboarding/invites`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ first_name: first_name.trim(), last_name: last_name.trim(), email: email.trim(), job_role: job_role.trim() || undefined, hourly_rate: hourly_rate ? Number(hourly_rate) : undefined, password: temp_password }),
+        body: JSON.stringify({ name: `${first_name.trim()} ${last_name.trim()}`, email: email.trim() || undefined, job_role: job_role.trim() || undefined, hourly_rate: hourly_rate ? Number(hourly_rate) : undefined }),
       })
-      if (res.status === 409) { toast.error('An account with that email already exists.'); return }
-      if (!res.ok) { toast.error('Failed to create employee.'); return }
-      const newUser = await res.json()
-      setUsers(prev => [...prev, newUser])
-      toast.success(`${first_name} ${last_name} added successfully!`)
+      const data = await res.json().catch(() => null)
+      if (!res.ok) { toast.error(data?.error || 'Failed to create invite.'); return }
+      setInviteListRefresh(n => n + 1)
+      toast.success(`Invite created for ${first_name.trim()}!`, { description: `Code ${data.code} — copy the code or signup link from the invite list.` })
       setShowAddHireModal(false)
-      setAddHireForm({ first_name: '', last_name: '', email: '', job_role: '', hourly_rate: '', temp_password: '' })
+      setAddHireForm({ first_name: '', last_name: '', email: '', job_role: '', hourly_rate: '' })
     } catch {
       toast.error('Network error.')
     } finally {
@@ -3871,39 +4038,51 @@ export default function App() {
     const lines = importCsv.trim().split('\n').filter(l => l.trim())
     if (lines.length < 2) { toast.error('CSV must have a header row and at least one data row.'); return }
     const header = lines[0].split(',').map(h => h.trim().toLowerCase())
-    const requiredCols = ['first_name', 'last_name', 'email', 'password']
+    const requiredCols = ['first_name', 'last_name']
     const missing = requiredCols.filter(c => !header.includes(c))
     if (missing.length) { toast.error(`Missing required columns: ${missing.join(', ')}`); return }
     setImportLoading(true)
-    const success: number[] = []
+    const rows: Array<{ line: number; invite: any }> = []
     const errors: string[] = []
     for (let i = 1; i < lines.length; i++) {
       const vals = lines[i].split(',').map(v => v.trim())
       const row: Record<string, string> = {}
       header.forEach((h, idx) => { row[h] = vals[idx] || '' })
-      if (!row.first_name || !row.last_name || !row.email || !row.password) {
+      if (!row.first_name || !row.last_name) {
         errors.push(`Row ${i + 1}: missing required fields`)
         continue
       }
+      rows.push({
+        line: i + 1,
+        invite: { name: `${row.first_name} ${row.last_name}`, email: row.email || undefined, job_role: row.job_role || undefined, hourly_rate: row.hourly_rate ? Number(row.hourly_rate) : undefined },
+      })
+    }
+    let successCount = 0
+    if (rows.length > 0) {
       try {
-        const res = await fetch(`${API_BASE}/api/users`, {
+        const res = await fetch(`${API_BASE}/api/onboarding/invites/bulk`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ first_name: row.first_name, last_name: row.last_name, email: row.email, password: row.password, job_role: row.job_role || undefined, hourly_rate: row.hourly_rate ? Number(row.hourly_rate) : undefined }),
+          body: JSON.stringify({ invites: rows.map(r => r.invite) }),
         })
-        if (res.status === 409) { errors.push(`Row ${i + 1}: email ${row.email} already exists`); continue }
-        if (!res.ok) { errors.push(`Row ${i + 1}: server error`); continue }
-        const newUser = await res.json()
-        setUsers(prev => [...prev, newUser])
-        success.push(newUser.id)
+        const data = await res.json().catch(() => null)
+        if (!res.ok) {
+          errors.push(data?.error || 'Server error.')
+        } else {
+          successCount = Array.isArray(data.created) ? data.created.length : 0
+          for (const e of data.errors || []) {
+            errors.push(`Row ${rows[e.index]?.line ?? e.index + 2}: ${e.error}`)
+          }
+          if (successCount > 0) setInviteListRefresh(n => n + 1)
+        }
       } catch {
-        errors.push(`Row ${i + 1}: network error`)
+        errors.push('Network error.')
       }
     }
-    setImportResult({ success: success.length, errors })
+    setImportResult({ success: successCount, errors })
     setImportLoading(false)
-    if (success.length > 0) toast.success(`Imported ${success.length} employee${success.length !== 1 ? 's' : ''} successfully!`)
-    if (errors.length > 0) toast.error(`${errors.length} row${errors.length !== 1 ? 's' : ''} failed to import.`)
+    if (successCount > 0) toast.success(`Created ${successCount} invite${successCount !== 1 ? 's' : ''}!`)
+    if (errors.length > 0) toast.error(`${errors.length} row${errors.length !== 1 ? 's' : ''} failed.`)
   }
 
   const navUnlockedAchievements = appGState.unlockedAchievements
@@ -3934,7 +4113,7 @@ export default function App() {
             onClick={() => setCmdkOpen(true)}
             title="Search & jump (⌘K)"
             aria-label="Open command palette"
-            className="hidden sm:flex items-center gap-2 pl-2.5 pr-2 py-1.5 text-xs rounded-full border border-white/10 text-white/55 hover:text-white hover:border-white/25 hover:bg-white/5 transition-all md:flex-1 md:min-w-0 md:max-w-md"
+            className="flex items-center gap-2 pl-2.5 pr-2 py-1.5 text-xs rounded-full border border-white/10 text-white/55 hover:text-white hover:border-white/25 hover:bg-white/5 transition-all md:flex-1 md:min-w-0 md:max-w-md"
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <span className="hidden md:inline">Search</span>
@@ -3954,7 +4133,7 @@ export default function App() {
             Upgrade
           </button>
           {/* Achievements badge */}
-          <div className="relative group">
+          <div className="relative group hidden sm:block">
             <button
               onClick={() => navTo('rewards')}
               title="Achievements"
@@ -3993,7 +4172,7 @@ export default function App() {
             </div>
           </div>
           {/* Daily streak counter */}
-          <div className="flex items-center gap-1.5 px-3 py-1 text-sm text-white/60 border border-white/10 rounded-full">
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 text-sm text-white/60 border border-white/10 rounded-full">
             <span style={{ color: 'var(--accent-color)' }}>
               {streak > 0
                 ? (
@@ -4022,9 +4201,28 @@ export default function App() {
                     style={{ boxShadow: `0 0 0 2px ${getXPLevelRingColor(appCurrentLevel.level)}${avatarFrame === 'glow' ? `, 0 0 8px ${getXPLevelRingColor(appCurrentLevel.level)}` : ''}` }}
                   >{user.first_name?.[0]?.toUpperCase()}</span>
               }
-              Hi, {user.first_name} <span className="text-[10px] px-1.5 py-0.5 rounded-full ml-1" style={{ backgroundColor: 'var(--accent-color)', color: '#000', fontWeight: 700 }}>Lv.{appCurrentLevel.level}</span> ▾
+              <span className="hidden sm:inline">Hi, {user.first_name}</span> <span className="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded-full ml-1" style={{ backgroundColor: 'var(--accent-color)', color: '#000', fontWeight: 700 }}>Lv.{appCurrentLevel.level}</span> ▾
             </button>
             <div className="absolute right-0 top-full w-56 bg-zinc-900 border border-white/10 rounded-xl shadow-lg hidden group-hover:block group-focus-within:block z-50 pt-1">
+              {/* Mobile-only rows — shown as navbar pills on ≥sm */}
+              <div className="sm:hidden border-b border-white/10">
+                <div className="px-4 py-2 text-sm text-zinc-300 rounded-t-xl">
+                  🔥 {streak} day streak
+                </div>
+                <button
+                  onClick={() => navTo('rewards')}
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-white/5"
+                >
+                  Achievements
+                </button>
+                <button
+                  onClick={() => navTo('pricing')}
+                  className="w-full text-left px-4 py-2 text-sm font-bold hover:bg-white/5"
+                  style={{ color: 'var(--accent-color)' }}
+                >
+                  Upgrade
+                </button>
+              </div>
               <button
                 onClick={() => navTo('profile')}
                 className="w-full text-left px-4 py-2 text-sm hover:bg-white/5 rounded-t-xl"
@@ -5881,9 +6079,10 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Personal Paystub */}
+              {/* Personal Paystub (estimate only — SwiftShift pays gross wages and withholds nothing) */}
               <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4 text-white">My Paystub - {periodLabel}</h2>
+                <h2 className="text-lg font-semibold mb-1 text-white">Estimated paycheck — {periodLabel}</h2>
+                <p className="text-xs text-zinc-500 mb-4">Taxes are estimates — not withheld by SwiftShift.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   {/* Earnings */}
                   <div className="space-y-3">
@@ -5968,78 +6167,14 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Employee Payroll Summary with One-Click Sign-off */}
-              <div className="glass rounded-3xl p-6">
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                  <h2 className="text-lg font-semibold text-white">Employee Payroll Summary</h2>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-zinc-400">
-                      {Object.values(payrollSignoffs).filter(Boolean).length}/{Object.keys(payrollSignoffs).length} signed off
-                    </span>
-                    <button
-                      onClick={() => {
-                        const allSigned = Object.keys(payrollSignoffs).every(k => payrollSignoffs[k])
-                        if (allSigned) { toast.success('All employees already signed off'); return }
-                        setPayrollSignoffs(prev => Object.fromEntries(Object.keys(prev).map(k => [k, true])))
-                        toast.success('All payroll signed off! Payroll run initiated.')
-                      }}
-                      className="px-4 py-1.5 rounded-xl text-xs font-semibold transition-colors"
-                      style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
-                    >
-                      Sign Off All
-                    </button>
-                  </div>
-                </div>
-                <div className="overflow-x-auto">
-                <table className="w-full text-sm" style={{ minWidth: '560px' }}>
-                  <thead>
-                    <tr className="text-zinc-400 border-b border-white/10 text-left">
-                      <th className="py-2 pr-4">Employee</th>
-                      <th className="py-2 pr-4">Role</th>
-                      <th className="py-2 pr-4">Hours</th>
-                      <th className="py-2 pr-4">Rate</th>
-                      <th className="py-2 pr-4">Gross Pay</th>
-                      <th className="py-2">Sign-off</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      { name: 'Alex Rivera', role: 'Co-Founder', hrs: '80h', rate: '$85/hr', gross: '$6,800' },
-                      { name: 'Jordan Lee', role: 'Engineering Lead', hrs: '76h', rate: '$72/hr', gross: '$5,472' },
-                      { name: 'Dana Morales', role: 'HR Director', hrs: '78h', rate: '$65/hr', gross: '$5,070' },
-                      { name: 'Casey Morgan', role: 'Sales Lead', hrs: '82h', rate: '$60/hr', gross: '$4,920' },
-                    ].map(({ name, role, hrs, rate, gross }) => {
-                      const signed = payrollSignoffs[name] || false
-                      return (
-                        <tr key={name} className="border-b border-white/5 hover:bg-white/5">
-                          <td className="py-2.5 pr-4 font-medium">{name}</td>
-                          <td className="py-2.5 pr-4 text-zinc-400">{role}</td>
-                          <td className="py-2.5 pr-4">{hrs}</td>
-                          <td className="py-2.5 pr-4">{rate}</td>
-                          <td className="py-2.5 pr-4 font-semibold" style={{ color: 'var(--accent-color)' }}>{gross}</td>
-                          <td className="py-2.5">
-                            <button
-                              onClick={() => {
-                                setPayrollSignoffs(prev => ({ ...prev, [name]: !prev[name] }))
-                                toast.success(signed ? `Sign-off removed for ${name}` : `${name} signed off!`)
-                              }}
-                              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${signed ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'bg-white/10 text-zinc-400 hover:bg-white/20'}`}
-                            >
-                              {signed ? '✓ Signed Off' : 'Sign Off'}
-                            </button>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-                </div>
-                {Object.values(payrollSignoffs).every(Boolean) && (
-                  <div className="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-medium text-center">
-                    All employees signed off. Payroll run ready to submit.
-                  </div>
-                )}
-              </div>
+              {/* Real payroll: company bank + run preview/execute + run history (Stripe) */}
+              {isManager && (
+                <PayrollRunsPanel
+                  status={paymentsStatus}
+                  defaultPeriodStart={period.start.toISOString().slice(0, 10)}
+                  defaultPeriodEnd={period.end.toISOString().slice(0, 10)}
+                />
+              )}
             </div>
             )
           })()}
@@ -6661,75 +6796,9 @@ export default function App() {
                   </div>
                 </div>
                 <div className="glass rounded-3xl p-6">
-                  <h2 className="text-lg font-semibold mb-4 text-white">Onboarding Queue</h2>
-                  <div className="space-y-3">
-                    {[
-                      { name: 'Sam Carter', role: 'Frontend Engineer', start: 'May 5, 2026' },
-                      { name: 'Mia Thompson', role: 'Product Designer', start: 'May 12, 2026' },
-                      { name: 'Leo Kim', role: 'Account Executive', start: 'Apr 28, 2026' },
-                    ].map(({ name, role, start }) => {
-                      const tasks = onboardingTasks[name] || []
-                      const done = tasks.filter(Boolean).length
-                      const pct = tasks.length > 0 ? Math.round(done / tasks.length * 100) : 0
-                      return (
-                        <div key={name} className="bg-white/5 rounded-xl px-4 py-3">
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <div className="font-medium text-sm">{name}</div>
-                              <div className="text-xs text-zinc-400">{role} · Starts {start}</div>
-                            </div>
-                            <span className="text-xs" style={{ color: 'var(--accent-color)' }}>{pct}%</span>
-                          </div>
-                          <div className="h-1.5 bg-white/10 rounded-full overflow-hidden mb-2">
-                            <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: 'var(--accent-color)' }} />
-                          </div>
-                          <div className="text-xs text-zinc-500">{done}/{tasks.length} tasks complete</div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* Onboarding Checklists */}
-              <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-4 text-white">Onboarding Checklists</h2>
-                <div className="space-y-6">
-                  {[
-                    { name: 'Sam Carter', role: 'Frontend Engineer' },
-                    { name: 'Mia Thompson', role: 'Product Designer' },
-                    { name: 'Leo Kim', role: 'Account Executive' },
-                  ].map(({ name, role }) => {
-                    const taskLabels = ['Equipment provisioned', 'Accounts created (email, Slack, GitHub)', 'HR paperwork signed', 'Benefits enrollment', '1:1 with manager scheduled', 'Team introduction done']
-                    const tasks = onboardingTasks[name] || taskLabels.map(() => false)
-                    const done = tasks.filter(Boolean).length
-                    return (
-                      <div key={name}>
-                        <div className="flex items-center gap-2 mb-3">
-                          <div className="text-sm font-semibold">{name}</div>
-                          <div className="text-xs text-zinc-400">{role}</div>
-                          <span className="ml-auto text-xs text-zinc-500">{done}/{tasks.length}</span>
-                        </div>
-                        <div className="space-y-2">
-                          {taskLabels.map((label, i) => (
-                            <div key={label} className="flex items-center gap-3 bg-white/5 rounded-lg px-3 py-2">
-                              <button
-                                onClick={() => setOnboardingTasks(prev => ({
-                                  ...prev,
-                                  [name]: (prev[name] || tasks).map((v, j) => j === i ? !v : v)
-                                }))}
-                                className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${tasks[i] ? 'border-transparent' : 'border-white/30 bg-transparent hover:border-white/60'}`}
-                                style={tasks[i] ? { backgroundColor: 'var(--accent-color)' } : {}}
-                              >
-                                {tasks[i] && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                              </button>
-                              <span className={`text-sm flex-1 ${tasks[i] ? 'line-through text-zinc-500' : ''}`}>{label}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  })}
+                  <h2 className="text-lg font-semibold mb-1 text-white">Invites &amp; Onboarding</h2>
+                  <p className="text-xs text-zinc-400 mb-4">Mint invite codes for new hires — they enter the code (or open the link) at signup to join your company.</p>
+                  <InviteManagerPanel refreshKey={inviteListRefresh} />
                 </div>
               </div>
 
@@ -6739,7 +6808,7 @@ export default function App() {
                   <div className="glass rounded-3xl p-6 w-full max-w-md space-y-4" onClick={e => e.stopPropagation()}>
                     <div>
                       <div className="text-lg font-bold" style={{ color: 'var(--accent-color)' }}>Add New Hire</div>
-                      <div className="text-xs text-zinc-400 mt-0.5">Create an account for a new employee. They can log in with the temporary password.</div>
+                      <div className="text-xs text-zinc-400 mt-0.5">Creates an invite code — share the code or signup link and they join your company when they sign up.</div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -6751,7 +6820,7 @@ export default function App() {
                         <input className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm" value={addHireForm.last_name} onChange={e => setAddHireForm(f => ({ ...f, last_name: e.target.value }))} placeholder="Smith" />
                       </div>
                       <div className="col-span-2">
-                        <label className="text-xs text-zinc-400 block mb-1">Email *</label>
+                        <label className="text-xs text-zinc-400 block mb-1">Email</label>
                         <input type="email" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm" value={addHireForm.email} onChange={e => setAddHireForm(f => ({ ...f, email: e.target.value }))} placeholder="jane@company.com" />
                       </div>
                       <div>
@@ -6762,15 +6831,11 @@ export default function App() {
                         <label className="text-xs text-zinc-400 block mb-1">Hourly Rate ($)</label>
                         <input type="number" min="0" step="0.01" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm" value={addHireForm.hourly_rate} onChange={e => setAddHireForm(f => ({ ...f, hourly_rate: e.target.value }))} placeholder="25.00" />
                       </div>
-                      <div className="col-span-2">
-                        <label className="text-xs text-zinc-400 block mb-1">Temporary Password *</label>
-                        <input type="text" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm font-mono" value={addHireForm.temp_password} onChange={e => setAddHireForm(f => ({ ...f, temp_password: e.target.value }))} placeholder="Share this with the employee" />
-                      </div>
                     </div>
                     <div className="flex gap-2 justify-end pt-1">
                       <button onClick={() => setShowAddHireModal(false)} className="px-4 py-2 rounded-xl text-sm bg-white/5 text-zinc-400">Cancel</button>
                       <button onClick={handleAddHire} disabled={addHireLoading} className="px-4 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000', opacity: addHireLoading ? 0.6 : 1 }}>
-                        {addHireLoading ? 'Adding...' : 'Add Employee'}
+                        {addHireLoading ? 'Creating...' : 'Create Invite'}
                       </button>
                     </div>
                   </div>
@@ -6783,26 +6848,26 @@ export default function App() {
                   <div className="glass rounded-3xl p-6 w-full max-w-lg space-y-4" onClick={e => e.stopPropagation()}>
                     <div>
                       <div className="text-lg font-bold" style={{ color: 'var(--accent-color)' }}>Import Employees from CSV</div>
-                      <div className="text-xs text-zinc-400 mt-0.5">Paste or type CSV data to bulk-import employees from another system.</div>
+                      <div className="text-xs text-zinc-400 mt-0.5">Paste or type CSV data to bulk-create invite codes for employees from another system.</div>
                     </div>
                     <div className="bg-black/30 rounded-xl p-3 text-[10px] text-zinc-500 font-mono leading-relaxed">
                       <div className="text-zinc-400 mb-1 text-xs font-sans font-medium">Required columns:</div>
-                      <div>first_name, last_name, email, password</div>
-                      <div className="mt-1 text-zinc-600">Optional: job_role, hourly_rate</div>
+                      <div>first_name, last_name</div>
+                      <div className="mt-1 text-zinc-600">Optional: email, job_role, hourly_rate</div>
                       <div className="mt-2 text-zinc-500">Example:</div>
-                      <div>first_name,last_name,email,password,job_role,hourly_rate</div>
-                      <div>Jane,Smith,jane@co.com,TempPass1,Engineer,35</div>
+                      <div>first_name,last_name,email,job_role,hourly_rate</div>
+                      <div>Jane,Smith,jane@co.com,Engineer,35</div>
                     </div>
                     <textarea
                       className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono resize-y"
                       rows={6}
                       value={importCsv}
                       onChange={e => setImportCsv(e.target.value)}
-                      placeholder="first_name,last_name,email,password,job_role,hourly_rate&#10;Jane,Smith,jane@co.com,TempPass1,Engineer,35"
+                      placeholder="first_name,last_name,email,job_role,hourly_rate&#10;Jane,Smith,jane@co.com,Engineer,35"
                     />
                     {importResult && (
                       <div className="rounded-xl p-3 text-xs space-y-1" style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <div style={{ color: 'var(--accent-color)' }}>{importResult.success} employee{importResult.success !== 1 ? 's' : ''} imported successfully</div>
+                        <div style={{ color: 'var(--accent-color)' }}>{importResult.success} invite code{importResult.success !== 1 ? 's' : ''} created</div>
                         {importResult.errors.map((e, i) => <div key={i} className="text-red-400">{e}</div>)}
                       </div>
                     )}
@@ -7968,9 +8033,15 @@ export default function App() {
                 const splitTotal = (depositEdit || []).reduce((s: number, a: any) => s + (parseFloat(String(a.split_percent)) || 0), 0)
                 const splitOk = Math.abs(splitTotal - 100) <= 0.01
                 return (
+                <div className="space-y-6">
+                {/* Real payouts (Stripe Express) — the legacy form below is reference only */}
+                <PayoutSetupCard status={paymentsStatus} />
                 <div className="glass rounded-3xl p-6 space-y-4">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-white">Direct Deposit</h2>
+                    <div>
+                      <h2 className="text-lg font-semibold text-white">Direct Deposit</h2>
+                      <p className="text-xs text-zinc-500 mt-0.5">Reference only — not used for SwiftShift payments</p>
+                    </div>
                     {(depositEdit?.length || 0) < 3 && (
                       <button onClick={() => setDepositEdit((s: any) => [...(s || []), { bank_name: '', account_type: 'checking', routing_number: '', account_number: '', split_percent: 0 }])}
                         className="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors">
@@ -8029,6 +8100,7 @@ export default function App() {
                   }} className="px-5 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
                     Save Banking Info
                   </button>
+                </div>
                 </div>
                 )
               })()}
@@ -8845,8 +8917,34 @@ export default function App() {
           )}
         </main>
 
-        {/* Guided tour modal */}
-        {showTour && (
+        {/* First-run onboarding wizards — rendered before the tour, which waits
+            (gated on !onboardingActive) until onboarding finishes or is skipped */}
+        {onboardingActive && onboardingMode === 'manager_setup' && (
+          <ManagerOnboarding
+            user={user}
+            company={onboardingStatus?.company ?? null}
+            onComplete={handleOnboardingComplete}
+            onSkip={handleOnboardingSkip}
+          />
+        )}
+        {onboardingActive && (onboardingMode === 'employee_link' || onboardingMode === 'employee_wizard') && (
+          <EmployeeOnboarding
+            user={user}
+            mode={onboardingMode === 'employee_link' ? 'link' : 'wizard'}
+            initialCode={localStorage.getItem('swiftshift-pending-invite') || undefined}
+            onComplete={handleOnboardingComplete}
+            onSkip={handleOnboardingSkip}
+            onCreateCompany={() => {
+              localStorage.setItem('swiftshift-onboarding-intent', 'create-company')
+              setOnboardingIntent('create-company')
+            }}
+          />
+        )}
+
+        {/* Guided tour modal — also waits for the onboarding status fetch to
+            resolve so a fresh signup's tour isn't yanked mid-display when the
+            wizard turns out to be needed */}
+        {showTour && !onboardingActive && onboardingStatus !== null && (
           <Tour
             onClose={() => {
               setShowTour(false)

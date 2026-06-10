@@ -51,6 +51,14 @@ def _ensure_tables(db):
         db.execute(f"ALTER TABLE pto_requests ADD COLUMN IF NOT EXISTS {col_def}")
 
 
+def _viewer_company_id(db, uid):
+    """The viewer's own company_id (NULL for legacy pre-company accounts)."""
+    if not uid:
+        return None
+    row = db.execute("SELECT company_id FROM users WHERE id = ?", (uid,)).fetchone()
+    return row["company_id"] if row else None
+
+
 # GET /api/pto/balance?user_id=X
 @bp.route("/api/pto/balance", methods=["GET"])
 def get_balance():
@@ -117,10 +125,22 @@ def list_requests():
     with get_db() as db:
         _ensure_tables(db)
         if is_manager(uid):
-            # Managers see everyone's requests so they can review them.
-            rows = db.execute(
-                "SELECT * FROM pto_requests ORDER BY created_at DESC"
-            ).fetchall()
+            viewer_company = _viewer_company_id(db, uid)
+            if viewer_company is not None:
+                # Company managers only see their own company's requests.
+                rows = db.execute(
+                    """
+                    SELECT * FROM pto_requests
+                    WHERE user_id IN (SELECT id FROM users WHERE company_id = ?)
+                    ORDER BY created_at DESC
+                    """,
+                    (viewer_company,),
+                ).fetchall()
+            else:
+                # Legacy pre-company managers keep the original global behavior.
+                rows = db.execute(
+                    "SELECT * FROM pto_requests ORDER BY created_at DESC"
+                ).fetchall()
         else:
             rows = db.execute(
                 "SELECT * FROM pto_requests WHERE user_id = ? ORDER BY created_at DESC",
@@ -204,6 +224,17 @@ def update_request(req_id):
         row = db.execute("SELECT * FROM pto_requests WHERE id = ?", (req_id,)).fetchone()
         if not row:
             return jsonify({"error": "not found"}), 404
+
+        # Company managers may only review their own company's requests.
+        # Legacy (NULL-company) managers keep the original global behavior.
+        caller_company = _viewer_company_id(db, current_uid())
+        if caller_company is not None:
+            owner = db.execute(
+                "SELECT company_id FROM users WHERE id = ?", (row["user_id"],)
+            ).fetchone()
+            owner_company = owner["company_id"] if owner else None
+            if owner_company != caller_company:
+                return jsonify({"error": "not found"}), 404
 
         # Re-check the balance at approval time, before any writes: several pending
         # requests can each pass the check at creation, but they can't all be approved.

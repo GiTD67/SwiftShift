@@ -9,7 +9,7 @@ from permissions import current_uid, is_manager, manager_required
 bp = Blueprint("users", __name__)
 
 
-_USER_COLS = "id, first_name, last_name, email, job_role, manager_name, is_fulltime, pay, salary, hourly_rate, pto_accrual_rate, streak_count, streak_last_date, is_manager"
+_USER_COLS = "id, first_name, last_name, email, job_role, manager_name, is_fulltime, pay, salary, hourly_rate, pto_accrual_rate, streak_count, streak_last_date, is_manager, company_id"
 
 # Fields only a manager (or the user viewing their own record) may see.
 _SENSITIVE = ("pay", "salary", "hourly_rate")
@@ -17,10 +17,21 @@ _SENSITIVE = ("pay", "salary", "hourly_rate")
 _MANAGER_ONLY_FIELDS = {"pay", "salary", "hourly_rate", "job_role", "is_manager"}
 
 
-def _redact(row, viewer_uid, viewer_is_manager):
-    """Hide pay/salary/hourly_rate unless the viewer is a manager or it's their own row."""
+def _viewer_company_id(db, uid):
+    """The viewer's own company_id (NULL for legacy pre-company accounts)."""
+    if not uid:
+        return None
+    row = db.execute("SELECT company_id FROM users WHERE id = ?", (uid,)).fetchone()
+    return row["company_id"] if row else None
+
+
+def _redact(row, viewer_uid, viewer_is_manager, viewer_company_id=None):
+    """Hide pay/salary/hourly_rate unless the viewer is a same-company manager
+    or it's their own row. Legacy (NULL-company) managers keep the original
+    global visibility — consistent with update_user, which lets them edit pay."""
     d = dict(row)
-    if viewer_is_manager or d.get("id") == viewer_uid:
+    same_company = viewer_company_id is None or d.get("company_id") == viewer_company_id
+    if (viewer_is_manager and same_company) or d.get("id") == viewer_uid:
         return d
     return {k: (None if k in _SENSITIVE else v) for k, v in d.items()}
 
@@ -30,8 +41,17 @@ def list_users():
     viewer = current_uid()
     viewer_is_manager = is_manager(viewer)
     with get_db() as db:
-        rows = db.execute(f"SELECT {_USER_COLS} FROM users ORDER BY id").fetchall()
-    return jsonify([_redact(r, viewer, viewer_is_manager) for r in rows])
+        viewer_company = _viewer_company_id(db, viewer)
+        if viewer_company is not None:
+            # Company accounts only ever see their own company's roster.
+            rows = db.execute(
+                f"SELECT {_USER_COLS} FROM users WHERE company_id = ? ORDER BY id",
+                (viewer_company,),
+            ).fetchall()
+        else:
+            # Legacy pre-company viewers keep the original global behavior.
+            rows = db.execute(f"SELECT {_USER_COLS} FROM users ORDER BY id").fetchall()
+    return jsonify([_redact(r, viewer, viewer_is_manager, viewer_company) for r in rows])
 
 
 @bp.route("/api/users", methods=["POST"])
@@ -51,12 +71,16 @@ def create_user():
         return jsonify({"error": "password required"}), 400
     pw_hash = generate_password_hash(password)
     with get_db() as db:
+        # Stamp the new account with the creating manager's company so it
+        # appears in (and only in) that company's roster and stays editable
+        # by its managers (NULL = legacy pre-company tenant).
+        company_id = _viewer_company_id(db, current_uid())
         try:
             row = db.execute(
-                f"""INSERT INTO users (first_name, last_name, email, password_hash, is_fulltime)
-                   VALUES (?, ?, ?, ?, 1)
+                f"""INSERT INTO users (first_name, last_name, email, password_hash, is_fulltime, company_id)
+                   VALUES (?, ?, ?, ?, 1, ?)
                    RETURNING {_USER_COLS}""",
-                (first_name, last_name, email, pw_hash),
+                (first_name, last_name, email, pw_hash, company_id),
             ).fetchone()
             db.commit()
         except Exception:
@@ -69,13 +93,21 @@ def get_user(target_id):
     viewer = current_uid()
     viewer_is_manager = is_manager(viewer)
     with get_db() as db:
-        row = db.execute(
-            f"SELECT {_USER_COLS} FROM users WHERE id = ?",
-            (target_id,),
-        ).fetchone()
+        viewer_company = _viewer_company_id(db, viewer)
+        if viewer_company is not None:
+            # Company accounts can only look up their own company's users.
+            row = db.execute(
+                f"SELECT {_USER_COLS} FROM users WHERE id = ? AND company_id = ?",
+                (target_id, viewer_company),
+            ).fetchone()
+        else:
+            row = db.execute(
+                f"SELECT {_USER_COLS} FROM users WHERE id = ?",
+                (target_id,),
+            ).fetchone()
     if not row:
         return jsonify({"error": "not found"}), 404
-    return jsonify(_redact(row, viewer, viewer_is_manager))
+    return jsonify(_redact(row, viewer, viewer_is_manager, viewer_company))
 
 
 @bp.route("/api/users/<int:target_id>", methods=["PUT"])
@@ -101,6 +133,20 @@ def update_user(target_id):
     set_clause = ", ".join(f"{k} = ?" for k in fields)
     values = list(fields.values()) + [target_id]
     with get_db() as db:
+        caller_company = _viewer_company_id(db, caller)
+        target = db.execute(
+            "SELECT company_id FROM users WHERE id = ?", (target_id,)
+        ).fetchone()
+        if not target:
+            return jsonify({"error": "not found"}), 404
+        # Company accounts may only edit their own company's users (same
+        # scoping as the read endpoints); editing yourself is always allowed.
+        if (
+            not editing_self
+            and caller_company is not None
+            and target["company_id"] != caller_company
+        ):
+            return jsonify({"error": "not found"}), 404
         db.execute(f"UPDATE users SET {set_clause} WHERE id = ?", values)
         db.commit()
         row = db.execute(
@@ -109,7 +155,7 @@ def update_user(target_id):
         ).fetchone()
     if not row:
         return jsonify({"error": "not found"}), 404
-    return jsonify(_redact(row, caller, caller_is_manager))
+    return jsonify(_redact(row, caller, caller_is_manager, caller_company))
 
 
 # ── Self-service profile (contact info + W-4 withholding) ────────────────────
@@ -230,9 +276,17 @@ def delete_user(target_id):
     if caller != target_id and not is_manager(caller):
         return jsonify({"error": "manager access required"}), 403
     with get_db() as db:
-        row = db.execute("SELECT id FROM users WHERE id = ?", (target_id,)).fetchone()
+        row = db.execute(
+            "SELECT id, company_id FROM users WHERE id = ?", (target_id,)
+        ).fetchone()
         if not row:
             return jsonify({"error": "not found"}), 404
+        # Company accounts may only delete their own company's users (same
+        # scoping as the read endpoints); deleting yourself is always allowed.
+        if caller != target_id:
+            caller_company = _viewer_company_id(db, caller)
+            if caller_company is not None and row["company_id"] != caller_company:
+                return jsonify({"error": "not found"}), 404
         db.execute("DELETE FROM users WHERE id = ?", (target_id,))
         db.commit()
     return jsonify({"ok": True})
