@@ -5,7 +5,9 @@ import './index.css'
 import confetti from 'canvas-confetti'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, addMonths, isSameMonth, isToday } from 'date-fns'
 import { useTimesheet } from './hooks/useTimesheet'
+import { useFormDraft, DraftRestoredNote } from './hooks/useFormDraft'
 import { Rewards } from './components/Rewards'
 import { XPCenter } from './components/XPCenter'
 import { LootDrop } from './components/LootDrop'
@@ -16,10 +18,18 @@ import { SalesKPI } from './components/SalesKPI'
 import { GravityGridBackground } from './components/GravityGridBackground'
 import { STATE_BREAK_RULES, STATE_CODES } from './data/stateBreakRules'
 import { Leaderboard } from './components/Leaderboard'
+import { queuePunch, hasQueuedPunches, flushQueuedPunches } from './utils/offlineQueue'
 
 const API_BASE = ''
 
 type View = 'clock' | 'timesheet' | 'rewards' | 'xpcenter' | 'admin' | 'profile' | 'insurance' | 'orgchart' | 'taxes' | 'groktax' | 'grokky' | 'applications' | 'jobs' | 'schedules' | 'payroll' | 'reports' | 'leaves' | 'compliance' | 'hiring' | 'kpi' | 'teamkpi' | 'announcements' | 'pricing' | 'auditlog' | 'enterprise' | 'alerts' | 'leaderboard' | 'holidays'
+
+// Notification preferences: per-category toggles + instant vs daily-digest delivery
+type NotifCategory = 'pto' | 'swaps' | 'timesheet' | 'manager'
+type NotifPrefs = { pto: boolean; swaps: boolean; timesheet: boolean; manager: boolean; mode: 'instant' | 'digest' }
+const DEFAULT_NOTIF_PREFS: NotifPrefs = { pto: true, swaps: true, timesheet: true, manager: true, mode: 'instant' }
+const NOTIF_DIGEST_KEY = 'swiftshift-notif-digest' // suppressed events queued for the daily summary
+const NOTIF_DIGEST_SHOWN_KEY = 'swiftshift-notif-digest-shown' // date the summary was last surfaced
 
 function formatMs(ms: number): string {
   const totalSec = Math.floor(ms / 1000)
@@ -33,10 +43,58 @@ function longDate(d: Date): string {
   return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
 }
 
+function downloadCSV(filename: string, headers: string[], rows: (string | number)[][]) {
+  const escape = (v: string | number) => {
+    const s = String(v ?? '')
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const csv = [headers, ...rows].map(row => row.map(escape).join(',')).join('\n')
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// Download a server-generated file (JSON/CSV/zip), keeping the filename the server suggests.
+function downloadFile(url: string, fallbackName: string) {
+  return fetch(url).then(async res => {
+    if (!res.ok) throw new Error(`export failed (${res.status})`)
+    const blob = await res.blob()
+    const match = /filename="?([^";]+)"?/.exec(res.headers.get('Content-Disposition') || '')
+    const objectUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = objectUrl
+    a.download = match?.[1] || fallbackName
+    a.click()
+    URL.revokeObjectURL(objectUrl)
+  })
+}
+
 function greeting(hour: number): string {
   if (hour < 12) return 'Good morning'
   if (hour < 17) return 'Good afternoon'
   return 'Good evening'
+}
+
+// 2026 federal income tax brackets by W-4 filing status (annualized income)
+const FEDERAL_BRACKETS_2026: Record<string, [number, number][]> = {
+  single: [[11925, 0.10], [48475, 0.12], [103350, 0.22], [197300, 0.24], [250525, 0.32], [626350, 0.35], [Infinity, 0.37]],
+  married: [[23850, 0.10], [96950, 0.12], [206700, 0.22], [394600, 0.24], [501050, 0.32], [751600, 0.35], [Infinity, 0.37]],
+  head_of_household: [[17000, 0.10], [64850, 0.12], [103350, 0.22], [197300, 0.24], [250500, 0.32], [626350, 0.35], [Infinity, 0.37]],
+}
+const FILING_LABELS: Record<string, string> = { single: 'Single', married: 'Married', head_of_household: 'Head of Household' }
+
+function calcFederal2026(income: number, filingStatus: string): number {
+  const brackets = FEDERAL_BRACKETS_2026[filingStatus] || FEDERAL_BRACKETS_2026.single
+  let tax = 0; let prev = 0
+  for (const [limit, rate] of brackets) {
+    if (income <= prev) break
+    tax += (Math.min(income, limit) - prev) * rate
+    prev = limit
+  }
+  return tax
 }
 
 function getXPLevelRingColor(level: number): string {
@@ -219,6 +277,13 @@ function parseHours(s: string): number {
 function fmtRange(start: Date, end: Date): string {
   const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
   return `${start.toLocaleDateString(undefined, opts)} to ${end.toLocaleDateString(undefined, opts)}`
+}
+
+// Returns the company holiday falling on a given local calendar date.
+// Recurring holidays repeat annually, so they match on month + day only.
+function holidayOnDate<T extends { date: string; recurring: number }>(holidays: T[], d: Date): T | undefined {
+  const mmdd = `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return holidays.find(h => (h.recurring ? h.date.slice(5) === mmdd : h.date === `${d.getFullYear()}-${mmdd}`))
 }
 
 function usePayPeriodRange(periodOffset: number) {
@@ -570,7 +635,7 @@ function useGamification() {
 }
 
 // ===== TimesheetView component =====
-function TimesheetView({ user, gamification }: { user: any; gamification: ReturnType<typeof useGamification> }) {
+function TimesheetView({ user, gamification, holidays }: { user: any; gamification: ReturnType<typeof useGamification>; holidays: { name: string; date: string; recurring: number }[] }) {
   const [periodOffset, setPeriodOffset] = useState(0)
   const [entries, setEntries] = useState<Record<string, string>>(() => {
     try { const s = localStorage.getItem(`swiftshift-ts-entries-${user?.id}`); return s ? JSON.parse(s) : {} } catch { return {} }
@@ -582,6 +647,15 @@ function TimesheetView({ user, gamification }: { user: any; gamification: Return
   const [highlightedDay, setHighlightedDay] = useState<number | null>(null)
   const [showHistory, setShowHistory] = useState(false)
   const [historyEntries, setHistoryEntries] = useState<Record<string, Record<string, string>>>({})
+  // Time-punch correction requests (employee side)
+  const [completedSessions, setCompletedSessions] = useState<any[]>([])
+  const [showCorrections, setShowCorrections] = useState(false)
+  const [myCorrections, setMyCorrections] = useState<any[]>([])
+  const [correctionSessionId, setCorrectionSessionId] = useState<number | null>(null)
+  const [corrIn, setCorrIn] = useState('')
+  const [corrOut, setCorrOut] = useState('')
+  const [corrReason, setCorrReason] = useState('')
+  const [corrSubmitting, setCorrSubmitting] = useState(false)
   const [showPaySummary, setShowPaySummary] = useState(false)
   const [allSubmissions, setAllSubmissions] = useState<any[]>([])
   const [selectedStubPeriod, setSelectedStubPeriod] = useState<any | null>(null)
@@ -592,6 +666,7 @@ function TimesheetView({ user, gamification }: { user: any; gamification: Return
   const [swiftyLoading, setSwiftyLoading] = useState(false)
   const [showSwifty, setShowSwifty] = useState(false)
   const [showCertModal, setShowCertModal] = useState(false)
+  const [showHolidayConfirm, setShowHolidayConfirm] = useState(false)
   const [tookLunches, setTookLunches] = useState<null | boolean>(null)
   const nlpRef = useRef<HTMLInputElement>(null)
   const swiftyRef = useRef<HTMLInputElement>(null)
@@ -634,6 +709,7 @@ function TimesheetView({ user, gamification }: { user: any; gamification: Return
           durationByDate[d] = (durationByDate[d] || 0) + (Number(row.duration_minutes) || 0)
         }
         setClockSessionsByDate(byDate)
+        setCompletedSessions(rows.filter(r => r.clock_in && r.clock_out))
 
         // Populate entries from API — only fill blanks, preserve manual edits
         setEntries(prev => {
@@ -673,6 +749,15 @@ function TimesheetView({ user, gamification }: { user: any; gamification: Return
       .catch(() => {})
   }, [user?.id])
 
+  // Fetch my time-punch correction requests
+  useEffect(() => {
+    if (!user?.id) return
+    fetch(`${API_BASE}/api/corrections/mine`)
+      .then(r => (r.ok ? r.json() : []))
+      .then((rows: any[]) => setMyCorrections(Array.isArray(rows) ? rows : []))
+      .catch(() => {})
+  }, [user?.id])
+
   const dayHours = dayDates.map((_, i) => parseHours(entries[entryKey(periodId, i)] || ''))
   const totalHours = dayHours.reduce((a, b) => a + b, 0)
   // Overtime is period-based (>80h per pay period) to match calcPay, the 80h
@@ -684,6 +769,11 @@ function TimesheetView({ user, gamification }: { user: any; gamification: Return
 
   const todayStr = new Date().toISOString().slice(0, 10)
   const todayIndex = dayDates.findIndex(d => d.toISOString().slice(0, 10) === todayStr)
+
+  // Company holidays falling inside this pay period (for grid markers + submit confirm)
+  const periodHolidays = dayDates
+    .map(d => { const h = holidayOnDate(holidays, d); return h ? { name: h.name, date: d } : null })
+    .filter((x): x is { name: string; date: Date } => x !== null)
 
   const setDayHours = (i: number, val: string) => {
     setEntries(prev => ({ ...prev, [entryKey(periodId, i)]: val }))
@@ -833,6 +923,36 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
 
   // Pay periods start on a Sunday (anchor in usePayPeriodRange), so columns run Sun→Sat.
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+  // Time-punch correction helpers
+  const fmtPunch = (iso: string) => new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+
+  const openCorrectionForm = (s: any) => {
+    setCorrectionSessionId(s.id)
+    setCorrIn(String(s.clock_in).slice(0, 16))
+    setCorrOut(String(s.clock_out).slice(0, 16))
+    setCorrReason('')
+  }
+
+  const submitCorrection = () => {
+    if (!correctionSessionId || !corrIn || !corrOut) { toast.error('Both corrected times are required'); return }
+    if (corrOut <= corrIn) { toast.error('Clock-out must be after clock-in'); return }
+    setCorrSubmitting(true)
+    fetch(`${API_BASE}/api/corrections`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: correctionSessionId, proposed_clock_in: corrIn, proposed_clock_out: corrOut, reason: corrReason || null }),
+    })
+      .then(r => r.json().then(d => ({ ok: r.ok, d })))
+      .then(({ ok, d }) => {
+        if (!ok) { toast.error(d?.error || 'Failed to submit correction'); return }
+        setMyCorrections(prev => [d, ...prev])
+        setCorrectionSessionId(null)
+        toast.success('Correction request sent to your manager')
+      })
+      .catch(() => toast.error('Failed to submit correction'))
+      .finally(() => setCorrSubmitting(false))
+  }
 
   // History grid renderer — shows hours + clock in/out times
   const HistoryGrid = ({ period, pDates, pId }: { period: string; pDates: Date[]; pId: string }) => {
@@ -1107,6 +1227,7 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
               const isWeekend = d.getDay() === 0 || d.getDay() === 6
               const dateStr = d.toISOString().slice(0, 10)
               const daySessions = clockSessionsByDate[dateStr] || []
+              const holiday = holidayOnDate(holidays, d)
               const fill = Math.min(h / 8, 1) // 0..1 of an 8-hour day
               return (
                 <div
@@ -1129,10 +1250,19 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
                       }}
                     />
                   )}
+                  {/* Subtle holiday tint */}
+                  {holiday && (
+                    <div className="absolute inset-0 pointer-events-none" style={{ background: 'rgba(56,189,248,0.08)' }} aria-hidden="true" />
+                  )}
                   <div className="relative z-10 w-full flex flex-col items-center">
                     <div className="text-[9px] sm:text-[10px] text-zinc-500 mb-1 text-center leading-tight" style={isToday ? { color: 'var(--accent-color)' } : undefined}>
                       {d.toLocaleDateString([], { month: 'short', day: 'numeric' })}
                     </div>
+                    {holiday && (
+                      <div className="w-full truncate text-center text-[8px] sm:text-[9px] leading-tight text-sky-300 mb-1" title={`${holiday.name} — company holiday`}>
+                        {holiday.name}
+                      </div>
+                    )}
                     <input type="text" inputMode="decimal" value={val}
                       aria-label={`Hours worked on ${d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}`}
                       onChange={e => setDayHours(i, e.target.value)}
@@ -1202,6 +1332,88 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
           <div className="px-4 pb-4 border-t border-white/10 pt-3">
             <HistoryGrid period={fmtRange(prevPeriod1.start, prevPeriod1.end)} pDates={prevPeriod1.dayDates} pId={prevPeriod1.periodId} />
             <HistoryGrid period={fmtRange(prevPeriod2.start, prevPeriod2.end)} pDates={prevPeriod2.dayDates} pId={prevPeriod2.periodId} />
+          </div>
+        )}
+      </div>
+
+      {/* Time punch corrections */}
+      <div className="glass rounded-2xl overflow-hidden">
+        <button onClick={() => setShowCorrections(v => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors text-left">
+          <div>
+            <div className="text-sm font-medium" style={{ color: 'var(--accent-color)' }}>Time Punch Corrections</div>
+            <div className="text-xs text-zinc-500">Wrong clock-in or clock-out time? Request a fix — your manager approves it.</div>
+          </div>
+          <span className="text-zinc-400 text-lg">{showCorrections ? '▲' : '▼'}</span>
+        </button>
+        {showCorrections && (
+          <div className="px-4 pb-4 border-t border-white/10 pt-3 space-y-2">
+            {completedSessions.length === 0 && (
+              <div className="text-xs text-zinc-500 text-center py-3">No completed clock sessions yet.</div>
+            )}
+            {completedSessions.slice(0, 10).map((s: any) => {
+              const hasPending = myCorrections.some(c => c.session_id === s.id && c.status === 'pending')
+              return (
+                <div key={s.id} className="bg-white/5 rounded-xl px-3 py-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-xs font-mono text-zinc-300">
+                      <span style={{ color: 'var(--accent-color)' }}>{fmtPunch(s.clock_in)}</span>
+                      <span className="text-zinc-500"> – </span>
+                      <span>{fmtPunch(s.clock_out)}</span>
+                      <span className="text-zinc-500 ml-2">{((Number(s.duration_minutes) || 0) / 60).toFixed(1)}h</span>
+                    </div>
+                    {hasPending ? (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400">correction pending</span>
+                    ) : correctionSessionId === s.id ? (
+                      <button onClick={() => setCorrectionSessionId(null)} className="text-xs text-zinc-500 hover:text-zinc-300">Cancel</button>
+                    ) : (
+                      <button onClick={() => openCorrectionForm(s)}
+                        className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white/10 hover:bg-white/20 transition-colors" style={{ color: 'var(--accent-color)' }}>
+                        Request correction
+                      </button>
+                    )}
+                  </div>
+                  {correctionSessionId === s.id && (
+                    <div className="mt-2 pt-2 border-t border-white/10 space-y-2">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <label className="text-xs text-zinc-400">In
+                          <input type="datetime-local" value={corrIn} onChange={e => setCorrIn(e.target.value)}
+                            className="ml-1.5 bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-xs text-zinc-200 focus:outline-none focus:border-white/30" />
+                        </label>
+                        <label className="text-xs text-zinc-400">Out
+                          <input type="datetime-local" value={corrOut} onChange={e => setCorrOut(e.target.value)}
+                            className="ml-1.5 bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-xs text-zinc-200 focus:outline-none focus:border-white/30" />
+                        </label>
+                      </div>
+                      <input type="text" value={corrReason} onChange={e => setCorrReason(e.target.value)} placeholder="Reason (e.g. forgot to clock out)"
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-white/30" />
+                      <button onClick={submitCorrection} disabled={corrSubmitting}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 transition-colors disabled:opacity-50">
+                        {corrSubmitting ? 'Submitting…' : 'Submit request'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            {myCorrections.length > 0 && (
+              <div className="pt-2">
+                <div className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5">My correction requests</div>
+                <div className="space-y-1.5">
+                  {myCorrections.map((c: any) => (
+                    <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 bg-white/5 rounded-xl px-3 py-2">
+                      <div className="text-xs font-mono text-zinc-400">
+                        {fmtPunch(c.proposed_clock_in)} – {fmtPunch(c.proposed_clock_out)}
+                        {c.reason && <span className="text-zinc-500 italic ml-2">"{c.reason}"</span>}
+                      </div>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${c.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : c.status === 'denied' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                        {c.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1356,7 +1568,7 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
           <button onClick={handleSaveDraft} className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/5 text-sm">Save draft (+15 XP)</button>
         </div>
         <button
-          onClick={() => { if (!isSubmitted) setShowCertModal(true) }}
+          onClick={() => { if (!isSubmitted) { if (periodHolidays.length > 0) setShowHolidayConfirm(true); else setShowCertModal(true) } }}
           disabled={isSubmitted}
           className="glass-btn-green w-full px-5 py-3 rounded-xl font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed"
         >
@@ -1364,6 +1576,39 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
         </button>
         <p className="text-[11px] text-zinc-500 mt-3">Once submitted, this period is locked until approval or rejection.</p>
       </div>
+
+      {/* Holiday heads-up confirm — shown before certification when the period contains a company holiday */}
+      {showHolidayConfirm && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowHolidayConfirm(false)}>
+          <div className="glass rounded-2xl p-6 w-full max-w-md mx-4 border border-white/20" onClick={e => e.stopPropagation()} style={{ boxShadow: '0 0 80px -20px rgba(var(--accent-color-rgb), 0.25), 0 28px 72px -14px rgba(0,0,0,0.85)' }}>
+            <h2 className="text-lg font-semibold mb-1 text-white">Holiday in this pay period</h2>
+            <p className="text-xs text-zinc-500 mb-4">Pay period: {fmtRange(start, end)}</p>
+            <div className="bg-black/30 border border-white/10 rounded-xl p-4 mb-4 space-y-1.5">
+              {periodHolidays.map((h, i) => (
+                <div key={i} className="flex items-center justify-between text-sm">
+                  <span className="text-sky-300 font-medium">{h.name}</span>
+                  <span className="text-zinc-400">{h.date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-sm text-zinc-300 mb-5 leading-relaxed">
+              This pay period includes {periodHolidays.length === 1 ? 'a company holiday' : 'company holidays'}. Please double-check your hours on {periodHolidays.length === 1 ? 'that day' : 'those days'} before submitting.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowHolidayConfirm(false)} className="flex-1 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-sm text-zinc-400">
+                Cancel
+              </button>
+              <button
+                onClick={() => { setShowHolidayConfirm(false); setShowCertModal(true) }}
+                className="flex-1 py-2.5 rounded-xl font-semibold text-sm"
+                style={{ backgroundColor: 'var(--accent-color)', color: 'black' }}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Certification popup modal */}
       {showCertModal && (
@@ -2333,12 +2578,32 @@ export default function App() {
   const appearanceOpenRef = useRef(false)
 
   // Profile tabs state
-  const [profileTab, setProfileTab] = useState<'info' | 'schedule' | 'deposit' | 'availability'>('info')
+  const [profileTab, setProfileTab] = useState<'info' | 'schedule' | 'deposit' | 'availability' | 'notifications'>('info')
   const [profilePicUrl, setProfilePicUrl] = useState<string>(() => localStorage.getItem('swiftshift-profile-pic') || '')
   const [profilePicZoom, setProfilePicZoom] = useState<number>(() => parseFloat(localStorage.getItem('swiftshift-profile-pic-zoom') || '1'))
   const [profilePicX, setProfilePicX] = useState<number>(() => parseFloat(localStorage.getItem('swiftshift-profile-pic-x') || '50'))
   const [profilePicY, setProfilePicY] = useState<number>(() => parseFloat(localStorage.getItem('swiftshift-profile-pic-y') || '50'))
   const [showCropModal, setShowCropModal] = useState(false)
+
+  // Notification preferences (loaded from the backend; gate the category toasts below)
+  const [notifPrefs, setNotifPrefs] = useState<NotifPrefs>(DEFAULT_NOTIF_PREFS)
+  const notifPrefsRef = useRef(notifPrefs)
+  notifPrefsRef.current = notifPrefs
+  // Fire a category-gated notification: dropped if the category is off, queued for the
+  // daily summary in digest mode, otherwise shown as a normal toast.
+  const notify = useCallback((category: NotifCategory, kind: 'success' | 'info' | 'warning', message: string, opts?: { description?: string; duration?: number }) => {
+    const prefs = notifPrefsRef.current
+    if (!prefs[category]) return
+    if (prefs.mode === 'digest') {
+      let queued: Array<{ category: NotifCategory; title: string; ts: string }> = []
+      try { queued = JSON.parse(localStorage.getItem(NOTIF_DIGEST_KEY) || '[]') } catch { queued = [] }
+      if (!Array.isArray(queued)) queued = []
+      queued.push({ category, title: message, ts: new Date().toISOString() })
+      localStorage.setItem(NOTIF_DIGEST_KEY, JSON.stringify(queued.slice(-100)))
+      return
+    }
+    toast[kind](message, opts)
+  }, [])
 
   // Sidebar customization
   const DEFAULT_SIDEBAR_ORDER = ['clock','timesheet','rewards','leaderboard','holidays','kpi','insurance','orgchart','taxes','groktax','applications']
@@ -2356,25 +2621,58 @@ export default function App() {
   const [dragOverFavPosition, setDragOverFavPosition] = useState<'above' | 'below'>('below')
   const [, setWorkSchedule] = useState<any>(null)
   const [directDeposit, setDirectDeposit] = useState<any>(null)
-  const [, setWorkAvailability] = useState<any>(null)
+  const [workAvailability, setWorkAvailability] = useState<any>(null)
   const [scheduleEdit, setScheduleEdit] = useState<any>(null)
   const [depositEdit, setDepositEdit] = useState<any>(null)
   const [availabilityEdit, setAvailabilityEdit] = useState<any>(null)
+  const [userProfile, setUserProfile] = useState<any>(null)
+  const [profileEdit, setProfileEdit] = useState<any>(null)
 
   // Leave Management state
   const [ptoBalance, setPtoBalance] = useState<any>(null)
   const [ptoRequests, setPtoRequests] = useState<any[]>([])
-  const [ptoRequestForm, setPtoRequestForm] = useState({ start_date: '', end_date: '', request_type: 'vacation', reason: '', hours_requested: '' })
+  const emptyPtoForm = { start_date: '', end_date: '', request_type: 'vacation', reason: '', hours_requested: '', is_partial_day: false, start_time: '', end_time: '' }
+  const [ptoRequestForm, setPtoRequestForm] = useState(emptyPtoForm)
   const [showPtoForm, setShowPtoForm] = useState(false)
+  const [editingPtoId, setEditingPtoId] = useState<number | null>(null)
   const [allPtoRequests, setAllPtoRequests] = useState<any[]>([])
   const [ptoApprovalLoading, setPtoApprovalLoading] = useState<number | null>(null)
+  // For partial-day requests: keep hours in sync with the chosen time range
+  const setPtoTime = (key: 'start_time' | 'end_time', value: string) => {
+    setPtoRequestForm(f => {
+      const next = { ...f, [key]: value }
+      if (next.start_time && next.end_time) {
+        const hrs = (Date.parse(`1970-01-01T${next.end_time}:00Z`) - Date.parse(`1970-01-01T${next.start_time}:00Z`)) / 3600000
+        if (hrs > 0) next.hours_requested = String(Math.round(hrs * 4) / 4)
+      }
+      return next
+    })
+  }
 
   // Schedules state
   const [shiftSwaps, setShiftSwaps] = useState<any[]>([])
   const [allShiftSwaps, setAllShiftSwaps] = useState<any[]>([])
   const [timesheetSubs, setTimesheetSubs] = useState<any[]>([])
   const [showSwapForm, setShowSwapForm] = useState(false)
-  const [swapForm, setSwapForm] = useState({ shift_date: '', shift_start: '', shift_end: '', reason: '' })
+  const [swapForm, setSwapForm] = useState({ shift_date: '', shift_start: '', shift_end: '', reason: '', target_id: '' })
+  // Schedule view toggle (weekly grid vs month calendar) + open-shifts board
+  const [scheduleViewMode, setScheduleViewMode] = useState<'week' | 'month'>('week')
+  const [monthCursor, setMonthCursor] = useState(() => new Date())
+  const [openShifts, setOpenShifts] = useState<any[]>([])
+  const [showOpenShiftForm, setShowOpenShiftForm] = useState(false)
+  const [openShiftForm, setOpenShiftForm] = useState({ shift_date: '', start_time: '', end_time: '', job_or_role: '' })
+  const [claimingShiftId, setClaimingShiftId] = useState<number | null>(null)
+  // Manager queue of time-punch correction requests
+  const [pendingCorrections, setPendingCorrections] = useState<any[]>([])
+  const [correctionActionLoading, setCorrectionActionLoading] = useState<number | null>(null)
+  // Manager workflow settings (org-wide) + computed flags (missed clock-outs, OT)
+  const [orgSettingsEdit, setOrgSettingsEdit] = useState({ auto_approve_swap_hours: '', ot_alert_daily_hours: '10', missed_clockout_hours: '12' })
+  const [orgFlags, setOrgFlags] = useState<{ missed_clockouts: any[]; ot_alerts: any[] } | null>(null)
+
+  // Reports & Analytics state
+  const [reportSummary, setReportSummary] = useState<any>(null)
+  const [reportHours, setReportHours] = useState<any[]>([])
+  const [reportsLoading, setReportsLoading] = useState(false)
 
   // Announcements state
   const [announcements, setAnnouncements] = useState<Array<{ id: number; title: string; body: string; author: string; priority: 'normal' | 'urgent'; created_at: string; read_by: string[] }>>([
@@ -2390,6 +2688,15 @@ export default function App() {
   const [showHolidayForm, setShowHolidayForm] = useState(false)
   const [editingHoliday, setEditingHoliday] = useState<number | null>(null)
   const [holidayForm, setHolidayForm] = useState({ name: '', date: '', recurring: false, description: '' })
+
+  // Draft auto-save for the entry forms — in-progress values survive accidental
+  // closes and reloads (restored on reopen, cleared on successful submit).
+  // Edit flows (existing PTO request / holiday) are excluded on purpose.
+  const ptoDraft = useFormDraft('pto-request', ptoRequestForm, setPtoRequestForm, showPtoForm && editingPtoId === null)
+  const swapDraft = useFormDraft('shift-swap', swapForm, setSwapForm, showSwapForm)
+  const openShiftDraft = useFormDraft('open-shift', openShiftForm, setOpenShiftForm, showOpenShiftForm)
+  const announcementDraft = useFormDraft('announcement', announcementForm, setAnnouncementForm, showAnnouncementForm)
+  const holidayDraft = useFormDraft('holiday', holidayForm, setHolidayForm, showHolidayForm && !editingHoliday)
 
   // Onboarding tasks state
   const [onboardingTasks, setOnboardingTasks] = useState<Record<string, boolean[]>>({
@@ -2419,22 +2726,10 @@ export default function App() {
   const [roiHeadcount, setRoiHeadcount] = useState(150)
   const [roiAvgHourlyRate, setRoiAvgHourlyRate] = useState(45)
 
-  // Enterprise: Audit log state
+  // Enterprise: Audit log state (real events from /api/audit)
   const [auditLogFilter, setAuditLogFilter] = useState<'all' | 'admin' | 'timesheet' | 'payroll' | 'user'>('all')
-  const AUDIT_LOG_ENTRIES = [
-    { id: 1, ts: '2026-04-28T17:32:00Z', actor: 'Dana Morales', action: 'Approved timesheet', target: 'Alex Rivera, Week of Apr 21', category: 'timesheet', ip: '10.0.1.14' },
-    { id: 2, ts: '2026-04-28T16:55:00Z', actor: 'Dana Morales', action: 'Rejected overtime request', target: 'Casey Brooks, 6h OT Apr 28', category: 'timesheet', ip: '10.0.1.14' },
-    { id: 3, ts: '2026-04-28T15:10:00Z', actor: 'System', action: 'Payroll run initiated', target: 'Pay period Apr 14-27', category: 'payroll', ip: 'system' },
-    { id: 4, ts: '2026-04-28T14:48:00Z', actor: 'Admin', action: 'Updated user pay rate', target: 'Jordan Lee ($52/hr)', category: 'user', ip: '10.0.1.2' },
-    { id: 5, ts: '2026-04-28T13:22:00Z', actor: 'Admin', action: 'Created new user', target: 'Mia Thompson', category: 'admin', ip: '10.0.1.2' },
-    { id: 6, ts: '2026-04-27T17:00:00Z', actor: 'System', action: 'Timesheet deadline reminder sent', target: 'All 42 employees', category: 'admin', ip: 'system' },
-    { id: 7, ts: '2026-04-27T11:30:00Z', actor: 'Casey Morgan', action: 'Approved PTO request', target: 'Jordan Lee (May 5-9)', category: 'timesheet', ip: '10.0.1.8' },
-    { id: 8, ts: '2026-04-27T09:05:00Z', actor: 'Admin', action: 'Changed role permissions', target: 'Sam Carter: Manager to Employee', category: 'admin', ip: '10.0.1.2' },
-    { id: 9, ts: '2026-04-26T16:40:00Z', actor: 'System', action: 'Payroll disbursed', target: '$94,600, 42 employees', category: 'payroll', ip: 'system' },
-    { id: 10, ts: '2026-04-26T10:15:00Z', actor: 'Dana Morales', action: 'Exported compliance report', target: 'Q1 2026 Labor Compliance', category: 'admin', ip: '10.0.1.14' },
-    { id: 11, ts: '2026-04-25T14:22:00Z', actor: 'Admin', action: 'SSO configuration updated', target: 'Okta: SAML endpoint refreshed', category: 'admin', ip: '10.0.1.2' },
-    { id: 12, ts: '2026-04-25T09:00:00Z', actor: 'Dana Morales', action: 'Published announcement', target: 'Timesheet deadline reminder', category: 'admin', ip: '10.0.1.14' },
-  ]
+  const [auditEvents, setAuditEvents] = useState<any[]>([])
+  const [auditLoading, setAuditLoading] = useState(false)
 
   // Enterprise: RBAC state
   const [rbacRoles, setRbacRoles] = useState([
@@ -2587,96 +2882,36 @@ export default function App() {
     return () => clearTimeout(timer)
   }, [highlightRate])
 
-  const orgData = {
-    id: 'ceo',
-    name: 'Trevor Dixon',
-    title: 'CEO & Founder',
-    dept: 'Executive',
-    email: 'co-founders@swiftshift.com',
-    reportsTo: null,
-    teamSize: 5,
-    children: [
-      {
-        id: 'eng',
-        name: 'Jordan Lee',
-        title: 'CTO',
-        dept: 'Engineering',
-        email: 'jordan@swiftshift.com',
-        reportsTo: 'Alex Rivera',
-        teamSize: 3,
-        children: [
-          { id: 'fe', name: 'Sam Chen', title: 'Frontend Lead', dept: 'Engineering', email: 'sam@swiftshift.com', reportsTo: 'Jordan Lee', teamSize: 3, children: [
-            { id: 'fe1', name: 'Parker Kim', title: 'Senior Frontend Engineer', dept: 'Engineering', email: 'parker@swiftshift.com', reportsTo: 'Sam Chen', teamSize: 0, children: [] },
-            { id: 'fe2', name: 'Quinn Torres', title: 'Frontend Engineer', dept: 'Engineering', email: 'quinn@swiftshift.com', reportsTo: 'Sam Chen', teamSize: 0, children: [] },
-          ] },
-          { id: 'be', name: 'Taylor Kim', title: 'Backend Lead', dept: 'Engineering', email: 'taylor@swiftshift.com', reportsTo: 'Jordan Lee', teamSize: 4, children: [
-            { id: 'be1', name: 'Cameron Ellis', title: 'Senior Backend Engineer', dept: 'Engineering', email: 'cameron@swiftshift.com', reportsTo: 'Taylor Kim', teamSize: 0, children: [] },
-            { id: 'be2', name: 'Jordan Vale', title: 'Backend Engineer', dept: 'Engineering', email: 'jordanv@swiftshift.com', reportsTo: 'Taylor Kim', teamSize: 0, children: [] },
-            { id: 'be3', name: 'Morgan Ellis', title: 'Backend Engineer', dept: 'Engineering', email: 'morgan@swiftshift.com', reportsTo: 'Taylor Kim', teamSize: 0, children: [] },
-          ] },
-          { id: 'infra', name: 'Casey Brooks', title: 'Infra Lead', dept: 'Engineering', email: 'casey@swiftshift.com', reportsTo: 'Jordan Lee', teamSize: 2, children: [
-            { id: 'inf1', name: 'Riley Voss', title: 'DevOps Engineer', dept: 'Engineering', email: 'rileyv@swiftshift.com', reportsTo: 'Casey Brooks', teamSize: 0, children: [] },
-          ] },
-        ]
-      },
-      {
-        id: 'sales',
-        name: 'Casey Morgan',
-        title: 'VP Sales',
-        dept: 'Sales',
-        email: 'casey@swiftshift.com',
-        reportsTo: 'Alex Rivera',
-        teamSize: 2,
-        children: [
-          { id: 'na', name: 'Jamie Quinn', title: 'North America Sales', dept: 'Sales', email: 'jamie@swiftshift.com', reportsTo: 'Casey Morgan', teamSize: 5, children: [
-            { id: 'na1', name: 'Skyler Reed', title: 'Account Executive', dept: 'Sales', email: 'skyler@swiftshift.com', reportsTo: 'Jamie Quinn', teamSize: 0, children: [] },
-            { id: 'na2', name: 'Avery Lane', title: 'Account Executive', dept: 'Sales', email: 'avery@swiftshift.com', reportsTo: 'Jamie Quinn', teamSize: 0, children: [] },
-          ] },
-          { id: 'eu', name: 'Riley Patel', title: 'Europe Sales', dept: 'Sales', email: 'riley@swiftshift.com', reportsTo: 'Casey Morgan', teamSize: 4, children: [
-            { id: 'eu1', name: 'Dakota Lane', title: 'Account Executive', dept: 'Sales', email: 'dakota@swiftshift.com', reportsTo: 'Riley Patel', teamSize: 0, children: [] },
-          ] },
-        ]
-      },
-      {
-        id: 'hr',
-        name: 'Dana Morales',
-        title: 'VP People',
-        dept: 'HR',
-        email: 'dana@swiftshift.com',
-        reportsTo: 'Alex Rivera',
-        teamSize: 3,
-        children: [
-          { id: 'hr1', name: 'Peyton Blake', title: 'HR Manager', dept: 'HR', email: 'peyton@swiftshift.com', reportsTo: 'Dana Morales', teamSize: 2, children: [] },
-          { id: 'hr2', name: 'Sage Rivera', title: 'Recruiter', dept: 'HR', email: 'sage@swiftshift.com', reportsTo: 'Dana Morales', teamSize: 0, children: [] },
-        ]
-      },
-      {
-        id: 'mkt',
-        name: 'Drew Ellis',
-        title: 'VP Marketing',
-        dept: 'Marketing',
-        email: 'drew@swiftshift.com',
-        reportsTo: 'Alex Rivera',
-        teamSize: 3,
-        children: [
-          { id: 'mkt1', name: 'Harper Vale', title: 'Growth Lead', dept: 'Marketing', email: 'harper@swiftshift.com', reportsTo: 'Drew Ellis', teamSize: 2, children: [] },
-          { id: 'mkt2', name: 'Rowan Knox', title: 'Brand Designer', dept: 'Marketing', email: 'rowan@swiftshift.com', reportsTo: 'Drew Ellis', teamSize: 0, children: [] },
-        ]
-      },
-      {
-        id: 'fin',
-        name: 'Emerson Holt',
-        title: 'CFO',
-        dept: 'Finance',
-        email: 'emerson@swiftshift.com',
-        reportsTo: 'Alex Rivera',
-        teamSize: 2,
-        children: [
-          { id: 'fin1', name: 'Finley Quinn', title: 'Controller', dept: 'Finance', email: 'finley@swiftshift.com', reportsTo: 'Emerson Holt', teamSize: 1, children: [] },
-        ]
-      },
-    ]
-  }
+  // Org chart built from the real user list: the first manager is the root, other
+  // managers sit under them, and everyone else is grouped under the manager named
+  // in their manager_name field (or the root when there's no match).
+  const orgData = (() => {
+    const fullName = (u: any) => `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email || `User #${u.id}`
+    const toNode = (u: any, reportsTo: string | null) => ({
+      id: String(u.id),
+      name: fullName(u),
+      title: u.job_role || (u.is_manager ? 'Manager' : 'Employee'),
+      dept: u.is_manager ? 'Management' : 'Team',
+      email: u.email,
+      reportsTo,
+      teamSize: 0,
+      children: [] as any[],
+    })
+    const managers = users.filter(u => u.is_manager)
+    const rootUser = managers[0] || users[0] || user
+    if (!rootUser) return null
+    const root = toNode(rootUser, null)
+    const managerNodes = [root, ...managers.filter(m => m.id !== rootUser.id).map(m => toNode(m, root.name))]
+    root.children.push(...managerNodes.slice(1))
+    const byName = new Map(managerNodes.map(n => [n.name.toLowerCase(), n]))
+    for (const u of users) {
+      if (u.is_manager || u.id === rootUser.id) continue
+      const parent = byName.get(String(u.manager_name || '').toLowerCase()) || root
+      parent.children.push(toNode(u, parent.name))
+    }
+    managerNodes.forEach(n => { n.teamSize = n.children.length })
+    return root
+  })()
 
   useTimesheet() // runs side effects (seeding)
 
@@ -2758,9 +2993,9 @@ export default function App() {
 
   const themeAccentHex = theme === 'custom' ? customAccentColor : theme === 'green' ? '#D7FE51' : theme === 'white' ? '#E5E7EB' : theme === 'orange' ? '#F97316' : theme === 'cyan' ? '#51FEFE' : theme === 'pink' ? '#FE51D7' : theme === 'purple' ? '#9B51FE' : theme === 'red' ? '#EF4444' : theme === 'gold' ? '#F59E0B' : theme === 'teal' ? '#2DD4BF' : theme === 'blue' ? '#60A5FA' : '#D7FE51'
 
-  // Load users for admin
+  // Load users for admin + org chart + schedules (swap-with teammate picker)
   useEffect(() => {
-    if (activeView === 'admin') {
+    if (activeView === 'admin' || activeView === 'orgchart' || activeView === 'schedules') {
       fetch(`${API_BASE}/api/users`)
         .then(r => (r.ok ? r.json() : []))
         .then(data => setUsers(Array.isArray(data) ? data : []))
@@ -2768,12 +3003,62 @@ export default function App() {
     }
   }, [activeView])
 
+  // Load audit log (manager-only endpoint)
+  useEffect(() => {
+    if (activeView !== 'auditlog') return
+    setAuditLoading(true)
+    fetch(`${API_BASE}/api/audit?limit=200`)
+      .then(r => (r.ok ? r.json() : []))
+      .then(r => setAuditEvents(Array.isArray(r) ? r : []))
+      .catch(() => setAuditEvents([]))
+      .finally(() => setAuditLoading(false))
+  }, [activeView])
+
+  // Load my editable profile (contact info + W-4 withholding) once signed in —
+  // filing status also drives the paystub estimate on the Payroll/Taxes tabs.
+  useEffect(() => {
+    if (!user?.id) return
+    fetch(`${API_BASE}/api/users/me/profile`).then(r => (r.ok ? r.json() : null)).then(d => { if (d) { setUserProfile(d); setProfileEdit(d) } }).catch(() => {})
+  }, [user?.id])
+
+  // Load notification preferences once signed in
+  useEffect(() => {
+    if (!user?.id) return
+    fetch(`${API_BASE}/api/users/me/notification-prefs`).then(r => (r.ok ? r.json() : null)).then(d => { if (d && !d.error) setNotifPrefs({ ...DEFAULT_NOTIF_PREFS, ...d }) }).catch(() => {})
+  }, [user?.id])
+
+  // Daily digest: on the first app open of a new day, surface events that digest mode
+  // suppressed on previous days as one combined "Your daily summary" notification.
+  useEffect(() => {
+    if (!user?.id) return
+    const today = new Date().toISOString().slice(0, 10)
+    if (localStorage.getItem(NOTIF_DIGEST_SHOWN_KEY) === today) return
+    let queued: Array<{ category: NotifCategory; title: string; ts: string }> = []
+    try { queued = JSON.parse(localStorage.getItem(NOTIF_DIGEST_KEY) || '[]') } catch { queued = [] }
+    if (!Array.isArray(queued)) queued = []
+    const past = queued.filter(e => (e.ts || '').slice(0, 10) < today)
+    if (past.length === 0) return
+    localStorage.setItem(NOTIF_DIGEST_SHOWN_KEY, today)
+    localStorage.setItem(NOTIF_DIGEST_KEY, JSON.stringify(queued.filter(e => (e.ts || '').slice(0, 10) >= today)))
+    const labels: Record<NotifCategory, string> = { pto: 'PTO update', swaps: 'shift-swap update', timesheet: 'timesheet reminder', manager: 'manager alert' }
+    const counts = past.reduce<Record<string, number>>((acc, e) => { acc[e.category] = (acc[e.category] || 0) + 1; return acc }, {})
+    const summary = Object.entries(counts).map(([cat, n]) => `${n} ${labels[cat as NotifCategory] || cat}${n !== 1 ? 's' : ''}`).join(' · ')
+    toast.info('📬 Your daily summary', {
+      description: `${summary} — ${past.slice(0, 3).map(e => e.title).join(' · ')}${past.length > 3 ? ` +${past.length - 3} more` : ''}`,
+      duration: 12000,
+    })
+  }, [user?.id])
+
   // Load profile data when navigating to profile
   useEffect(() => {
     if (activeView !== 'profile' || !user?.id) return
     const uid = user.id
     fetch(`${API_BASE}/api/work-schedule?user_id=${uid}`).then(r => (r.ok ? r.json() : null)).then(d => { setWorkSchedule(d); setScheduleEdit(d) }).catch(() => {})
-    fetch(`${API_BASE}/api/direct-deposit?user_id=${uid}`).then(r => (r.ok ? r.json() : null)).then(d => { setDirectDeposit(d); setDepositEdit(d) }).catch(() => {})
+    fetch(`${API_BASE}/api/direct-deposit?user_id=${uid}`).then(r => (r.ok ? r.json() : null)).then(d => {
+      setDirectDeposit(d)
+      const accts = (d?.accounts?.length ? d.accounts : [{ bank_name: d?.bank_name, account_type: d?.account_type, split_percent: 100 }])
+      setDepositEdit(accts.map((a: any) => ({ bank_name: a.bank_name || '', account_type: a.account_type || 'checking', routing_number: '', account_number: '', split_percent: a.split_percent ?? 100 })))
+    }).catch(() => {})
     fetch(`${API_BASE}/api/availability?user_id=${uid}`).then(r => (r.ok ? r.json() : null)).then(d => { setWorkAvailability(d); setAvailabilityEdit(d) }).catch(() => {})
   }, [activeView, user?.id])
 
@@ -2798,6 +3083,38 @@ export default function App() {
     fetch(`${API_BASE}/api/shift-swaps?user_id=${uid}`).then(r => r.json()).then(r => setShiftSwaps(Array.isArray(r) ? r : [])).catch(() => {})
     fetch(`${API_BASE}/api/shift-swaps`).then(r => r.json()).then(r => setAllShiftSwaps(Array.isArray(r) ? r : [])).catch(() => {})
     fetch(`${API_BASE}/api/timesheet-submissions?user_id=${uid}`).then(r => r.json()).then(r => setTimesheetSubs(Array.isArray(r) ? r : [])).catch(() => {})
+    fetch(`${API_BASE}/api/open-shifts`).then(r => r.json()).then(r => setOpenShifts(Array.isArray(r) ? r : [])).catch(() => {})
+    fetch(`${API_BASE}/api/availability?user_id=${uid}`).then(r => (r.ok ? r.json() : null)).then(d => setWorkAvailability(d)).catch(() => {})
+    if (isManager) {
+      fetch(`${API_BASE}/api/corrections/pending`).then(r => (r.ok ? r.json() : [])).then(r => setPendingCorrections(Array.isArray(r) ? r : [])).catch(() => {})
+      fetch(`${API_BASE}/api/org-settings`).then(r => (r.ok ? r.json() : null)).then(d => {
+        if (d && !d.error) setOrgSettingsEdit({
+          auto_approve_swap_hours: d.auto_approve_swap_hours == null ? '' : String(d.auto_approve_swap_hours),
+          ot_alert_daily_hours: String(d.ot_alert_daily_hours ?? 10),
+          missed_clockout_hours: String(d.missed_clockout_hours ?? 12),
+        })
+      }).catch(() => {})
+      fetch(`${API_BASE}/api/org-settings/flags`).then(r => (r.ok ? r.json() : null)).then(d => setOrgFlags(d && Array.isArray(d.missed_clockouts) ? d : null)).catch(() => {})
+    }
+  }, [activeView, user?.id, isManager])
+
+  // Load reports data (manager-only endpoints; current month)
+  useEffect(() => {
+    if (activeView !== 'reports' || !user?.id) return
+    const now = new Date()
+    const start = `${now.toISOString().slice(0, 8)}01`
+    const end = now.toISOString().slice(0, 10)
+    setReportsLoading(true)
+    Promise.all([
+      fetch(`${API_BASE}/api/reports/summary?start=${start}&end=${end}`).then(r => (r.ok ? r.json() : null)),
+      fetch(`${API_BASE}/api/reports/hours?start=${start}&end=${end}`).then(r => (r.ok ? r.json() : [])),
+    ])
+      .then(([summary, hours]) => {
+        setReportSummary(summary)
+        setReportHours(Array.isArray(hours) ? hours : [])
+      })
+      .catch(() => { setReportSummary(null); setReportHours([]) })
+      .finally(() => setReportsLoading(false))
   }, [activeView, user?.id])
 
   // Clock state
@@ -2833,6 +3150,8 @@ export default function App() {
   const [now, setNow] = useState(new Date())
   const [_shockwaveActive, setShockwaveActive] = useState(false)
   const [ripplePos, setRipplePos] = useState<{ x: number; y: number } | null>(null)
+  // True while clock punches made offline are queued in localStorage awaiting sync
+  const [offlinePunchPending, setOfflinePunchPending] = useState(() => hasQueuedPunches())
 
   // Milestone tracking refs (persist across renders, reset on new clock session)
   const hoursMilestoneFiredRef = useRef<Set<number>>(new Set())
@@ -2926,6 +3245,33 @@ export default function App() {
         setPeriodTotalMs(periodMs)
       })
       .catch(() => {})
+  }, [user?.id])
+
+  // Replay punches queued while offline — on app load and whenever connectivity returns
+  useEffect(() => {
+    if (!user?.id) return
+    let cancelled = false
+    const flush = () => {
+      if (!hasQueuedPunches() || !navigator.onLine) return
+      flushQueuedPunches(API_BASE)
+        .then(({ synced, activeSessionId: sid }) => {
+          if (cancelled) return
+          if (sid) setActiveSessionId(sid)
+          if (!hasQueuedPunches()) setOfflinePunchPending(false)
+          if (synced > 0) {
+            toast.success('Back online — offline punches synced', {
+              description: `${synced} punch${synced === 1 ? '' : 'es'} saved with the original time.`,
+            })
+          }
+        })
+        .catch(() => {})
+    }
+    flush()
+    window.addEventListener('online', flush)
+    return () => {
+      cancelled = true
+      window.removeEventListener('online', flush)
+    }
   }, [user?.id])
 
   // Live clock tick every second
@@ -3087,7 +3433,7 @@ export default function App() {
     if (todayStr === endStr && !paydayFiredRef.current) {
       paydayFiredRef.current = true
       setTimeout(() => {
-        toast.success('💸 Payday!', {
+        notify('timesheet', 'success', '💸 Payday!', {
           description: 'Today is the last day of your pay period. Payday is coming!',
           duration: 8000,
         })
@@ -3106,7 +3452,7 @@ export default function App() {
     if ((hour > 9 || (hour === 9 && min >= 30)) && !clockInReminderFiredRef.current) {
       clockInReminderFiredRef.current = true
       localStorage.setItem(key, '1')
-      toast.info("⏰ Don't forget to clock in!", {
+      notify('timesheet', 'info', "⏰ Don't forget to clock in!", {
         description: 'You haven\'t clocked in yet today.',
         duration: 8000,
       })
@@ -3150,18 +3496,28 @@ export default function App() {
       setBreakMsAccum(0)
       setPaidBreakMsAccum(0)
 
-      // Persist clock-in to DB
+      // Persist clock-in to DB; queue it offline if the network is down
       if (user?.id) {
-        fetch(`${API_BASE}/api/clock-sessions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ employee_id: user.id }),
-        })
-          .then(r => { if (!r.ok) throw new Error('clock-in not saved'); return r.json() })
-          .then(row => { if (row?.id) setActiveSessionId(row.id) })
-          .catch(() => toast.error("Couldn't sync your clock-in to the server", {
-            description: 'Your time is still tracked on this device.',
-          }))
+        const punchTs = now.toISOString()
+        const queueOffline = () => {
+          queuePunch({ action: 'clock_in', timestamp: punchTs })
+          setOfflinePunchPending(true)
+          toast.info('Saved offline — will sync when you reconnect', {
+            description: 'Your clock-in is queued with its original time.',
+          })
+        }
+        if (!navigator.onLine) {
+          queueOffline()
+        } else {
+          fetch(`${API_BASE}/api/clock-sessions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ employee_id: user.id, client_ts: punchTs }),
+          })
+            .then(r => { if (!r.ok) throw new Error('clock-in not saved'); return r.json() })
+            .then(row => { if (row?.id) setActiveSessionId(row.id) })
+            .catch(queueOffline)
+        }
       }
 
       // Update daily streak (freeze over weekends)
@@ -3336,28 +3692,40 @@ export default function App() {
       setLootDurationMin(Math.round(session / 60000))
       setShowLootDrop(true)
 
-      // Persist clock-out to DB (send unpaid break minutes so backend deducts them)
+      // Persist clock-out to DB (send unpaid break minutes so backend deducts them);
+      // queue it offline if the network is down
       const sid = activeSessionId
       setActiveSessionId(null)
       const unpaidBreakMin = Math.round(unpaidAccum / 60000)
-      if (sid && user?.id) {
-        fetch(`${API_BASE}/api/clock-sessions/${sid}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ break_minutes: unpaidBreakMin }),
-        })
-          .then(r => { if (!r.ok) throw new Error('clock-out not saved') })
-          .catch(() => toast.error("Couldn't save your session to the server", {
-            description: 'Your hours may be missing from the timesheet — please double-check.',
-          }))
-        // Accrue PTO to DB
-        fetch(`${API_BASE}/api/pto/balance/accrue`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: user.id, hours_worked: hoursWorked }),
-        })
-          .then(r => { if (!r.ok) throw new Error('accrual not saved') })
-          .catch(() => toast.error("Couldn't record your PTO accrual for this session"))
+      if (user?.id) {
+        const punchTs = now.toISOString()
+        const queueOffline = () => {
+          queuePunch({ action: 'clock_out', timestamp: punchTs, sessionId: sid, breakMinutes: unpaidBreakMin })
+          setOfflinePunchPending(true)
+          toast.info('Saved offline — will sync when you reconnect', {
+            description: 'Your clock-out is queued with its original time.',
+          })
+        }
+        if (!navigator.onLine || (!sid && hasQueuedPunches())) {
+          // Offline, or the matching clock-in is itself still queued — keep order
+          queueOffline()
+        } else if (sid) {
+          fetch(`${API_BASE}/api/clock-sessions/${sid}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ break_minutes: unpaidBreakMin, client_ts: punchTs }),
+          })
+            .then(r => { if (!r.ok) throw new Error('clock-out not saved') })
+            .catch(queueOffline)
+          // Accrue PTO to DB
+          fetch(`${API_BASE}/api/pto/balance/accrue`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: user.id, hours_worked: hoursWorked }),
+          })
+            .then(r => { if (!r.ok) throw new Error('accrual not saved') })
+            .catch(() => toast.error("Couldn't record your PTO accrual for this session"))
+        }
       }
     }
   }
@@ -4130,6 +4498,17 @@ export default function App() {
         <main className="ta-main">
           {activeView === 'clock' && (
             <>
+              {/* Company holiday banner */}
+              {(() => {
+                const todayHoliday = holidayOnDate(holidays, now)
+                if (!todayHoliday) return null
+                return (
+                  <div className="max-w-[1200px] mx-auto mb-4 px-4 py-3 rounded-2xl bg-sky-500/10 border border-sky-500/30 text-sm text-sky-300 flex items-center gap-2.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    <span>Today is <span className="font-semibold text-white">{todayHoliday.name}</span> — company holiday</span>
+                  </div>
+                )
+              })()}
               <div className="flex flex-col xl:flex-row gap-6 items-stretch max-w-[1200px] mx-auto">
               {/* Left: Dashboard */}
               <div className="flex-1 flex flex-col">
@@ -4153,6 +4532,15 @@ export default function App() {
                           {statusText}
                         </span>
                       </div>
+
+                      {offlinePunchPending && (
+                        <div className="mb-4 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-sm text-amber-400 inline-flex items-center gap-2">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.58 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/>
+                          </svg>
+                          Saved offline — will sync when you reconnect
+                        </div>
+                      )}
 
                   <div className="flex flex-wrap gap-3">
                     {!isClockedIn && (
@@ -4527,7 +4915,7 @@ export default function App() {
           )}
 
           {activeView === 'timesheet' && (
-            <TimesheetView user={user} gamification={gamification} />
+            <TimesheetView user={user} gamification={gamification} holidays={holidays} />
           )}
           {activeView === 'rewards' && (
             <div className="space-y-6">
@@ -4599,6 +4987,7 @@ export default function App() {
                   } else {
                     setHolidays(prev => [...prev, row])
                     toast.success('Holiday added!')
+                    holidayDraft.clearDraft()
                   }
                   setShowHolidayForm(false)
                   setEditingHoliday(null)
@@ -4651,7 +5040,10 @@ export default function App() {
                 {/* Add/Edit form */}
                 {(showHolidayForm || editingHoliday) && (
                   <div className="glass rounded-3xl p-6 space-y-4">
-                    <h2 className="text-lg font-semibold text-white">{editingHoliday ? 'Edit Holiday' : 'Add Holiday'}</h2>
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-lg font-semibold text-white">{editingHoliday ? 'Edit Holiday' : 'Add Holiday'}</h2>
+                      <DraftRestoredNote show={holidayDraft.draftRestored} onDiscard={() => holidayDraft.discardDraft({ name: '', date: '', recurring: false, description: '' })} />
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <div className="text-xs text-zinc-400 mb-1">Holiday Name</div>
@@ -4774,6 +5166,17 @@ export default function App() {
               <div className="glass rounded-3xl p-8">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                   <h1 className="text-2xl font-semibold neon-green">Admin: Manage Users</h1>
+                  <div className="flex gap-2 flex-wrap">
+                  <button
+                    onClick={() => {
+                      downloadFile(`${API_BASE}/api/export/company`, 'swiftshift-company-export.zip')
+                        .then(() => toast.success('Company data export downloaded'))
+                        .catch(() => toast.error('Failed to export company data'))
+                    }}
+                    className="px-4 py-2 rounded-xl text-sm font-medium bg-white/5 hover:bg-white/10 border border-white/10 transition-colors text-zinc-300"
+                  >
+                    Export Company Data
+                  </button>
                   <button
                     onClick={() => {
                       users.forEach(u => {
@@ -4788,6 +5191,7 @@ export default function App() {
                   >
                     Save Changes
                   </button>
+                  </div>
                 </div>
                 <div className="overflow-x-auto">
                 <table className="w-full text-xs" style={{ minWidth: '700px' }}>
@@ -4919,17 +5323,37 @@ export default function App() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h1 className="text-2xl font-semibold neon-green">Schedule Management</h1>
-                  <p className="text-sm text-zinc-400">Shift swaps, timesheet submissions, and weekly view</p>
+                  <p className="text-sm text-zinc-400">Shift swaps, open shifts, timesheet submissions, and week/month views</p>
                 </div>
                 <button onClick={() => setShowSwapForm(v => !v)} className="px-4 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
                   {showSwapForm ? 'Cancel' : '↔ Request Swap'}
                 </button>
               </div>
 
+              {/* Manager: workflow flags strip (missed clock-outs + daily OT) */}
+              {isManager && orgFlags && (orgFlags.missed_clockouts.length > 0 || orgFlags.ot_alerts.length > 0) && (
+                <div className="glass rounded-2xl px-4 py-3 flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold text-zinc-400 uppercase">Flags</span>
+                  {orgFlags.missed_clockouts.map(f => (
+                    <span key={`mc-${f.session_id}`} className="px-2.5 py-1 rounded-full text-xs font-medium bg-red-500/20 text-red-400">
+                      Missed clock-out: {f.employee_name || `User #${f.employee_id}`} — open {f.open_hours}h
+                    </span>
+                  ))}
+                  {orgFlags.ot_alerts.map(f => (
+                    <span key={`ot-${f.employee_id}-${f.date}`} className="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400">
+                      OT: {f.employee_name || `User #${f.employee_id}`} — {f.hours}h on {f.date}
+                    </span>
+                  ))}
+                </div>
+              )}
+
               {/* Shift Swap Request Form */}
               {showSwapForm && (
                 <div className="glass rounded-3xl p-6 space-y-4">
-                  <h2 className="text-lg font-semibold text-white">Request Shift Swap</h2>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-white">Request Shift Swap</h2>
+                    <DraftRestoredNote show={swapDraft.draftRestored} onDiscard={() => swapDraft.discardDraft({ shift_date: '', shift_start: '', shift_end: '', reason: '', target_id: '' })} />
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {[
                       { label: 'Shift Date', key: 'shift_date', type: 'date' },
@@ -4943,6 +5367,16 @@ export default function App() {
                           className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
                       </div>
                     ))}
+                    <div>
+                      <div className="text-xs text-zinc-400 mb-1">Swap With (teammate who agreed)</div>
+                      <select value={swapForm.target_id} onChange={e => setSwapForm(f => ({ ...f, target_id: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
+                        <option value="">No one yet</option>
+                        {users.filter(u => u.id !== user?.id).map(u => (
+                          <option key={u.id} value={u.id}>{u.first_name} {u.last_name}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                   <button onClick={() => {
                     if (!user?.id || !swapForm.shift_date || !swapForm.shift_start || !swapForm.shift_end) {
@@ -4951,13 +5385,15 @@ export default function App() {
                     fetch(`${API_BASE}/api/shift-swaps`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ requester_id: user.id, ...swapForm }),
+                      body: JSON.stringify({ requester_id: user.id, ...swapForm, target_id: swapForm.target_id ? Number(swapForm.target_id) : null }),
                     }).then(r => r.json()).then(row => {
                       if (row.error) { toast.error(row.error); return }
                       setShiftSwaps(prev => [row, ...prev])
+                      setAllShiftSwaps(prev => [row, ...prev])
                       setShowSwapForm(false)
-                      setSwapForm({ shift_date: '', shift_start: '', shift_end: '', reason: '' })
-                      toast.success('Shift swap requested!')
+                      swapDraft.clearDraft()
+                      setSwapForm({ shift_date: '', shift_start: '', shift_end: '', reason: '', target_id: '' })
+                      notify('swaps', 'success', row.status === 'accepted' ? 'Shift swap auto-approved!' : 'Shift swap requested!')
                     }).catch(() => toast.error('Failed to submit'))
                   }} className="px-5 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
                     Submit Swap Request
@@ -5039,7 +5475,7 @@ export default function App() {
                                   }).then(() => {
                                     setAllShiftSwaps(prev => prev.map(s => s.id === sw.id ? { ...s, status: 'accepted' } : s))
                                     setShiftSwaps(prev => prev.map(s => s.id === sw.id ? { ...s, status: 'accepted' } : s))
-                                    toast.success('Shift swap approved')
+                                    notify('swaps', 'success', 'Shift swap approved')
                                   }).catch(() => toast.error('Failed to approve'))
                                 }}
                                 className="px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 transition-colors"
@@ -5055,7 +5491,7 @@ export default function App() {
                                   }).then(() => {
                                     setAllShiftSwaps(prev => prev.map(s => s.id === sw.id ? { ...s, status: 'denied' } : s))
                                     setShiftSwaps(prev => prev.map(s => s.id === sw.id ? { ...s, status: 'denied' } : s))
-                                    toast.success('Shift swap denied')
+                                    notify('swaps', 'success', 'Shift swap denied')
                                   }).catch(() => toast.error('Failed to deny'))
                                 }}
                                 className="px-3 py-1 rounded-lg text-xs font-semibold bg-red-500/20 text-red-400 hover:bg-red-500/40 transition-colors"
@@ -5075,21 +5511,337 @@ export default function App() {
                 </div>
               )}
 
-              {/* Weekly grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-                  <div key={day} className="glass rounded-2xl p-3">
-                    <div className="text-xs font-semibold text-zinc-400 mb-2 uppercase">{day}</div>
-                    {['Morning 6-2', 'Afternoon 2-10'].map((shift, i) => (
-                      <div key={i} className="text-xs rounded-lg px-2 py-1.5 mb-1.5 cursor-pointer hover:opacity-80 transition-opacity"
-                        style={{ backgroundColor: 'var(--accent-color-dim)', borderLeft: '3px solid var(--accent-color)', color: 'var(--accent-color)' }}>
-                        {shift}
-                        <div className="text-zinc-400 mt-0.5">{i === 0 ? '3 assigned' : '2 assigned'}</div>
+              {/* Manager: Time Punch Correction Approvals */}
+              {isManager && pendingCorrections.length > 0 && (
+                <div className="glass rounded-3xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h2 className="text-lg font-semibold text-white">Manager: Time Punch Corrections</h2>
+                      <p className="text-xs text-zinc-400 mt-0.5">Approving a request updates the employee's clock session times</p>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400">
+                      {pendingCorrections.filter(c => c.status === 'pending').length} pending
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    {pendingCorrections.map(c => {
+                      const fmtPunch = (iso: string | null) => iso ? new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
+                      return (
+                        <div key={c.id} className="flex flex-wrap items-center gap-3 bg-white/5 rounded-xl px-4 py-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm">Session #{c.session_id} <span className="text-xs text-zinc-500 font-normal">· User #{c.user_id}</span></div>
+                            <div className="text-xs text-zinc-400 mt-0.5">Current: {fmtPunch(c.current_clock_in)} – {fmtPunch(c.current_clock_out)}</div>
+                            <div className="text-xs mt-0.5" style={{ color: 'var(--accent-color)' }}>Proposed: {fmtPunch(c.proposed_clock_in)} – {fmtPunch(c.proposed_clock_out)}</div>
+                            {c.reason && <div className="text-xs text-zinc-500 mt-0.5 italic">"{c.reason}"</div>}
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {c.status === 'pending' ? (
+                              <>
+                                <button
+                                  disabled={correctionActionLoading === c.id}
+                                  onClick={() => {
+                                    setCorrectionActionLoading(c.id)
+                                    fetch(`${API_BASE}/api/corrections/${c.id}/approve`, { method: 'POST' })
+                                      .then(r => { if (!r.ok) throw new Error(); return r.json() })
+                                      .then(() => {
+                                        setPendingCorrections(prev => prev.map(x => x.id === c.id ? { ...x, status: 'approved' } : x))
+                                        notify('manager', 'success', 'Correction approved — session times updated')
+                                      }).catch(() => toast.error('Failed to approve')).finally(() => setCorrectionActionLoading(null))
+                                  }}
+                                  className="px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 transition-colors disabled:opacity-50"
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  disabled={correctionActionLoading === c.id}
+                                  onClick={() => {
+                                    setCorrectionActionLoading(c.id)
+                                    fetch(`${API_BASE}/api/corrections/${c.id}/deny`, { method: 'POST' })
+                                      .then(r => { if (!r.ok) throw new Error(); return r.json() })
+                                      .then(() => {
+                                        setPendingCorrections(prev => prev.map(x => x.id === c.id ? { ...x, status: 'denied' } : x))
+                                        notify('manager', 'success', 'Correction denied')
+                                      }).catch(() => toast.error('Failed to deny')).finally(() => setCorrectionActionLoading(null))
+                                  }}
+                                  className="px-3 py-1 rounded-lg text-xs font-semibold bg-red-500/20 text-red-400 hover:bg-red-500/40 transition-colors disabled:opacity-50"
+                                >
+                                  Deny
+                                </button>
+                              </>
+                            ) : (
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${c.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                {c.status}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Manager: Workflow Settings */}
+              {isManager && (
+                <div className="glass rounded-3xl p-6">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <div>
+                      <h2 className="text-lg font-semibold text-white">Manager: Workflow Settings</h2>
+                      <p className="text-xs text-zinc-400 mt-0.5">Auto-approvals and team flags — applies org-wide</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        fetch(`${API_BASE}/api/org-settings`, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            auto_approve_swap_hours: orgSettingsEdit.auto_approve_swap_hours === '' ? null : parseFloat(orgSettingsEdit.auto_approve_swap_hours),
+                            ot_alert_daily_hours: parseFloat(orgSettingsEdit.ot_alert_daily_hours) || 10,
+                            missed_clockout_hours: parseFloat(orgSettingsEdit.missed_clockout_hours) || 12,
+                          }),
+                        }).then(r => r.json()).then(row => {
+                          if (row.error) { toast.error(row.error); return }
+                          setOrgSettingsEdit({
+                            auto_approve_swap_hours: row.auto_approve_swap_hours == null ? '' : String(row.auto_approve_swap_hours),
+                            ot_alert_daily_hours: String(row.ot_alert_daily_hours),
+                            missed_clockout_hours: String(row.missed_clockout_hours),
+                          })
+                          fetch(`${API_BASE}/api/org-settings/flags`).then(r => (r.ok ? r.json() : null)).then(d => setOrgFlags(d && Array.isArray(d.missed_clockouts) ? d : null)).catch(() => {})
+                          toast.success('Workflow settings saved')
+                        }).catch(() => toast.error('Failed to save settings'))
+                      }}
+                      className="px-4 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
+                    >
+                      Save Settings
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <div className="text-xs text-zinc-400 mb-1">Auto-approve swaps (hours ahead)</div>
+                      <input type="number" min="0" step="1" placeholder="Off"
+                        value={orgSettingsEdit.auto_approve_swap_hours}
+                        onChange={e => setOrgSettingsEdit(s => ({ ...s, auto_approve_swap_hours: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                      <div className="text-[11px] text-zinc-500 mt-1">Swaps with an agreed teammate at least this far in the future approve automatically. Leave blank to turn off.</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-zinc-400 mb-1">OT alert (hours per day)</div>
+                      <input type="number" min="1" step="0.5"
+                        value={orgSettingsEdit.ot_alert_daily_hours}
+                        onChange={e => setOrgSettingsEdit(s => ({ ...s, ot_alert_daily_hours: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                      <div className="text-[11px] text-zinc-500 mt-1">Flag any day someone works more than this many hours.</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-zinc-400 mb-1">Missed clock-out flag (hours)</div>
+                      <input type="number" min="1" step="0.5"
+                        value={orgSettingsEdit.missed_clockout_hours}
+                        onChange={e => setOrgSettingsEdit(s => ({ ...s, missed_clockout_hours: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                      <div className="text-[11px] text-zinc-500 mt-1">Flag clock sessions still open after this many hours.</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Open Shifts board */}
+              <div className="glass rounded-3xl p-6">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-white">Open Shifts</h2>
+                    <p className="text-xs text-zinc-400 mt-0.5">Up-for-grabs shifts — first to claim gets it</p>
+                  </div>
+                  {isManager && (
+                    <button onClick={() => setShowOpenShiftForm(v => !v)} className="px-4 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
+                      {showOpenShiftForm ? 'Cancel' : '+ Post Open Shift'}
+                    </button>
+                  )}
+                </div>
+                {isManager && showOpenShiftForm && (
+                  <div className="bg-white/5 rounded-2xl p-4 mb-4 space-y-4">
+                    <DraftRestoredNote show={openShiftDraft.draftRestored} onDiscard={() => openShiftDraft.discardDraft({ shift_date: '', start_time: '', end_time: '', job_or_role: '' })} />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {[
+                        { label: 'Shift Date', key: 'shift_date', type: 'date' },
+                        { label: 'Job / Role', key: 'job_or_role', type: 'text' },
+                        { label: 'Start Time', key: 'start_time', type: 'time' },
+                        { label: 'End Time', key: 'end_time', type: 'time' },
+                      ].map(({ label, key, type }) => (
+                        <div key={key}>
+                          <div className="text-xs text-zinc-400 mb-1">{label}</div>
+                          <input type={type} value={(openShiftForm as any)[key]} onChange={e => setOpenShiftForm(f => ({ ...f, [key]: e.target.value }))}
+                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                        </div>
+                      ))}
+                    </div>
+                    <button onClick={() => {
+                      if (!openShiftForm.shift_date || !openShiftForm.start_time || !openShiftForm.end_time) {
+                        toast.error('Please fill shift date, start, and end'); return
+                      }
+                      fetch(`${API_BASE}/api/open-shifts`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(openShiftForm),
+                      }).then(r => r.json()).then(row => {
+                        if (row.error) { toast.error(row.error); return }
+                        setOpenShifts(prev => [...prev, row].sort((a, b) => `${a.shift_date} ${a.start_time}`.localeCompare(`${b.shift_date} ${b.start_time}`)))
+                        setShowOpenShiftForm(false)
+                        openShiftDraft.clearDraft()
+                        setOpenShiftForm({ shift_date: '', start_time: '', end_time: '', job_or_role: '' })
+                        toast.success('Open shift posted!')
+                      }).catch(() => toast.error('Failed to post shift'))
+                    }} className="px-5 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
+                      Post Shift
+                    </button>
+                  </div>
+                )}
+                {openShifts.length === 0 ? (
+                  <div className="text-sm text-zinc-500 text-center py-6">No open shifts right now.{isManager ? ' Click "+ Post Open Shift" to add one.' : ''}</div>
+                ) : (
+                  <div className="space-y-3">
+                    {openShifts.map(s => (
+                      <div key={s.id} className="flex flex-wrap items-center gap-3 bg-white/5 rounded-xl px-4 py-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm">{new Date(s.shift_date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</div>
+                          <div className="text-xs text-zinc-400">{s.start_time} - {s.end_time}{s.job_or_role ? ` · ${s.job_or_role}` : ''}</div>
+                          {s.status === 'claimed' && (
+                            <div className="text-xs text-zinc-500 mt-0.5">Claimed by {s.claimed_by === user?.id ? 'you' : (s.claimed_by_name || `User #${s.claimed_by}`)}</div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {s.status === 'open' ? (
+                            <button
+                              disabled={claimingShiftId === s.id}
+                              onClick={() => {
+                                setClaimingShiftId(s.id)
+                                fetch(`${API_BASE}/api/open-shifts/${s.id}/claim`, { method: 'POST' })
+                                  .then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Failed to claim'); return d })
+                                  .then(row => {
+                                    setOpenShifts(prev => prev.map(x => x.id === row.id ? { ...x, ...row } : x))
+                                    toast.success("Shift claimed — it's yours!")
+                                  })
+                                  .catch((e: any) => {
+                                    toast.error(e.message || 'Failed to claim')
+                                    // Someone may have beaten us to it — refresh the board
+                                    fetch(`${API_BASE}/api/open-shifts`).then(r => r.json()).then(r => setOpenShifts(Array.isArray(r) ? r : [])).catch(() => {})
+                                  })
+                                  .finally(() => setClaimingShiftId(null))
+                              }}
+                              className="px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 transition-colors disabled:opacity-50"
+                            >
+                              Claim
+                            </button>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-500/20 text-zinc-400">claimed</span>
+                          )}
+                          {isManager && (
+                            <button onClick={() => {
+                              fetch(`${API_BASE}/api/open-shifts/${s.id}`, { method: 'DELETE' })
+                                .then(r => r.json())
+                                .then(d => {
+                                  if (d.error) { toast.error(d.error); return }
+                                  setOpenShifts(prev => prev.filter(x => x.id !== s.id))
+                                  toast.success('Open shift cancelled')
+                                })
+                                .catch(() => toast.error('Failed to cancel'))
+                            }} className="px-3 py-1 rounded-lg text-xs font-semibold bg-red-500/20 text-red-400 hover:bg-red-500/40 transition-colors">
+                              Cancel
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
-                ))}
+                )}
               </div>
+
+              {/* Schedule calendar: weekly grid or month view */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold text-white">{scheduleViewMode === 'week' ? 'Weekly Schedule' : format(monthCursor, 'MMMM yyyy')}</h2>
+                <div className="flex items-center gap-2">
+                  {scheduleViewMode === 'month' && (
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setMonthCursor(c => addMonths(c, -1))} aria-label="Previous month" className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs transition-colors">←</button>
+                      <button onClick={() => setMonthCursor(new Date())} className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs transition-colors">Today</button>
+                      <button onClick={() => setMonthCursor(c => addMonths(c, 1))} aria-label="Next month" className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs transition-colors">→</button>
+                    </div>
+                  )}
+                  <div className="flex rounded-xl overflow-hidden border border-white/10">
+                    {(['week', 'month'] as const).map(mode => (
+                      <button key={mode} onClick={() => setScheduleViewMode(mode)}
+                        className={`px-3 py-1.5 text-xs font-medium capitalize transition-colors ${scheduleViewMode === mode ? '' : 'text-zinc-400 hover:bg-white/10'}`}
+                        style={scheduleViewMode === mode ? { backgroundColor: 'var(--accent-color)', color: '#000' } : undefined}>
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {scheduleViewMode === 'week' ? (
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
+                    <div key={day} className="glass rounded-2xl p-3">
+                      <div className="text-xs font-semibold text-zinc-400 mb-2 uppercase">{day}</div>
+                      {['Morning 6-2', 'Afternoon 2-10'].map((shift, i) => (
+                        <div key={i} className="text-xs rounded-lg px-2 py-1.5 mb-1.5 cursor-pointer hover:opacity-80 transition-opacity"
+                          style={{ backgroundColor: 'var(--accent-color-dim)', borderLeft: '3px solid var(--accent-color)', color: 'var(--accent-color)' }}>
+                          {shift}
+                          <div className="text-zinc-400 mt-0.5">{i === 0 ? '3 assigned' : '2 assigned'}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ) : (() => {
+                const days = eachDayOfInterval({
+                  start: startOfWeek(startOfMonth(monthCursor), { weekStartsOn: 1 }),
+                  end: endOfWeek(endOfMonth(monthCursor), { weekStartsOn: 1 }),
+                })
+                const dayKeys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const
+                return (
+                  <div className="glass rounded-3xl p-4 sm:p-6">
+                    <div className="grid grid-cols-7 gap-1.5 mb-1.5">
+                      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
+                        <div key={day} className="text-xs font-semibold text-zinc-400 uppercase text-center py-1">{day}</div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-7 gap-1.5">
+                      {days.map(d => {
+                        const iso = format(d, 'yyyy-MM-dd')
+                        const inMonth = isSameMonth(d, monthCursor)
+                        const avail = workAvailability?.[dayKeys[(d.getDay() + 6) % 7]]
+                        const working = avail === 'available' || avail === 'preferred'
+                        const dayHolidays = holidays.filter(h => h.recurring ? h.date.slice(5) === iso.slice(5) : h.date === iso)
+                        const dayShifts = openShifts.filter(s => s.shift_date === iso)
+                        return (
+                          <div key={iso}
+                            className={`rounded-xl p-1.5 min-h-[72px] border ${inMonth ? 'bg-white/5 border-white/10' : 'border-white/5 opacity-40'}`}
+                            style={isToday(d) ? { boxShadow: 'inset 0 0 0 1.5px var(--accent-color)' } : undefined}>
+                            <div className="flex items-center justify-between">
+                              <span className={`text-xs font-medium ${inMonth ? 'text-zinc-300' : 'text-zinc-600'}`}>{format(d, 'd')}</span>
+                              {working && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--accent-color)' }} title={`Working day (${avail})`} />}
+                            </div>
+                            {dayHolidays.map(h => (
+                              <div key={`h-${h.id}`} className="mt-1 text-[10px] leading-tight rounded px-1 py-0.5 bg-purple-500/20 text-purple-300 truncate" title={h.name}>{h.name}</div>
+                            ))}
+                            {dayShifts.map(s => (
+                              <div key={`s-${s.id}`} className={`mt-1 text-[10px] leading-tight rounded px-1 py-0.5 truncate ${s.status === 'open' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-500/20 text-zinc-400'}`}
+                                title={`${s.start_time}-${s.end_time}${s.job_or_role ? ` · ${s.job_or_role}` : ''} (${s.status})`}>
+                                {s.start_time} {s.job_or_role || 'Open shift'}
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-4 mt-3 text-[11px] text-zinc-500">
+                      <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--accent-color)' }} /> Working day (your availability)</span>
+                      <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded bg-purple-500/40" /> Company holiday</span>
+                      <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded bg-emerald-500/40" /> Open shift</span>
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           )}
           {activeView === 'payroll' && (() => {
@@ -5097,23 +5849,12 @@ export default function App() {
             const grossPay = periodEarnings.pay
             const regularPay = periodEarnings.regular * clockHourlyRate
             const overtimePay = periodEarnings.overtime * clockHourlyRate * 1.5
-            // 2026 federal income tax brackets (single filer, annualized then per-paycheck)
+            // 2026 federal income tax brackets (per W-4 filing status, annualized then per-paycheck)
             const payPeriodsPerYear = 26 // bi-weekly
             const annualGross = grossPay * payPeriodsPerYear
-            const calcFederal2026 = (income: number) => {
-              const brackets = [
-                [11925, 0.10], [48475, 0.12], [103350, 0.22],
-                [197300, 0.24], [250525, 0.32], [626350, 0.35], [Infinity, 0.37],
-              ] as [number, number][]
-              let tax = 0; let prev = 0
-              for (const [limit, rate] of brackets) {
-                if (income <= prev) break
-                tax += (Math.min(income, limit) - prev) * rate
-                prev = limit
-              }
-              return tax
-            }
-            const annualFederalTax = calcFederal2026(annualGross)
+            const filingStatus = userProfile?.filing_status || 'single'
+            const extraWithholding = Number(userProfile?.extra_withholding) || 0
+            const annualFederalTax = calcFederal2026(annualGross, filingStatus)
             const federalTax = annualFederalTax / payPeriodsPerYear
             const federalEffectiveRate = annualGross > 0 ? annualFederalTax / annualGross : 0
             const stateTaxRate = 0.0593  // CA avg
@@ -5122,7 +5863,7 @@ export default function App() {
             const stateTax = grossPay * stateTaxRate
             const socialSecurity = grossPay * socialSecurityRate
             const medicare = grossPay * medicareRate
-            const totalDeductions = federalTax + stateTax + socialSecurity + medicare
+            const totalDeductions = federalTax + extraWithholding + stateTax + socialSecurity + medicare
             const netPay = grossPay - totalDeductions
             return (
             <div className="max-w-5xl mx-auto space-y-6">
@@ -5169,7 +5910,8 @@ export default function App() {
                   <div className="space-y-3">
                     <div className="text-xs uppercase tracking-widest text-zinc-500 mb-2">Deductions</div>
                     {[
-                      ['Federal Income Tax', `${(federalEffectiveRate * 100).toFixed(1)}% eff. (2026 brackets)`, federalTax],
+                      ['Federal Income Tax', `${(federalEffectiveRate * 100).toFixed(1)}% eff. (2026 brackets, ${FILING_LABELS[filingStatus]})`, federalTax],
+                      ...(extraWithholding > 0 ? [['Extra Withholding', 'W-4 per-paycheck election', extraWithholding]] : []),
                       ['State Income Tax', `${(stateTaxRate * 100).toFixed(1)}% (CA)`, stateTax],
                       ['Social Security', '6.2%', socialSecurity],
                       ['Medicare', '1.45%', medicare],
@@ -5307,212 +6049,133 @@ export default function App() {
                 <h1 className="text-2xl font-semibold neon-green">Reports &amp; Analytics</h1>
                 <p className="text-sm text-zinc-400">Workforce performance and operational insights</p>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                {[
-                  { title: 'Hours Worked (This Month)', value: '1,842h', change: '+4.2%', sub: 'vs last month' },
-                  { title: 'Labor Cost (This Month)', value: '$94,600', change: '+1.8%', sub: 'vs last month' },
-                  { title: 'Absenteeism Rate', value: '2.1%', change: '-0.4%', sub: 'improvement' },
-                  { title: 'Overtime Rate', value: '8.3%', change: '+1.1%', sub: 'above target' },
-                ].map(({ title, value, change, sub }) => (
-                  <div key={title} className="glass rounded-2xl p-5">
-                    <div className="text-sm text-zinc-400 mb-1">{title}</div>
-                    <div className="text-3xl font-bold mb-1" style={{ color: 'var(--accent-color)' }}>{value}</div>
-                    <div className="text-xs text-zinc-500"><span className={change.startsWith('+') ? 'text-emerald-400' : 'text-red-400'}>{change}</span> {sub}</div>
-                  </div>
-                ))}
-              </div>
+              {reportsLoading ? (
+                <div className="glass rounded-2xl p-8 text-center text-sm text-zinc-400">Loading report data…</div>
+              ) : !reportSummary ? (
+                <div className="glass rounded-2xl p-8 text-center text-sm text-zinc-400">Couldn't load report data. Try again later.</div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  {[
+                    { title: 'Hours Worked (This Month)', value: `${Number(reportSummary.total_hours || 0).toLocaleString()}h`, sub: `${reportSummary.start} to ${reportSummary.end}` },
+                    { title: 'Labor Cost (This Month)', value: `$${Number(reportSummary.labor_cost || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`, sub: 'estimated from hourly rates' },
+                    { title: 'Overtime Hours', value: `${Number(reportSummary.overtime_hours || 0).toLocaleString()}h`, sub: 'over 8h/day or 40h/week' },
+                    { title: 'Active Employees', value: String(reportSummary.active_employees || 0), sub: 'logged hours this period' },
+                  ].map(({ title, value, sub }) => (
+                    <div key={title} className="glass rounded-2xl p-5">
+                      <div className="text-sm text-zinc-400 mb-1">{title}</div>
+                      <div className="text-3xl font-bold mb-1" style={{ color: 'var(--accent-color)' }}>{value}</div>
+                      <div className="text-xs text-zinc-500">{sub}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="glass rounded-3xl p-6">
                 <h2 className="text-lg font-semibold mb-4 text-white">Department Hours Breakdown</h2>
-                <div className="space-y-3">
-                  {[['Engineering', 680, 800], ['Sales', 420, 500], ['HR', 210, 240], ['Marketing', 190, 200], ['Finance', 140, 160]].map(([dept, used, total]) => (
-                    <div key={dept}>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>{dept}</span>
-                        <span className="text-zinc-400">{used}h / {total}h</span>
-                      </div>
-                      <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all" style={{ width: `${Math.round(((used as number) / (total as number)) * 100)}%`, backgroundColor: 'var(--accent-color)' }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Manager Hub */}
-              <div className="pt-2">
-                <h2 className="text-xl font-semibold mb-4 text-white">Manager Hub</h2>
-                <p className="text-sm text-zinc-400 -mt-3 mb-5">Real-time insights and action items for team managers</p>
-              </div>
-
-              {/* Timesheet Approvals with Anomaly Flagging */}
-              <div className="glass rounded-3xl p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-lg font-semibold text-white">Timesheet Approvals</h2>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-medium">5 pending</span>
-                </div>
-                <p className="text-xs text-zinc-400 mb-4">Anomalies auto-detected from clock records. Review before approving.</p>
-                <div className="space-y-2">
-                  {[
-                    { type: 'Timesheet', name: 'Alex Rivera', detail: 'Week of Apr 21 · 42.5h', anomaly: 'Overtime: 2.5h above threshold', urgency: 'High' },
-                    { type: 'PTO Request', name: 'Jordan Lee', detail: 'May 5-9 · 40h vacation', anomaly: null, urgency: 'Normal' },
-                    { type: 'Timesheet', name: 'Casey Brooks', detail: 'Week of Apr 21 · 38h', anomaly: 'Missed clock-out on Apr 23', urgency: 'Normal' },
-                    { type: 'PTO Request', name: 'Sam Carter', detail: 'Apr 30 · 8h sick leave', anomaly: null, urgency: 'Normal' },
-                    { type: 'Overtime Auth', name: 'Dana Morales', detail: 'Apr 28 · 6h OT requested', anomaly: 'No prior OT this period, unusual spike', urgency: 'High' },
-                  ].map(({ type, name, detail, anomaly, urgency }) => (
-                    <div key={name + type} className={`flex flex-wrap items-start gap-3 rounded-xl px-4 py-3 ${anomaly ? 'bg-amber-500/5 border border-amber-500/10' : 'bg-white/5'}`}>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 mt-0.5 ${urgency === 'High' ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/10 text-blue-400'}`}>{type}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium">{name}</div>
-                        <div className="text-xs text-zinc-500">{detail}</div>
-                        {anomaly && (
-                          <div className="flex items-center gap-1 mt-1 text-xs text-amber-400">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                            {anomaly}
+                {reportsLoading ? (
+                  <div className="text-sm text-zinc-500 text-center py-6">Loading…</div>
+                ) : !reportSummary?.departments?.length ? (
+                  <div className="text-sm text-zinc-500 text-center py-6">No hours logged in this period yet.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {(() => {
+                      const maxHrs = Math.max(1, ...reportSummary.departments.map((d: any) => Number(d.hours) || 0))
+                      return reportSummary.departments.map((d: any) => (
+                        <div key={d.department}>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span>{d.department}</span>
+                            <span className="text-zinc-400">{Number(d.hours).toLocaleString()}h · {d.employees} {d.employees === 1 ? 'person' : 'people'} · ${Number(d.labor_cost).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                           </div>
-                        )}
-                      </div>
-                      <div className="flex gap-2 flex-shrink-0">
-                        <button className="px-3 py-1 rounded-lg text-xs font-medium bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors">Approve</button>
-                        <button className="px-3 py-1 rounded-lg text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors">Reject</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                          <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all" style={{ width: `${Math.round((Number(d.hours) / maxHrs) * 100)}%`, backgroundColor: 'var(--accent-color)' }} />
+                          </div>
+                        </div>
+                      ))
+                    })()}
+                  </div>
+                )}
               </div>
 
-              {/* Live Team Status + Top Performers */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="glass rounded-3xl p-6">
-                  <h2 className="text-lg font-semibold mb-4 text-white">Live Team Status</h2>
-                  <div className="space-y-2">
-                    {[
-                      { name: 'Alex Rivera', role: 'Engineer', status: 'clocked-in', since: '8:02 AM' },
-                      { name: 'Jordan Lee', role: 'Designer', status: 'clocked-in', since: '9:15 AM' },
-                      { name: 'Casey Brooks', role: 'Infra Lead', status: 'on-break', since: '10:30 AM' },
-                      { name: 'Dana Morales', role: 'Finance', status: 'clocked-out', since: '-' },
-                      { name: 'Mia Thompson', role: 'Designer', status: 'clocked-in', since: '8:45 AM' },
-                      { name: 'Sam Carter', role: 'Frontend Eng', status: 'clocked-out', since: '-' },
-                    ].map(({ name, role, status, since }) => (
-                      <div key={name} className="flex items-center gap-3 bg-white/5 rounded-xl px-3 py-2.5">
-                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${status === 'clocked-in' ? 'bg-emerald-400' : status === 'on-break' ? 'bg-amber-400' : 'bg-zinc-600'}`} />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{name}</div>
-                          <div className="text-xs text-zinc-500">{role}</div>
-                        </div>
-                        <span className="text-xs text-zinc-500 flex-shrink-0">{status === 'clocked-in' ? `Since ${since}` : status === 'on-break' ? 'On break' : 'Off'}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="glass rounded-3xl p-6">
-                  <h2 className="text-lg font-semibold mb-4 text-white">Top Performers</h2>
-                  <div className="space-y-2">
-                    {[
-                      { rank: 1, name: 'Alex Rivera', metric: '98% on-time', hours: '164h', badge: '🥇' },
-                      { rank: 2, name: 'Mia Thompson', metric: '96% on-time', hours: '158h', badge: '🥈' },
-                      { rank: 3, name: 'Jordan Lee', metric: '94% on-time', hours: '152h', badge: '🥉' },
-                      { rank: 4, name: 'Casey Brooks', metric: '91% on-time', hours: '148h', badge: '' },
-                      { rank: 5, name: 'Dana Morales', metric: '89% on-time', hours: '141h', badge: '' },
-                    ].map(({ rank, name, metric, hours, badge }) => (
-                      <div key={name} className="flex items-center gap-3 bg-white/5 rounded-xl px-3 py-2.5">
-                        <span className="text-base w-5 text-center flex-shrink-0">{badge || <span className="text-xs text-zinc-500">#{rank}</span>}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{name}</div>
-                          <div className="text-xs text-zinc-500">{metric}</div>
-                        </div>
-                        <span className="text-xs font-mono flex-shrink-0" style={{ color: 'var(--accent-color)' }}>{hours}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Labor Budget Tracker */}
+              {/* Hours by Employee (real data from /api/reports/hours) */}
               <div className="glass rounded-3xl p-6">
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-                  <h2 className="text-lg font-semibold text-white">Labor Budget Tracker</h2>
-                  <span className="text-xs text-zinc-500">April 2026 · 27 days elapsed</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
-                  {[
-                    { label: 'Monthly Budget', value: '$98,000', sub: 'approved' },
-                    { label: 'Spent to Date', value: '$94,600', sub: '96.5% of budget', warn: false },
-                    { label: 'Remaining', value: '$3,400', sub: '3 days left', warn: true },
-                  ].map(({ label, value, sub, warn }) => (
-                    <div key={label} className="bg-white/5 rounded-2xl p-4">
-                      <div className="text-xs text-zinc-400 mb-1">{label}</div>
-                      <div className="text-2xl font-bold" style={{ color: warn ? '#F59E0B' : 'var(--accent-color)' }}>{value}</div>
-                      <div className="text-xs text-zinc-500 mt-0.5">{sub}</div>
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <div className="flex justify-between text-xs text-zinc-400 mb-1">
-                    <span>Budget used</span>
-                    <span>96.5%</span>
-                  </div>
-                  <div className="h-3 bg-white/10 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all" style={{ width: '96.5%', background: 'linear-gradient(90deg, var(--accent-color) 0%, #F59E0B 100%)' }} />
-                  </div>
-                </div>
-                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {[
-                    { dept: 'Engineering', budget: 40000, spent: 39200 },
-                    { dept: 'Sales', budget: 25000, spent: 22800 },
-                    { dept: 'HR', budget: 15000, spent: 14600 },
-                    { dept: 'Marketing', budget: 12000, spent: 11200 },
-                    { dept: 'Finance', budget: 6000, spent: 6800 },
-                  ].map(({ dept, budget, spent }) => {
-                    const pct = Math.min(100, Math.round(spent / budget * 100))
-                    const over = spent > budget
-                    return (
-                      <div key={dept}>
-                        <div className="flex justify-between text-xs mb-1">
-                          <span>{dept}</span>
-                          <span className={over ? 'text-red-400' : 'text-zinc-400'}>${spent.toLocaleString()} / ${budget.toLocaleString()}{over ? ' ⚠ Over' : ''}</span>
+                <h2 className="text-lg font-semibold mb-4 text-white">Hours by Employee</h2>
+                {reportsLoading ? (
+                  <div className="text-sm text-zinc-500 text-center py-6">Loading…</div>
+                ) : reportHours.length === 0 ? (
+                  <div className="text-sm text-zinc-500 text-center py-6">No hours logged in this period yet.</div>
+                ) : (
+                  <div className="space-y-2">
+                    {(() => {
+                      const byUser: Record<string, { name: string; department: string; hours: number; overtime: number }> = {}
+                      for (const r of reportHours) {
+                        const u = byUser[r.user_id] || (byUser[r.user_id] = { name: r.name, department: r.department, hours: 0, overtime: 0 })
+                        u.hours += Number(r.hours) || 0
+                        u.overtime += Number(r.overtime_hours) || 0
+                      }
+                      return Object.values(byUser).sort((a, b) => b.hours - a.hours).map((u, i) => (
+                        <div key={u.name + i} className="flex items-center gap-3 bg-white/5 rounded-xl px-3 py-2.5">
+                          <span className="text-base w-5 text-center flex-shrink-0">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : <span className="text-xs text-zinc-500">#{i + 1}</span>}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{u.name}</div>
+                            <div className="text-xs text-zinc-500">{u.department}{u.overtime > 0 ? ` · ${u.overtime.toFixed(1)}h OT` : ''}</div>
+                          </div>
+                          <span className="text-xs font-mono flex-shrink-0" style={{ color: 'var(--accent-color)' }}>{u.hours.toFixed(1)}h</span>
                         </div>
-                        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: over ? '#EF4444' : 'var(--accent-color)' }} />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Schedule Gap Alerts */}
-              <div className="glass rounded-3xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-white">Schedule Coverage Alerts</h2>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-medium">3 gaps</span>
-                </div>
-                <div className="space-y-2">
-                  {[
-                    { shift: 'Wed Apr 30 · Morning (8AM-12PM)', dept: 'Engineering', needed: 4, scheduled: 2, gap: 2 },
-                    { shift: 'Thu May 1 · Afternoon (1PM-5PM)', dept: 'Sales', needed: 3, scheduled: 1, gap: 2 },
-                    { shift: 'Fri May 2 · All-Day', dept: 'HR', needed: 2, scheduled: 0, gap: 2 },
-                  ].map(({ shift, dept, needed, scheduled, gap }) => (
-                    <div key={shift} className="flex flex-wrap items-center gap-3 bg-red-500/5 border border-red-500/10 rounded-xl px-4 py-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium">{shift}</div>
-                        <div className="text-xs text-zinc-500">{dept} · {scheduled}/{needed} staff scheduled</div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="text-xs text-red-400 font-medium">−{gap} staff</span>
-                        <button className="px-3 py-1 rounded-lg text-xs font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>Fill Gap</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                      ))
+                    })()}
+                  </div>
+                )}
               </div>
 
               {/* Quick Export */}
               <div className="glass rounded-3xl p-6">
                 <h2 className="text-lg font-semibold mb-4 text-white">Quick Export</h2>
                 <div className="flex flex-wrap gap-3">
-                  {['Timesheet CSV', 'Payroll Summary PDF', 'PTO Balance Report', 'Headcount Report', 'Compliance Summary'].map(label => (
-                    <button key={label} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm border border-white/10 transition-colors">
+                  {[
+                    {
+                      label: 'Hours Detail CSV',
+                      onExport: () => {
+                        if (reportHours.length === 0) { toast.error('No hours data to export for this period'); return }
+                        downloadCSV(
+                          `hours-detail-${reportSummary?.start || 'report'}-to-${reportSummary?.end || ''}.csv`,
+                          ['Date', 'Employee', 'Department', 'Hours', 'Overtime Hours', 'Hourly Rate', 'Est. Cost'],
+                          reportHours.map(r => [r.date, r.name, r.department, r.hours, r.overtime_hours, r.hourly_rate, r.cost])
+                        )
+                        toast.success('Hours detail CSV downloaded')
+                      },
+                    },
+                    {
+                      label: 'Payroll Summary CSV',
+                      onExport: () => {
+                        if (reportHours.length === 0) { toast.error('No hours data to export for this period'); return }
+                        const byUser: Record<string, { name: string; department: string; hours: number; overtime: number; rate: number; cost: number }> = {}
+                        for (const r of reportHours) {
+                          const u = byUser[r.user_id] || (byUser[r.user_id] = { name: r.name, department: r.department, hours: 0, overtime: 0, rate: Number(r.hourly_rate) || 0, cost: 0 })
+                          u.hours += Number(r.hours) || 0
+                          u.overtime += Number(r.overtime_hours) || 0
+                          u.cost += Number(r.cost) || 0
+                        }
+                        downloadCSV(
+                          `payroll-summary-${reportSummary?.start || 'report'}-to-${reportSummary?.end || ''}.csv`,
+                          ['Employee', 'Department', 'Total Hours', 'Overtime Hours', 'Hourly Rate', 'Est. Gross Pay'],
+                          Object.values(byUser).map(u => [u.name, u.department, u.hours.toFixed(2), u.overtime.toFixed(2), u.rate, u.cost.toFixed(2)])
+                        )
+                        toast.success('Payroll summary CSV downloaded')
+                      },
+                    },
+                    {
+                      label: 'Department Summary CSV',
+                      onExport: () => {
+                        if (!reportSummary?.departments?.length) { toast.error('No department data to export for this period'); return }
+                        downloadCSV(
+                          `department-summary-${reportSummary.start}-to-${reportSummary.end}.csv`,
+                          ['Department', 'Hours', 'Overtime Hours', 'Employees', 'Est. Labor Cost'],
+                          reportSummary.departments.map((d: any) => [d.department, d.hours, d.overtime_hours, d.employees, d.labor_cost])
+                        )
+                        toast.success('Department summary CSV downloaded')
+                      },
+                    },
+                  ].map(({ label, onExport }) => (
+                    <button key={label} onClick={onExport} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm border border-white/10 transition-colors">
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                       {label}
                     </button>
@@ -5537,7 +6200,7 @@ export default function App() {
                   <h1 className="text-2xl font-semibold neon-green">Leave Management</h1>
                   <p className="text-sm text-zinc-400">Your PTO bank, requests, and payout calculator</p>
                 </div>
-                <button onClick={() => setShowPtoForm(v => !v)} className="px-4 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
+                <button onClick={() => { setShowPtoForm(v => !v); setEditingPtoId(null); setPtoRequestForm(emptyPtoForm) }} className="px-4 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
                   {showPtoForm ? 'Cancel' : '+ Request PTO'}
                 </button>
               </div>
@@ -5581,8 +6244,16 @@ export default function App() {
               {/* PTO Request Form */}
               {showPtoForm && (
                 <div className="glass rounded-3xl p-6 space-y-4">
-                  <h2 className="text-lg font-semibold text-white">New PTO Request</h2>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-white">{editingPtoId ? 'Edit PTO Request' : 'New PTO Request'}</h2>
+                    <DraftRestoredNote show={ptoDraft.draftRestored} onDiscard={() => ptoDraft.discardDraft(emptyPtoForm)} />
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="sm:col-span-2 flex items-center gap-2">
+                      <input type="checkbox" id="pto-partial-day" checked={ptoRequestForm.is_partial_day}
+                        onChange={e => setPtoRequestForm(f => ({ ...f, is_partial_day: e.target.checked }))} className="accent-current" />
+                      <label htmlFor="pto-partial-day" className="text-xs text-zinc-400">Partial day — request a few hours instead of full days</label>
+                    </div>
                     <div>
                       <div className="text-xs text-zinc-400 mb-1">Type</div>
                       <select value={ptoRequestForm.request_type} onChange={e => setPtoRequestForm(f => ({ ...f, request_type: e.target.value }))}
@@ -5592,19 +6263,34 @@ export default function App() {
                     </div>
                     <div>
                       <div className="text-xs text-zinc-400 mb-1">Hours Requested</div>
-                      <input type="number" min="1" step="0.5" value={ptoRequestForm.hours_requested} onChange={e => setPtoRequestForm(f => ({ ...f, hours_requested: e.target.value }))}
-                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" placeholder="8" />
+                      <input type="number" min={ptoRequestForm.is_partial_day ? '0.5' : '1'} step="0.5" value={ptoRequestForm.hours_requested} onChange={e => setPtoRequestForm(f => ({ ...f, hours_requested: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" placeholder={ptoRequestForm.is_partial_day ? '3' : '8'} />
                     </div>
                     <div>
-                      <div className="text-xs text-zinc-400 mb-1">Start Date</div>
+                      <div className="text-xs text-zinc-400 mb-1">{ptoRequestForm.is_partial_day ? 'Date' : 'Start Date'}</div>
                       <input type="date" value={ptoRequestForm.start_date} onChange={e => setPtoRequestForm(f => ({ ...f, start_date: e.target.value }))}
                         className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
                     </div>
-                    <div>
-                      <div className="text-xs text-zinc-400 mb-1">End Date</div>
-                      <input type="date" value={ptoRequestForm.end_date} onChange={e => setPtoRequestForm(f => ({ ...f, end_date: e.target.value }))}
-                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
-                    </div>
+                    {ptoRequestForm.is_partial_day ? (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <div className="text-xs text-zinc-400 mb-1">From</div>
+                          <input type="time" value={ptoRequestForm.start_time} onChange={e => setPtoTime('start_time', e.target.value)}
+                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                        </div>
+                        <div>
+                          <div className="text-xs text-zinc-400 mb-1">To</div>
+                          <input type="time" value={ptoRequestForm.end_time} onChange={e => setPtoTime('end_time', e.target.value)}
+                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="text-xs text-zinc-400 mb-1">End Date</div>
+                        <input type="date" value={ptoRequestForm.end_date} onChange={e => setPtoRequestForm(f => ({ ...f, end_date: e.target.value }))}
+                          className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                      </div>
+                    )}
                     <div className="sm:col-span-2">
                       <div className="text-xs text-zinc-400 mb-1">Reason (optional)</div>
                       <input type="text" value={ptoRequestForm.reason} onChange={e => setPtoRequestForm(f => ({ ...f, reason: e.target.value }))}
@@ -5612,28 +6298,42 @@ export default function App() {
                     </div>
                   </div>
                   <button onClick={() => {
-                    if (!user?.id || !ptoRequestForm.start_date || !ptoRequestForm.end_date || !ptoRequestForm.hours_requested) {
+                    if (!user?.id || !ptoRequestForm.start_date || (!ptoRequestForm.is_partial_day && !ptoRequestForm.end_date) || !ptoRequestForm.hours_requested) {
                       toast.error('Please fill in all required fields'); return
                     }
                     if (!(parseFloat(ptoRequestForm.hours_requested) > 0)) {
                       toast.error('Hours requested must be greater than 0'); return
                     }
-                    if (ptoRequestForm.start_date > ptoRequestForm.end_date) {
+                    if (!ptoRequestForm.is_partial_day && ptoRequestForm.start_date > ptoRequestForm.end_date) {
                       toast.error('Start date must be on or before end date'); return
                     }
-                    fetch(`${API_BASE}/api/pto/requests`, {
-                      method: 'POST',
+                    const body = {
+                      ...ptoRequestForm,
+                      end_date: ptoRequestForm.is_partial_day ? ptoRequestForm.start_date : ptoRequestForm.end_date,
+                      hours_requested: parseFloat(ptoRequestForm.hours_requested),
+                    }
+                    fetch(editingPtoId ? `${API_BASE}/api/pto/requests/${editingPtoId}` : `${API_BASE}/api/pto/requests`, {
+                      method: editingPtoId ? 'PUT' : 'POST',
+
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ user_id: user.id, ...ptoRequestForm, hours_requested: parseFloat(ptoRequestForm.hours_requested) }),
+                      body: JSON.stringify(editingPtoId ? body : { user_id: user.id, ...body }),
                     }).then(r => r.json()).then(row => {
                       if (row.error) { toast.error(row.error); return }
-                      setPtoRequests(prev => [row, ...prev])
+                      if (editingPtoId) {
+                        setPtoRequests(prev => prev.map(r => r.id === row.id ? row : r))
+                        setAllPtoRequests(prev => prev.map(r => r.id === row.id ? row : r))
+                        notify('pto', 'success', 'PTO request updated!')
+                      } else {
+                        setPtoRequests(prev => [row, ...prev])
+                        notify('pto', 'success', 'PTO request submitted!')
+                        ptoDraft.clearDraft()
+                      }
                       setShowPtoForm(false)
-                      setPtoRequestForm({ start_date: '', end_date: '', request_type: 'vacation', reason: '', hours_requested: '' })
-                      toast.success('PTO request submitted!')
-                    }).catch(() => toast.error('Failed to submit request'))
+                      setEditingPtoId(null)
+                      setPtoRequestForm(emptyPtoForm)
+                    }).catch(() => toast.error(editingPtoId ? 'Failed to update request' : 'Failed to submit request'))
                   }} className="px-5 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
-                    Submit Request
+                    {editingPtoId ? 'Save Changes' : 'Submit Request'}
                   </button>
                 </div>
               )}
@@ -5646,15 +6346,57 @@ export default function App() {
                 ) : (
                   <div className="space-y-3">
                     {ptoRequests.map(req => (
-                      <div key={req.id} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
+                      <div key={req.id} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3 gap-3">
                         <div>
                           <div className="font-medium capitalize">{req.request_type}</div>
-                          <div className="text-xs text-zinc-400">{req.start_date} → {req.end_date} · {req.hours_requested}h</div>
+                          <div className="text-xs text-zinc-400">
+                            {Number(req.is_partial_day)
+                              ? `${req.start_date}${req.start_time && req.end_time ? ` · ${req.start_time}–${req.end_time}` : ''} · ${req.hours_requested}h (partial day)`
+                              : `${req.start_date} → ${req.end_date} · ${req.hours_requested}h`}
+                          </div>
                           {req.reason && <div className="text-xs text-zinc-500 mt-0.5">{req.reason}</div>}
                         </div>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${req.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : req.status === 'denied' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'}`}>
-                          {req.status}
-                        </span>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {req.status === 'pending' && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setEditingPtoId(req.id)
+                                  setPtoRequestForm({
+                                    start_date: req.start_date || '',
+                                    end_date: req.end_date || '',
+                                    request_type: req.request_type || 'vacation',
+                                    reason: req.reason || '',
+                                    hours_requested: String(req.hours_requested ?? ''),
+                                    is_partial_day: !!Number(req.is_partial_day),
+                                    start_time: req.start_time || '',
+                                    end_time: req.end_time || '',
+                                  })
+                                  setShowPtoForm(true)
+                                }}
+                                className="px-3 py-1 rounded-lg text-xs font-semibold bg-white/10 text-zinc-300 hover:bg-white/20 transition-colors"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => {
+                                  fetch(`${API_BASE}/api/pto/requests/${req.id}`, { method: 'DELETE' }).then(r => r.json()).then(row => {
+                                    if (row.error) { toast.error(row.error); return }
+                                    setPtoRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'cancelled' } : r))
+                                    setAllPtoRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'cancelled' } : r))
+                                    notify('pto', 'success', 'PTO request cancelled')
+                                  }).catch(() => toast.error('Failed to cancel request'))
+                                }}
+                                className="px-3 py-1 rounded-lg text-xs font-semibold bg-red-500/20 text-red-400 hover:bg-red-500/40 transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          )}
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${req.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : req.status === 'denied' ? 'bg-red-500/20 text-red-400' : req.status === 'cancelled' ? 'bg-zinc-500/20 text-zinc-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                            {req.status}
+                          </span>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -5681,7 +6423,11 @@ export default function App() {
                             <div className="font-medium capitalize text-sm">{req.request_type}</div>
                             {req.user_id && <div className="text-xs text-zinc-500">User #{req.user_id}</div>}
                           </div>
-                          <div className="text-xs text-zinc-400 mt-0.5">{req.start_date} → {req.end_date} · {req.hours_requested}h</div>
+                          <div className="text-xs text-zinc-400 mt-0.5">
+                            {Number(req.is_partial_day)
+                              ? `${req.start_date}${req.start_time && req.end_time ? ` · ${req.start_time}–${req.end_time}` : ''} · ${req.hours_requested}h (partial day)`
+                              : `${req.start_date} → ${req.end_date} · ${req.hours_requested}h`}
+                          </div>
                           {req.reason && <div className="text-xs text-zinc-500 mt-0.5 italic">"{req.reason}"</div>}
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
@@ -5699,7 +6445,7 @@ export default function App() {
                                     if (!ok || row?.error) { toast.error(row?.error || 'Failed to approve'); return }
                                     setAllPtoRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'approved' } : r))
                                     setPtoRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'approved' } : r))
-                                    toast.success('Leave approved')
+                                    notify('pto', 'success', 'Leave approved')
                                   }).catch(() => toast.error('Failed to approve')).finally(() => setPtoApprovalLoading(null))
                                 }}
                                 className="px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 transition-colors disabled:opacity-50"
@@ -5718,7 +6464,7 @@ export default function App() {
                                     if (!ok || row?.error) { toast.error(row?.error || 'Failed to deny'); return }
                                     setAllPtoRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'denied' } : r))
                                     setPtoRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'denied' } : r))
-                                    toast.success('Leave denied')
+                                    notify('pto', 'success', 'Leave denied')
                                   }).catch(() => toast.error('Failed to deny')).finally(() => setPtoApprovalLoading(null))
                                 }}
                                 className="px-3 py-1 rounded-lg text-xs font-semibold bg-red-500/20 text-red-400 hover:bg-red-500/40 transition-colors disabled:opacity-50"
@@ -5727,7 +6473,7 @@ export default function App() {
                               </button>
                             </>
                           ) : (
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${req.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${req.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : req.status === 'cancelled' ? 'bg-zinc-500/20 text-zinc-400' : 'bg-red-500/20 text-red-400'}`}>
                               {req.status}
                             </span>
                           )}
@@ -6249,7 +6995,10 @@ export default function App() {
 
               {showAnnouncementForm && (
                 <div className="glass rounded-3xl p-6 space-y-4">
-                  <h2 className="text-lg font-semibold text-white">New Announcement</h2>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-white">New Announcement</h2>
+                    <DraftRestoredNote show={announcementDraft.draftRestored} onDiscard={() => announcementDraft.discardDraft({ title: '', body: '', priority: 'normal' })} />
+                  </div>
                   <div className="space-y-3">
                     <div>
                       <div className="text-xs text-zinc-400 mb-1">Title</div>
@@ -6299,6 +7048,7 @@ export default function App() {
                       }
                       setAnnouncements(prev => [newA, ...prev])
                       setShowAnnouncementForm(false)
+                      announcementDraft.clearDraft()
                       setAnnouncementForm({ title: '', body: '', priority: 'normal' })
                       toast.success('Announcement sent to team!')
                     }}
@@ -6547,13 +7297,15 @@ export default function App() {
               {/* Tree chart - fills remaining space */}
               <div className="flex-1 overflow-auto p-4">
                 <div className="flex justify-center">
-                  <OctopusChart
-                    node={orgData}
-                    expanded={orgExpanded}
-                    setExpanded={setOrgExpanded}
-                    search={orgSearch}
-                    expandedAll={orgExpandedAll}
-                  />
+                  {orgData && (
+                    <OctopusChart
+                      node={orgData}
+                      expanded={orgExpanded}
+                      setExpanded={setOrgExpanded}
+                      search={orgSearch}
+                      expandedAll={orgExpandedAll}
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -6565,18 +7317,14 @@ export default function App() {
             const _op = periodEarnings.overtime * clockHourlyRate * 1.5
             const _ppy = 26
             const _ag = _gp * _ppy
-            const _calcFed = (inc: number) => {
-              const b = [[11925,0.10],[48475,0.12],[103350,0.22],[197300,0.24],[250525,0.32],[626350,0.35],[Infinity,0.37]] as [number,number][]
-              let t = 0; let p = 0
-              for (const [lim, rate] of b) { if (inc <= p) break; t += (Math.min(inc, lim) - p) * rate; p = lim }
-              return t
-            }
-            const _ft = _calcFed(_ag) / _ppy
-            const _fer = _ag > 0 ? _calcFed(_ag) / _ag : 0
+            const _fs = userProfile?.filing_status || 'single'
+            const _ew = Number(userProfile?.extra_withholding) || 0
+            const _ft = calcFederal2026(_ag, _fs) / _ppy
+            const _fer = _ag > 0 ? calcFederal2026(_ag, _fs) / _ag : 0
             const _st = _gp * 0.0593
             const _ss = _gp * 0.062
             const _med = _gp * 0.0145
-            const _td = _ft + _st + _ss + _med
+            const _td = _ft + _ew + _st + _ss + _med
             const _np = _gp - _td
             return (
             <div className="max-w-5xl mx-auto space-y-6">
@@ -6615,7 +7363,8 @@ export default function App() {
                   <div className="space-y-3">
                     <div className="text-xs uppercase tracking-widest text-zinc-500 mb-2">Deductions</div>
                     {[
-                      ['Federal Income Tax', `${(_fer * 100).toFixed(1)}% eff. (2026 brackets)`, _ft],
+                      ['Federal Income Tax', `${(_fer * 100).toFixed(1)}% eff. (2026 brackets, ${FILING_LABELS[_fs]})`, _ft],
+                      ...(_ew > 0 ? [['Extra Withholding', 'W-4 per-paycheck election', _ew]] : []),
                       ['State Income Tax', '5.93% (CA)', _st],
                       ['Social Security', '6.2%', _ss],
                       ['Medicare', '1.45%', _med],
@@ -7055,28 +7804,107 @@ export default function App() {
 
               {/* Tab nav */}
               <div className="flex gap-2 flex-wrap">
-                {(['info', 'schedule', 'deposit', 'availability'] as const).map(tab => (
+                {(['info', 'schedule', 'deposit', 'availability', 'notifications'] as const).map(tab => (
                   <button key={tab} onClick={() => setProfileTab(tab)}
                     className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${profileTab === tab ? 'text-black' : 'glass hover:bg-white/10 text-zinc-300'}`}
                     style={profileTab === tab ? { backgroundColor: 'var(--accent-color)' } : undefined}>
-                    {tab === 'info' ? 'Info' : tab === 'schedule' ? 'Work Schedule' : tab === 'deposit' ? 'Direct Deposit' : 'Availability'}
+                    {tab === 'info' ? 'Info' : tab === 'schedule' ? 'Work Schedule' : tab === 'deposit' ? 'Direct Deposit' : tab === 'availability' ? 'Availability' : 'Notifications'}
                   </button>
                 ))}
               </div>
 
               {/* Tab: Info */}
               {profileTab === 'info' && (
-                <div className="glass rounded-3xl p-6">
-                  <h2 className="text-lg font-semibold mb-4 text-white">Personal Information</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[['Email', user.email], ['Manager', user.manager_name || '-'], ['User ID', String(user.id)], ['Role', user.job_role || '-'], ['Pay Type', user.salary ? 'Salaried' : 'Hourly'], ['Rate', user.salary ? `$${user.salary.toLocaleString()}/yr` : user.pay ? `$${user.pay}/hr` : '-']].map(([label, val]) => (
-                      <div key={label} className="bg-white/5 rounded-2xl p-4">
-                        <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-1">{label}</div>
-                        <div className="text-base font-mono">{val}</div>
-                      </div>
-                    ))}
+                <div className="space-y-6">
+                  <div className="glass rounded-3xl p-6">
+                    <h2 className="text-lg font-semibold mb-4 text-white">Personal Information</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {[['Email', user.email], ['Manager', user.manager_name || '-'], ['User ID', String(user.id)], ['Role', user.job_role || '-'], ['Pay Type', user.salary ? 'Salaried' : 'Hourly'], ['Rate', user.salary ? `$${user.salary.toLocaleString()}/yr` : user.pay ? `$${user.pay}/hr` : '-']].map(([label, val]) => (
+                        <div key={label} className="bg-white/5 rounded-2xl p-4">
+                          <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-1">{label}</div>
+                          <div className="text-base font-mono">{val}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {[
+                        { label: 'Phone', key: 'phone', placeholder: '(555) 555-5555' },
+                        { label: 'Address Line 1', key: 'address_line1', placeholder: '123 Main St' },
+                        { label: 'Address Line 2', key: 'address_line2', placeholder: 'Apt 4B (optional)' },
+                        { label: 'City', key: 'city', placeholder: 'San Francisco' },
+                        { label: 'State', key: 'state', placeholder: 'CA' },
+                        { label: 'ZIP', key: 'zip', placeholder: '94103' },
+                        { label: 'Emergency Contact Name', key: 'emergency_contact_name', placeholder: 'Jane Doe' },
+                        { label: 'Emergency Contact Phone', key: 'emergency_contact_phone', placeholder: '(555) 555-1234' },
+                      ].map(({ label, key, placeholder }) => (
+                        <div key={key} className="bg-white/5 rounded-2xl p-4">
+                          <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-2">{label}</div>
+                          <input type="text" value={profileEdit?.[key] || ''} placeholder={placeholder} onChange={e => setProfileEdit((s: any) => ({ ...s, [key]: e.target.value }))}
+                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-white/30" />
+                        </div>
+                      ))}
+                    </div>
+                    <button onClick={() => {
+                      if (!user?.id || !profileEdit) return
+                      fetch(`${API_BASE}/api/users/me/profile`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profileEdit) })
+                        .then(r => r.json()).then(d => { if (d?.error) { toast.error(d.error); return } setUserProfile(d); setProfileEdit(d); toast.success('Personal info saved!') }).catch(() => toast.error('Failed to save'))
+                    }} className="mt-4 px-5 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
+                      Save Personal Info
+                    </button>
                   </div>
-                  <div className="mt-4 text-xs text-zinc-500">Contact HR to update personal information.</div>
+
+                  {/* Tax Withholding (W-4) */}
+                  <div className="glass rounded-3xl p-6">
+                    <h2 className="text-lg font-semibold mb-1 text-white">Tax Withholding (W-4)</h2>
+                    <p className="text-xs text-zinc-500 mb-4">Your filing status picks the federal bracket used in your paystub estimate.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-white/5 rounded-2xl p-4">
+                        <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-2">Filing Status</div>
+                        <select value={profileEdit?.filing_status || 'single'} onChange={e => setProfileEdit((s: any) => ({ ...s, filing_status: e.target.value }))}
+                          className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-white/30">
+                          <option value="single">Single</option>
+                          <option value="married">Married</option>
+                          <option value="head_of_household">Head of Household</option>
+                        </select>
+                      </div>
+                      <div className="bg-white/5 rounded-2xl p-4">
+                        <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-2">Extra Withholding ($ / Paycheck)</div>
+                        <input type="number" min="0" step="1" value={profileEdit?.extra_withholding ?? 0} onChange={e => setProfileEdit((s: any) => ({ ...s, extra_withholding: e.target.value }))}
+                          className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-white/30" />
+                      </div>
+                    </div>
+                    <button onClick={() => {
+                      if (!user?.id || !profileEdit) return
+                      fetch(`${API_BASE}/api/users/me/profile`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profileEdit) })
+                        .then(r => r.json()).then(d => { if (d?.error) { toast.error(d.error); return } setUserProfile(d); setProfileEdit(d); toast.success('Withholding saved!') }).catch(() => toast.error('Failed to save'))
+                    }} className="mt-4 px-5 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
+                      Save Withholding
+                    </button>
+                  </div>
+
+                  {/* Export My Data */}
+                  <div className="glass rounded-3xl p-6">
+                    <h2 className="text-lg font-semibold mb-1 text-white">Export My Data</h2>
+                    <p className="text-xs text-zinc-500 mb-4">Download everything SwiftShift stores about you: profile, clock sessions, time entries, PTO, shift swaps, and timesheet submissions.</p>
+                    <div className="flex flex-wrap gap-3">
+                      <button onClick={() => {
+                        downloadFile(`${API_BASE}/api/export/me`, 'swiftshift-my-data.json')
+                          .then(() => toast.success('Your data export downloaded'))
+                          .catch(() => toast.error('Failed to export your data'))
+                      }} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm border border-white/10 transition-colors">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Export my data (JSON)
+                      </button>
+                      <button onClick={() => {
+                        downloadFile(`${API_BASE}/api/export/me.csv`, 'swiftshift-my-time.csv')
+                          .then(() => toast.success('Your time data CSV downloaded'))
+                          .catch(() => toast.error('Failed to export your time data'))
+                      }} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm border border-white/10 transition-colors">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Export my time data (CSV)
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -7136,42 +7964,74 @@ export default function App() {
               )}
 
               {/* Tab: Direct Deposit */}
-              {profileTab === 'deposit' && (
+              {profileTab === 'deposit' && (() => {
+                const splitTotal = (depositEdit || []).reduce((s: number, a: any) => s + (parseFloat(String(a.split_percent)) || 0), 0)
+                const splitOk = Math.abs(splitTotal - 100) <= 0.01
+                return (
                 <div className="glass rounded-3xl p-6 space-y-4">
-                  <h2 className="text-lg font-semibold text-white">Direct Deposit</h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {[
-                      { label: 'Bank Name', key: 'bank_name', type: 'text' },
-                      { label: 'Account Type', key: 'account_type', type: 'select', options: ['checking', 'savings'] },
-                      { label: 'Routing Number', key: 'routing_number', type: 'text', placeholder: '•••••••••' },
-                      { label: 'Account Number', key: 'account_number', type: 'text', placeholder: '••••••••••••' },
-                    ].map(({ label, key, type, options, placeholder }) => (
-                      <div key={key} className="bg-white/5 rounded-2xl p-4">
-                        <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-2">{label}</div>
-                        {type === 'select' ? (
-                          <select value={depositEdit?.[key] || ''} onChange={e => setDepositEdit((s: any) => ({ ...s, [key]: e.target.value }))}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-white/30">
-                            {(options || []).map(o => <option key={o} value={o}>{o}</option>)}
-                          </select>
-                        ) : (
-                          <input type={type} value={depositEdit?.[key] || ''} placeholder={placeholder} onChange={e => setDepositEdit((s: any) => ({ ...s, [key]: e.target.value }))}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-white/30" />
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-white">Direct Deposit</h2>
+                    {(depositEdit?.length || 0) < 3 && (
+                      <button onClick={() => setDepositEdit((s: any) => [...(s || []), { bank_name: '', account_type: 'checking', routing_number: '', account_number: '', split_percent: 0 }])}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors">
+                        + Add Account
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-zinc-500">Split your paycheck across up to 3 accounts. Percentages must total 100%.</p>
+                  {(depositEdit || []).map((acct: any, i: number) => (
+                    <div key={i} className="bg-white/5 rounded-2xl p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs uppercase tracking-[1px] text-zinc-500">Account {i + 1}</div>
+                        {depositEdit.length > 1 && (
+                          <button onClick={() => setDepositEdit((s: any) => s.filter((_: any, j: number) => j !== i))}
+                            className="text-xs text-red-400 hover:text-red-300 transition-colors">
+                            Remove
+                          </button>
                         )}
                       </div>
-                    ))}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {[
+                          { label: 'Bank Name', key: 'bank_name', type: 'text' },
+                          { label: 'Account Type', key: 'account_type', type: 'select', options: ['checking', 'savings'] },
+                          { label: 'Routing Number', key: 'routing_number', type: 'text', placeholder: '•••••••••' },
+                          { label: 'Account Number', key: 'account_number', type: 'text', placeholder: '••••••••••••' },
+                          { label: 'Split %', key: 'split_percent', type: 'number' },
+                        ].map(({ label, key, type, options, placeholder }) => (
+                          <div key={key}>
+                            <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-2">{label}</div>
+                            {type === 'select' ? (
+                              <select value={acct[key] || ''} onChange={e => setDepositEdit((s: any) => s.map((a: any, j: number) => j === i ? { ...a, [key]: e.target.value } : a))}
+                                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-white/30">
+                                {(options || []).map(o => <option key={o} value={o}>{o}</option>)}
+                              </select>
+                            ) : (
+                              <input type={type} value={acct[key] ?? ''} placeholder={placeholder} {...(type === 'number' ? { min: 0, max: 100, step: 1 } : {})}
+                                onChange={e => setDepositEdit((s: any) => s.map((a: any, j: number) => j === i ? { ...a, [key]: e.target.value } : a))}
+                                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-white/30" />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  <div className={`text-xs ${splitOk ? 'text-zinc-500' : 'text-red-400'}`}>
+                    Split total: {Math.round(splitTotal * 100) / 100}%{splitOk ? '' : ' — percentages must total 100%'}
                   </div>
-                  {directDeposit?.bank_name && (
-                    <div className="text-xs text-zinc-500">Currently on file: <span className="text-zinc-300">{directDeposit.bank_name}</span> ({directDeposit.account_type})</div>
+                  {directDeposit?.accounts?.some((a: any) => a.bank_name) && (
+                    <div className="text-xs text-zinc-500">Currently on file: <span className="text-zinc-300">{directDeposit.accounts.filter((a: any) => a.bank_name).map((a: any) => `${a.bank_name} (${a.account_type}, ${a.split_percent}%)`).join(' · ')}</span></div>
                   )}
                   <button onClick={() => {
-                    if (!user?.id || !depositEdit) return
-                    fetch(`${API_BASE}/api/direct-deposit`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: user.id, ...depositEdit }) })
-                      .then(r => r.json()).then(d => { setDirectDeposit(d); toast.success('Direct deposit saved!') }).catch(() => toast.error('Failed to save'))
+                    if (!user?.id || !depositEdit?.length) return
+                    if (!splitOk) { toast.error('Split percentages must total 100%'); return }
+                    fetch(`${API_BASE}/api/direct-deposit`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: user.id, accounts: depositEdit }) })
+                      .then(r => r.json()).then(d => { if (d?.error) { toast.error(d.error); return } setDirectDeposit(d); toast.success('Direct deposit saved!') }).catch(() => toast.error('Failed to save'))
                   }} className="px-5 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
                     Save Banking Info
                   </button>
                 </div>
-              )}
+                )
+              })()}
 
               {/* Tab: Availability */}
               {profileTab === 'availability' && (
@@ -7213,6 +8073,60 @@ export default function App() {
                       .then(r => r.json()).then(d => { setWorkAvailability(d); toast.success('Availability saved!') }).catch(() => toast.error('Failed to save'))
                   }} className="px-5 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
                     Save Availability
+                  </button>
+                </div>
+              )}
+
+              {/* Tab: Notifications */}
+              {profileTab === 'notifications' && (
+                <div className="glass rounded-3xl p-6">
+                  <h2 className="text-lg font-semibold mb-1 text-white">Notifications</h2>
+                  <p className="text-xs text-zinc-500 mb-4">Choose which in-app notifications you get and whether they arrive instantly or as one daily summary.</p>
+                  <div className="space-y-3">
+                    {([
+                      ['pto', 'PTO status updates', 'Submissions, approvals, and denials of PTO requests'],
+                      ['swaps', 'Shift-swap requests', 'New swap requests and approval decisions'],
+                      ['timesheet', 'Timesheet reminders', 'Clock-in nudges and pay-period reminders'],
+                      ['manager', 'Manager alerts', 'Clock correction reviews and team flags'],
+                    ] as Array<[NotifCategory, string, string]>).map(([key, label, desc]) => (
+                      <div key={key} className="flex items-center justify-between gap-3 bg-white/5 rounded-2xl p-4">
+                        <div>
+                          <div className="text-sm font-medium text-white">{label}</div>
+                          <div className="text-xs text-zinc-500 mt-0.5">{desc}</div>
+                        </div>
+                        <button
+                          onClick={() => setNotifPrefs(p => ({ ...p, [key]: !p[key] }))}
+                          className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${notifPrefs[key] ? '' : 'bg-white/10'}`}
+                          style={notifPrefs[key] ? { backgroundColor: 'var(--accent-color)' } : {}}
+                          aria-label={`Toggle ${label}`}
+                        >
+                          <span className={`absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${notifPrefs[key] ? 'translate-x-4' : 'translate-x-0'}`} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 bg-white/5 rounded-2xl p-4">
+                    <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-2">Delivery</div>
+                    <div className="flex gap-2">
+                      {([['instant', 'Instant'], ['digest', 'Daily digest']] as const).map(([value, label]) => (
+                        <button key={value} onClick={() => setNotifPrefs(p => ({ ...p, mode: value }))}
+                          className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${notifPrefs.mode === value ? 'text-black' : 'glass hover:bg-white/10 text-zinc-300'}`}
+                          style={notifPrefs.mode === value ? { backgroundColor: 'var(--accent-color)' } : undefined}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-2">
+                      {notifPrefs.mode === 'digest'
+                        ? 'Notifications are held and combined into one "Your daily summary" on your first visit each day.'
+                        : 'Notifications appear as they happen.'}
+                    </p>
+                  </div>
+                  <button onClick={() => {
+                    fetch(`${API_BASE}/api/users/me/notification-prefs`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(notifPrefs) })
+                      .then(r => r.json()).then(d => { if (d?.error) { toast.error(d.error); return } setNotifPrefs({ ...DEFAULT_NOTIF_PREFS, ...d }); toast.success('Notification preferences saved!') }).catch(() => toast.error('Failed to save'))
+                  }} className="mt-4 px-5 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
+                    Save Preferences
                   </button>
                 </div>
               )}
@@ -7414,7 +8328,31 @@ export default function App() {
           )}
 
           {activeView === 'auditlog' && (() => {
-            const filtered = auditLogFilter === 'all' ? AUDIT_LOG_ENTRIES : AUDIT_LOG_ENTRIES.filter(e => e.category === auditLogFilter)
+            const actionMeta: Record<string, { label: string; category: 'admin' | 'timesheet' | 'payroll' | 'user' }> = {
+              login: { label: 'Signed in', category: 'user' },
+              clock_in: { label: 'Clocked in', category: 'timesheet' },
+              clock_out: { label: 'Clocked out', category: 'timesheet' },
+              timesheet_submit: { label: 'Submitted timesheet', category: 'timesheet' },
+              pto_request: { label: 'Requested PTO', category: 'timesheet' },
+              pto_approve: { label: 'Approved PTO request', category: 'admin' },
+              pto_deny: { label: 'Denied PTO request', category: 'admin' },
+              swap_create: { label: 'Requested shift swap', category: 'timesheet' },
+              swap_approve: { label: 'Approved shift swap', category: 'admin' },
+              swap_deny: { label: 'Denied shift swap', category: 'admin' },
+              swap_auto_approve: { label: 'Shift swap auto-approved', category: 'admin' },
+              org_settings_update: { label: 'Updated workflow settings', category: 'admin' },
+            }
+            // created_at comes from Postgres NOW()::text ("YYYY-MM-DD HH:MM:SS.ssssss+00") — normalize to ISO for Date()
+            const parseTs = (ts: string) => new Date(String(ts || '').replace(' ', 'T').replace(/\+00$/, 'Z'))
+            const entries = auditEvents.map(e => {
+              const meta = actionMeta[e.action] || { label: e.action, category: 'admin' as const }
+              return { id: e.id, ts: e.created_at, actor: e.actor_name || `User #${e.user_id ?? '?'}`, userId: e.user_id, action: meta.label, target: e.detail || '', category: meta.category }
+            })
+            const filtered = auditLogFilter === 'all' ? entries : entries.filter(e => e.category === auditLogFilter)
+            const last30d = entries.filter(e => Date.now() - parseTs(e.ts).getTime() < 30 * 86400000).length
+            const uniqueActors = new Set(entries.map(e => e.actor)).size
+            const adminActions = entries.filter(e => e.category === 'admin').length
+            const latest = entries[0] ? parseTs(entries[0].ts) : null
             const catColor: Record<string, string> = { admin: 'text-purple-400 bg-purple-500/10', timesheet: 'text-blue-400 bg-blue-500/10', payroll: 'text-emerald-400 bg-emerald-500/10', user: 'text-amber-400 bg-amber-500/10' }
             return (
               <div className="max-w-5xl mx-auto space-y-6">
@@ -7424,7 +8362,29 @@ export default function App() {
                     <p className="text-sm text-zinc-400">Immutable record of all system actions. SOC2 and GDPR compliant.</p>
                   </div>
                   <div className="flex gap-2 flex-wrap">
-                    <button className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 hover:bg-white/20 transition-colors text-zinc-300">
+                    <button onClick={async () => {
+                      try {
+                        // The API caps each page at 500 events, so page until exhausted.
+                        const events: any[] = []
+                        for (let offset = 0; ; offset += 500) {
+                          const r = await fetch(`${API_BASE}/api/audit?limit=500&offset=${offset}`)
+                          if (!r.ok) throw new Error('export failed')
+                          const page = await r.json()
+                          if (!Array.isArray(page)) throw new Error('export failed')
+                          events.push(...page)
+                          if (page.length < 500) break
+                        }
+                        if (events.length === 0) { toast.error('No audit events to export'); return }
+                        downloadCSV(
+                          `audit-log-${new Date().toISOString().slice(0, 10)}.csv`,
+                          ['ID', 'Timestamp', 'User ID', 'Actor', 'Action', 'Detail'],
+                          events.map(e => [e.id, e.created_at, e.user_id ?? '', e.actor_name ?? '', e.action, e.detail ?? ''])
+                        )
+                        toast.success(`Audit log CSV downloaded (${events.length} events)`)
+                      } catch {
+                        toast.error('Failed to export audit log')
+                      }
+                    }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 hover:bg-white/20 transition-colors text-zinc-300">
                       ↓ Export CSV
                     </button>
                     <button className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 hover:bg-white/20 transition-colors text-zinc-300">
@@ -7436,10 +8396,10 @@ export default function App() {
                 {/* Stats */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   {[
-                    { label: 'Events (30 days)', value: '1,284' },
-                    { label: 'Unique Actors', value: '18' },
-                    { label: 'High-Risk Actions', value: '3' },
-                    { label: 'Last Export', value: 'Apr 26' },
+                    { label: 'Events (30 days)', value: last30d.toLocaleString() },
+                    { label: 'Unique Actors', value: String(uniqueActors) },
+                    { label: 'Admin Actions', value: String(adminActions) },
+                    { label: 'Latest Event', value: latest && !isNaN(latest.getTime()) ? latest.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—' },
                   ].map(({ label, value }) => (
                     <div key={label} className="glass rounded-2xl p-4 text-center">
                       <div className="text-2xl font-bold" style={{ color: 'var(--accent-color)' }}>{value}</div>
@@ -7468,12 +8428,17 @@ export default function App() {
                     <div>Timestamp</div><div>Actor</div><div>Action</div><div>Category</div>
                   </div>
                   <div className="divide-y divide-white/5">
+                    {filtered.length === 0 && (
+                      <div className="px-5 py-8 text-center text-sm text-zinc-500">
+                        {auditLoading ? 'Loading audit events…' : 'No audit events yet. Logins, clock-ins, PTO requests, and approvals will appear here.'}
+                      </div>
+                    )}
                     {filtered.map(entry => (
                       <div key={entry.id} className="px-5 py-3 grid grid-cols-[140px_1fr_1fr_80px] gap-3 items-center hover:bg-white/3 transition-colors">
-                        <div className="text-xs text-zinc-500 font-mono">{new Date(entry.ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                        <div className="text-xs text-zinc-500 font-mono">{(d => isNaN(d.getTime()) ? String(entry.ts).slice(0, 16) : d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }))(parseTs(entry.ts))}</div>
                         <div>
                           <div className="text-sm font-medium text-white">{entry.actor}</div>
-                          <div className="text-[10px] text-zinc-600 font-mono">{entry.ip}</div>
+                          <div className="text-[10px] text-zinc-600 font-mono">{entry.userId != null ? `uid ${entry.userId}` : ''}</div>
                         </div>
                         <div>
                           <div className="text-sm text-zinc-200">{entry.action}</div>

@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 
+from audit import log_event
 from db import get_db
 from permissions import current_uid
 
@@ -65,4 +66,5 @@ def create_submission():
             (user_id, period_start, period_end, total_hours),
         ).fetchone()
         db.commit()
+    log_event(user_id, None, "timesheet_submit", f"Submitted timesheet {period_start} to {period_end} ({total_hours}h)")
     return jsonify(dict(row)), 201

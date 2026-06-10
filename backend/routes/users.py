@@ -1,3 +1,5 @@
+import json
+
 from flask import Blueprint, jsonify, request
 from werkzeug.security import generate_password_hash
 
@@ -108,6 +110,117 @@ def update_user(target_id):
     if not row:
         return jsonify({"error": "not found"}), 404
     return jsonify(_redact(row, caller, caller_is_manager))
+
+
+# ── Self-service profile (contact info + W-4 withholding) ────────────────────
+
+_PROFILE_FIELDS = ("phone", "address_line1", "address_line2", "city", "state", "zip",
+                   "emergency_contact_name", "emergency_contact_phone",
+                   "filing_status", "extra_withholding")
+_PROFILE_COLS = "id, first_name, last_name, email, " + ", ".join(_PROFILE_FIELDS)
+_FILING_STATUSES = ("single", "married", "head_of_household")
+
+
+@bp.route("/api/users/me/profile", methods=["GET"])
+def get_my_profile():
+    uid = current_uid()
+    if not uid:
+        return jsonify({"error": "authentication required"}), 401
+    with get_db() as db:
+        row = db.execute(
+            f"SELECT {_PROFILE_COLS} FROM users WHERE id = ?", (uid,)
+        ).fetchone()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(dict(row))
+
+
+@bp.route("/api/users/me/profile", methods=["PUT"])
+def update_my_profile():
+    uid = current_uid()
+    if not uid:
+        return jsonify({"error": "authentication required"}), 401
+    data = request.get_json() or {}
+    fields = {k: v for k, v in data.items() if k in _PROFILE_FIELDS}
+    if not fields:
+        return jsonify({"error": "no updatable fields provided"}), 400
+    if "filing_status" in fields and fields["filing_status"] not in _FILING_STATUSES:
+        return jsonify({"error": f"filing_status must be one of: {', '.join(_FILING_STATUSES)}"}), 400
+    if "extra_withholding" in fields:
+        try:
+            fields["extra_withholding"] = max(0.0, float(fields["extra_withholding"] or 0))
+        except (TypeError, ValueError):
+            return jsonify({"error": "extra_withholding must be a number"}), 400
+    set_clause = ", ".join(f"{k} = ?" for k in fields)
+    with get_db() as db:
+        db.execute(f"UPDATE users SET {set_clause} WHERE id = ?", list(fields.values()) + [uid])
+        db.commit()
+        row = db.execute(
+            f"SELECT {_PROFILE_COLS} FROM users WHERE id = ?", (uid,)
+        ).fetchone()
+    return jsonify(dict(row))
+
+
+# ── Notification preferences (per-category toggles + instant/daily-digest mode) ──
+
+_NOTIF_CATEGORIES = ("pto", "swaps", "timesheet", "manager")
+_NOTIF_MODES = ("instant", "digest")
+_NOTIF_DEFAULTS = {"pto": True, "swaps": True, "timesheet": True, "manager": True, "mode": "instant"}
+
+
+def _load_notif_prefs(db, uid):
+    """Return the user's saved prefs merged over the defaults, or None if the user is gone."""
+    db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS notification_prefs TEXT")
+    row = db.execute("SELECT notification_prefs FROM users WHERE id = ?", (uid,)).fetchone()
+    if not row:
+        return None
+    prefs = dict(_NOTIF_DEFAULTS)
+    try:
+        saved = json.loads(row["notification_prefs"] or "{}")
+        if isinstance(saved, dict):
+            for cat in _NOTIF_CATEGORIES:
+                if cat in saved:
+                    prefs[cat] = bool(saved[cat])
+            if saved.get("mode") in _NOTIF_MODES:
+                prefs["mode"] = saved["mode"]
+    except (TypeError, ValueError):
+        pass
+    return prefs
+
+
+@bp.route("/api/users/me/notification-prefs", methods=["GET"])
+def get_my_notification_prefs():
+    uid = current_uid()
+    if not uid:
+        return jsonify({"error": "authentication required"}), 401
+    with get_db() as db:
+        prefs = _load_notif_prefs(db, uid)
+        db.commit()
+    if prefs is None:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(prefs)
+
+
+@bp.route("/api/users/me/notification-prefs", methods=["PUT"])
+def update_my_notification_prefs():
+    uid = current_uid()
+    if not uid:
+        return jsonify({"error": "authentication required"}), 401
+    data = request.get_json() or {}
+    if "mode" in data and data["mode"] not in _NOTIF_MODES:
+        return jsonify({"error": f"mode must be one of: {', '.join(_NOTIF_MODES)}"}), 400
+    with get_db() as db:
+        prefs = _load_notif_prefs(db, uid)
+        if prefs is None:
+            return jsonify({"error": "not found"}), 404
+        for cat in _NOTIF_CATEGORIES:
+            if cat in data:
+                prefs[cat] = bool(data[cat])
+        if "mode" in data:
+            prefs["mode"] = data["mode"]
+        db.execute("UPDATE users SET notification_prefs = ? WHERE id = ?", (json.dumps(prefs), uid))
+        db.commit()
+    return jsonify(prefs)
 
 
 @bp.route("/api/users/<int:target_id>", methods=["DELETE"])

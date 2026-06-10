@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import confetti from 'canvas-confetti'
 import { TimeEntry } from '../types'
 import { format } from 'date-fns'
+import { useFormDraft, DraftRestoredNote } from '../hooks/useFormDraft'
 
 interface QuickAddProps {
   onAdd: (entry: Omit<TimeEntry, 'id' | 'duration'>) => void
@@ -29,6 +30,9 @@ export function QuickAdd({ onAdd, disabled }: QuickAddProps) {
   }
 
   const [form, setForm] = useState(getDefaultTimes())
+
+  // Auto-save in-progress values so an accidental close or reload loses nothing
+  const { draftRestored, clearDraft, discardDraft } = useFormDraft('quick-add', form, setForm, isOpen)
 
   const descRef = useRef<HTMLTextAreaElement>(null)
   const startRef = useRef<HTMLInputElement>(null)
@@ -88,6 +92,9 @@ export function QuickAdd({ onAdd, disabled }: QuickAddProps) {
     })
     confetti({ particleCount: 60, spread: 55, origin: { y: 0.65 }, ticks: 50 })
 
+    // Entry saved — the draft is no longer needed
+    clearDraft()
+
     // Reset form but keep date/project/task
     setForm(prev => ({
       ...prev,
@@ -124,7 +131,10 @@ export function QuickAdd({ onAdd, disabled }: QuickAddProps) {
             className="glass rounded-3xl p-6 space-y-4"
           >
             <div className="flex justify-between items-center mb-2">
-              <div className="text-lg font-semibold">New Time Entry</div>
+              <div className="flex items-center gap-3">
+                <div className="text-lg font-semibold">New Time Entry</div>
+                <DraftRestoredNote show={draftRestored} onDiscard={() => discardDraft(getDefaultTimes())} />
+              </div>
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}

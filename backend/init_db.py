@@ -37,7 +37,18 @@ tables = [
       hourly_rate REAL DEFAULT 20.0,
       pto_accrual_rate REAL DEFAULT 0.0385,
       streak_count INTEGER DEFAULT 0,
-      streak_last_date TEXT
+      streak_last_date TEXT,
+      phone TEXT,
+      address_line1 TEXT,
+      address_line2 TEXT,
+      city TEXT,
+      state TEXT,
+      zip TEXT,
+      emergency_contact_name TEXT,
+      emergency_contact_phone TEXT,
+      filing_status TEXT DEFAULT 'single',
+      extra_withholding REAL DEFAULT 0,
+      notification_prefs TEXT
     )
     """,
     """
@@ -91,6 +102,52 @@ tables = [
       total_hours REAL NOT NULL,
       submitted_at TEXT NOT NULL DEFAULT (NOW()::text),
       UNIQUE (user_id, period_start)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS audit_events (
+      id SERIAL PRIMARY KEY,
+      created_at TEXT NOT NULL DEFAULT (NOW()::text),
+      user_id INTEGER,
+      actor_name TEXT,
+      action TEXT NOT NULL,
+      detail TEXT
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS org_settings (
+      id INTEGER PRIMARY KEY DEFAULT 1,
+      auto_approve_swap_hours REAL,
+      ot_alert_daily_hours REAL NOT NULL DEFAULT 10,
+      missed_clockout_hours REAL NOT NULL DEFAULT 12,
+      updated_at TEXT NOT NULL DEFAULT (NOW()::text)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS open_shifts (
+      id SERIAL PRIMARY KEY,
+      shift_date TEXT NOT NULL,
+      start_time TEXT NOT NULL,
+      end_time TEXT NOT NULL,
+      job_or_role TEXT,
+      posted_by INTEGER NOT NULL,
+      claimed_by INTEGER,
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at TEXT NOT NULL DEFAULT (NOW()::text)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS clock_correction_requests (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      session_id INTEGER NOT NULL,
+      proposed_clock_in TEXT NOT NULL,
+      proposed_clock_out TEXT NOT NULL,
+      reason TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      reviewed_by INTEGER,
+      created_at TEXT NOT NULL DEFAULT (NOW()::text),
+      reviewed_at TEXT
     )
     """,
 ]

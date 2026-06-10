@@ -6,6 +6,7 @@ import requests as http_requests
 from flask import Blueprint, jsonify, request, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
+from audit import log_event
 from db import get_db
 
 bp = Blueprint("auth", __name__, url_prefix="/api/auth")
@@ -48,6 +49,17 @@ def _ensure_users_table():
             "streak_count INTEGER DEFAULT 0",
             "streak_last_date TEXT",
             "is_manager BOOLEAN DEFAULT FALSE",
+            "phone TEXT",
+            "address_line1 TEXT",
+            "address_line2 TEXT",
+            "city TEXT",
+            "state TEXT",
+            "zip TEXT",
+            "emergency_contact_name TEXT",
+            "emergency_contact_phone TEXT",
+            "filing_status TEXT DEFAULT 'single'",
+            "extra_withholding REAL DEFAULT 0",
+            "notification_prefs TEXT",
         ):
             db.execute(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col_def}")
         # Add break_minutes to clock_sessions if upgrading from older schema
@@ -205,6 +217,7 @@ def signin():
         return jsonify({"error": "invalid credentials"}), 401
     session.permanent = True
     session["uid"] = row["id"]
+    log_event(row["id"], f"{row['first_name']} {row['last_name']}", "login", f"Signed in as {row['email']}")
     return jsonify({
         "id": row["id"],
         "first_name": row["first_name"],
@@ -261,6 +274,7 @@ def google_auth():
 
     session.permanent = True
     session["uid"] = row["id"]
+    log_event(row["id"], f"{row['first_name']} {row['last_name']}", "login", f"Signed in with Google as {row['email']}")
     return jsonify({
         "id": row["id"],
         "first_name": row["first_name"],

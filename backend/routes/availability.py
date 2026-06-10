@@ -49,9 +49,32 @@ _DDL = [
 ]
 
 
+# Direct deposit upgrade: support up to 3 accounts with percentage splits.
+# Must use IF NOT EXISTS so existing single-account rows upgrade in place
+# (slot 1 keeps the original columns and defaults to a 100% split).
+_DEPOSIT_SPLIT_COLS = (
+    "split_percent REAL DEFAULT 100",
+    "bank_name_2 TEXT",
+    "routing_number_2 TEXT",
+    "account_number_2 TEXT",
+    "account_type_2 TEXT",
+    "split_percent_2 REAL",
+    "bank_name_3 TEXT",
+    "routing_number_3 TEXT",
+    "account_number_3 TEXT",
+    "account_type_3 TEXT",
+    "split_percent_3 REAL",
+)
+
+# Column suffixes for deposit account slots 1-3 ("" = the original single-account columns).
+_ACCOUNT_SUFFIXES = ("", "_2", "_3")
+
+
 def _ensure_tables(db):
     for ddl in _DDL:
         db.execute(ddl)
+    for col_def in _DEPOSIT_SPLIT_COLS:
+        db.execute(f"ALTER TABLE direct_deposit ADD COLUMN IF NOT EXISTS {col_def}")
 
 
 # ── Work Availability ─────────────────────────────────────────────────────────
@@ -109,6 +132,27 @@ def upsert_availability():
 
 # ── Direct Deposit ────────────────────────────────────────────────────────────
 
+def _deposit_payload(db, user_id):
+    """Safe deposit summary (never echoes routing/account numbers) + accounts list."""
+    safe_cols = ["id", "user_id", "updated_at"]
+    for s in _ACCOUNT_SUFFIXES:
+        safe_cols += [f"bank_name{s}", f"account_type{s}", f"split_percent{s}"]
+    row = db.execute(
+        f"SELECT {', '.join(safe_cols)} FROM direct_deposit WHERE user_id = ?",
+        (user_id,),
+    ).fetchone()
+    if not row:
+        return {}
+    d = dict(row)
+    d["accounts"] = [
+        {"bank_name": d.get(f"bank_name{s}"), "account_type": d.get(f"account_type{s}"),
+         "split_percent": d.get(f"split_percent{s}")}
+        for s in _ACCOUNT_SUFFIXES
+        if d.get(f"bank_name{s}") or d.get(f"split_percent{s}")
+    ]
+    return d
+
+
 @bp.route("/api/direct-deposit", methods=["GET"])
 def get_direct_deposit():
     user_id = current_uid()
@@ -116,11 +160,8 @@ def get_direct_deposit():
         return jsonify({"error": "authentication required"}), 401
     with get_db() as db:
         _ensure_tables(db)
-        row = db.execute(
-            "SELECT id, user_id, bank_name, account_type, updated_at FROM direct_deposit WHERE user_id = ?",
-            (user_id,),
-        ).fetchone()
-    return jsonify(dict(row) if row else {})
+        payload = _deposit_payload(db, user_id)
+    return jsonify(payload)
 
 
 @bp.route("/api/direct-deposit", methods=["PUT"])
@@ -130,8 +171,39 @@ def upsert_direct_deposit():
     if not user_id:
         return jsonify({"error": "authentication required"}), 401
 
-    allowed = {"bank_name", "routing_number", "account_number", "account_type"}
-    fields = {k: v for k, v in data.items() if k in allowed}
+    accounts = data.get("accounts")
+    if accounts is not None:
+        # New split-deposit shape: up to 3 accounts whose percentages total 100.
+        if not isinstance(accounts, list) or not 1 <= len(accounts) <= 3 \
+                or not all(isinstance(a, dict) for a in accounts):
+            return jsonify({"error": "accounts must be a list of 1 to 3 accounts"}), 400
+        try:
+            splits = [float(a.get("split_percent") or 0) for a in accounts]
+        except (TypeError, ValueError):
+            return jsonify({"error": "split_percent must be a number"}), 400
+        if any(s < 0 for s in splits):
+            return jsonify({"error": "split_percent cannot be negative"}), 400
+        if abs(sum(splits) - 100) > 0.01:
+            return jsonify({"error": "split percentages must total 100"}), 400
+        fields = {}
+        for i, suffix in enumerate(_ACCOUNT_SUFFIXES):
+            if i < len(accounts):
+                acct = accounts[i]
+                fields[f"bank_name{suffix}"] = acct.get("bank_name")
+                fields[f"account_type{suffix}"] = acct.get("account_type") or "checking"
+                fields[f"split_percent{suffix}"] = splits[i]
+                # Numbers are never echoed back by GET, so only overwrite when re-entered.
+                if acct.get("routing_number"):
+                    fields[f"routing_number{suffix}"] = acct.get("routing_number")
+                if acct.get("account_number"):
+                    fields[f"account_number{suffix}"] = acct.get("account_number")
+            else:
+                for col in ("bank_name", "routing_number", "account_number", "account_type", "split_percent"):
+                    fields[f"{col}{suffix}"] = None
+    else:
+        # Legacy single-account shape, kept working for existing callers/data.
+        allowed = {"bank_name", "routing_number", "account_number", "account_type"}
+        fields = {k: v for k, v in data.items() if k in allowed}
 
     with get_db() as db:
         _ensure_tables(db)
@@ -154,11 +226,8 @@ def upsert_direct_deposit():
                 vals,
             )
         db.commit()
-        row = db.execute(
-            "SELECT id, user_id, bank_name, account_type, updated_at FROM direct_deposit WHERE user_id = ?",
-            (user_id,),
-        ).fetchone()
-    return jsonify(dict(row))
+        payload = _deposit_payload(db, user_id)
+    return jsonify(payload)
 
 
 # ── Work Schedule Template ────────────────────────────────────────────────────

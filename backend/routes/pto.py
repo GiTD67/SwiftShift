@@ -2,6 +2,7 @@ from datetime import datetime
 
 from flask import Blueprint, jsonify, request
 
+from audit import log_event
 from db import get_db
 from permissions import current_uid, is_manager, manager_required
 
@@ -35,9 +36,19 @@ _DDL = [
 ]
 
 
+# Partial-day support: a request can cover just part of one day (e.g. 3 hours).
+_PARTIAL_DAY_COLS = [
+    "is_partial_day INTEGER NOT NULL DEFAULT 0",
+    "start_time TEXT",
+    "end_time TEXT",
+]
+
+
 def _ensure_tables(db):
     for ddl in _DDL:
         db.execute(ddl)
+    for col_def in _PARTIAL_DAY_COLS:
+        db.execute(f"ALTER TABLE pto_requests ADD COLUMN IF NOT EXISTS {col_def}")
 
 
 # GET /api/pto/balance?user_id=X
@@ -152,8 +163,8 @@ def create_request():
 
         row = db.execute(
             """
-            INSERT INTO pto_requests (user_id, request_type, start_date, end_date, hours_requested, reason)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO pto_requests (user_id, request_type, start_date, end_date, hours_requested, reason, is_partial_day, start_time, end_time)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING *
             """,
             (
@@ -163,19 +174,26 @@ def create_request():
                 end_date,
                 hours_requested,
                 data.get("reason"),
+                1 if data.get("is_partial_day") else 0,
+                data.get("start_time") or None,
+                data.get("end_time") or None,
             ),
         ).fetchone()
         db.commit()
+    log_event(user_id, None, "pto_request", f"Requested {hours_requested}h PTO ({start_date} to {end_date})")
     return jsonify(dict(row)), 201
 
 
-# PUT /api/pto/requests/:id  — approve or deny
+# PUT /api/pto/requests/:id  — manager approve/deny, or owner edit while pending
 @bp.route("/api/pto/requests/<int:req_id>", methods=["PUT"])
 def update_request(req_id):
+    data = request.get_json() or {}
+    if "status" not in data:
+        # No status change: the request owner is editing a pending request.
+        return _owner_edit(req_id, data)
     err = manager_required()
     if err:
         return err
-    data = request.get_json() or {}
     status = data.get("status")
     if status not in ("approved", "denied", "pending"):
         return jsonify({"error": "status must be approved, denied, or pending"}), 400
@@ -230,4 +248,84 @@ def update_request(req_id):
 
         db.commit()
         row = db.execute("SELECT * FROM pto_requests WHERE id = ?", (req_id,)).fetchone()
+    if status in ("approved", "denied"):
+        log_event(
+            current_uid(), None,
+            "pto_approve" if status == "approved" else "pto_deny",
+            f"PTO request #{req_id} ({row['hours_requested']}h, user #{row['user_id']}) {status}",
+        )
+    return jsonify(dict(row))
+
+
+def _owner_edit(req_id, data):
+    uid = current_uid()
+    with get_db() as db:
+        _ensure_tables(db)
+        row = db.execute("SELECT * FROM pto_requests WHERE id = ?", (req_id,)).fetchone()
+        if not row:
+            return jsonify({"error": "not found"}), 404
+        if row["user_id"] != uid:
+            return jsonify({"error": "only the request owner can edit it"}), 403
+        if row["status"] != "pending":
+            return jsonify({"error": "only pending requests can be edited"}), 400
+
+        start_date = data.get("start_date", row["start_date"])
+        end_date = data.get("end_date", row["end_date"])
+        try:
+            hours_requested = float(data.get("hours_requested", row["hours_requested"]))
+        except (TypeError, ValueError):
+            return jsonify({"error": "hours_requested must be a number"}), 400
+        if hours_requested <= 0:
+            return jsonify({"error": "hours_requested must be positive"}), 400
+
+        # Check balance against the edited amount
+        balance_row = db.execute(
+            "SELECT hours_available FROM pto_balances WHERE user_id = ?", (uid,)
+        ).fetchone()
+        available = float(balance_row["hours_available"]) if balance_row else 0
+        if available < hours_requested:
+            return jsonify({"error": "insufficient PTO balance", "available": available}), 400
+
+        db.execute(
+            """
+            UPDATE pto_requests
+            SET request_type = ?, start_date = ?, end_date = ?, hours_requested = ?,
+                reason = ?, is_partial_day = ?, start_time = ?, end_time = ?
+            WHERE id = ?
+            """,
+            (
+                data.get("request_type", row["request_type"]),
+                start_date,
+                end_date,
+                hours_requested,
+                data.get("reason", row["reason"]),
+                1 if data.get("is_partial_day", row["is_partial_day"]) else 0,
+                data.get("start_time", row["start_time"]) or None,
+                data.get("end_time", row["end_time"]) or None,
+                req_id,
+            ),
+        )
+        db.commit()
+        row = db.execute("SELECT * FROM pto_requests WHERE id = ?", (req_id,)).fetchone()
+    log_event(uid, None, "pto_edit", f"Edited PTO request #{req_id} ({hours_requested}h, {start_date} to {end_date})")
+    return jsonify(dict(row))
+
+
+# DELETE /api/pto/requests/:id  — owner cancels a still-pending request
+@bp.route("/api/pto/requests/<int:req_id>", methods=["DELETE"])
+def cancel_request(req_id):
+    uid = current_uid()
+    with get_db() as db:
+        _ensure_tables(db)
+        row = db.execute("SELECT * FROM pto_requests WHERE id = ?", (req_id,)).fetchone()
+        if not row:
+            return jsonify({"error": "not found"}), 404
+        if row["user_id"] != uid:
+            return jsonify({"error": "only the request owner can cancel it"}), 403
+        if row["status"] != "pending":
+            return jsonify({"error": "only pending requests can be cancelled"}), 400
+        db.execute("UPDATE pto_requests SET status = 'cancelled' WHERE id = ?", (req_id,))
+        db.commit()
+        row = db.execute("SELECT * FROM pto_requests WHERE id = ?", (req_id,)).fetchone()
+    log_event(uid, None, "pto_cancel", f"Cancelled PTO request #{req_id} ({row['hours_requested']}h)")
     return jsonify(dict(row))

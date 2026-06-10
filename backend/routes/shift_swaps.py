@@ -1,9 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify, request
 
+from audit import log_event
 from db import get_db
 from permissions import current_uid, manager_required
+from routes.org_settings import get_org_settings
 
 bp = Blueprint("shift_swaps", __name__)
 
@@ -66,12 +68,26 @@ def create_swap():
     if not all([requester_id, shift_date, shift_start, shift_end]):
         return jsonify({"error": "shift_date, shift_start, shift_end required"}), 400
 
+    status = "open"
+    reviewed_at = None
     with get_db() as db:
         _ensure_table(db)
+        # Auto-approve when the org setting is on, both employees agreed (a target
+        # was named), and the shift starts far enough in the future.
+        if data.get("target_id"):
+            min_hours = get_org_settings(db).get("auto_approve_swap_hours")
+            if min_hours is not None:
+                try:
+                    shift_dt = datetime.fromisoformat(f"{shift_date}T{shift_start}")
+                except ValueError:
+                    shift_dt = None
+                if shift_dt and shift_dt - datetime.utcnow() >= timedelta(hours=float(min_hours)):
+                    status = "accepted"
+                    reviewed_at = datetime.utcnow().isoformat()
         row = db.execute(
             """
-            INSERT INTO shift_swaps (requester_id, target_id, shift_date, shift_start, shift_end, reason)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO shift_swaps (requester_id, target_id, shift_date, shift_start, shift_end, reason, status, reviewed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING *
             """,
             (
@@ -81,9 +97,14 @@ def create_swap():
                 shift_start,
                 shift_end,
                 data.get("reason"),
+                status,
+                reviewed_at,
             ),
         ).fetchone()
         db.commit()
+    log_event(requester_id, None, "swap_create", f"Requested shift swap for {shift_date} ({shift_start}-{shift_end})")
+    if status == "accepted":
+        log_event(requester_id, None, "swap_auto_approve", f"Shift swap #{row['id']} ({shift_date}) auto-approved by workflow settings")
     return jsonify(dict(row)), 201
 
 
@@ -110,4 +131,10 @@ def update_swap(swap_id):
         )
         db.commit()
         row = db.execute("SELECT * FROM shift_swaps WHERE id = ?", (swap_id,)).fetchone()
+    if status in ("accepted", "denied"):
+        log_event(
+            current_uid(), None,
+            "swap_approve" if status == "accepted" else "swap_deny",
+            f"Shift swap #{swap_id} ({row['shift_date']}, user #{row['requester_id']}) {status}",
+        )
     return jsonify(dict(row))

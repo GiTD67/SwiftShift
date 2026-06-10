@@ -9,11 +9,16 @@ interface WeeklyGridProps {
   onUpdate: (id: string, updates: Partial<TimeEntry>) => void
   onDelete: (id: string) => void
   disabled?: boolean
+  holidays?: { name: string; date: string; recurring: number }[]
 }
 
-export function WeeklyGrid({ entriesByDate, onUpdate, onDelete, disabled }: WeeklyGridProps) {
+export function WeeklyGrid({ entriesByDate, onUpdate, onDelete, disabled, holidays }: WeeklyGridProps) {
   const weekDates = getWeekDates()
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({})
+
+  // Company holiday on a 'yyyy-MM-dd' date; recurring holidays match on month + day
+  const getHoliday = (date: string) =>
+    holidays?.find(h => (h.recurring ? h.date.slice(5) === date.slice(5) : h.date === date))
 
   const toggleDay = (date: string) => {
     setExpandedDays(prev => ({ ...prev, [date]: !prev[date] }))
@@ -38,9 +43,10 @@ export function WeeklyGrid({ entriesByDate, onUpdate, onDelete, disabled }: Week
           const dayTotal = getDayTotal(date)
           const isExpanded = expandedDays[date] !== false // default expanded
           const hasEntries = dayEntries.length > 0
+          const holiday = getHoliday(date)
 
           return (
-            <div key={date} className="px-6 py-4">
+            <div key={date} className={`px-6 py-4 ${holiday ? 'bg-sky-400/[0.06]' : ''}`}>
               <button
                 onClick={() => toggleDay(date)}
                 className="w-full flex items-center justify-between group"
@@ -51,6 +57,12 @@ export function WeeklyGrid({ entriesByDate, onUpdate, onDelete, disabled }: Week
                     <div className="text-sm text-zinc-500">{getDayNumber(date)}</div>
                   </div>
                   
+                  {holiday && (
+                    <div className="px-2.5 py-0.5 rounded-full bg-sky-400/10 border border-sky-400/30 text-sky-300 text-xs" title="Company holiday">
+                      {holiday.name}
+                    </div>
+                  )}
+
                   {hasEntries && (
                     <div className="px-3 py-1 rounded-full bg-white/10 text-white text-sm font-mono neon-green">
                       {formatDuration(dayTotal)}
