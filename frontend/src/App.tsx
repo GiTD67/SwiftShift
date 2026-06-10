@@ -16,7 +16,6 @@ import { SalesKPI } from './components/SalesKPI'
 import { GravityGridBackground } from './components/GravityGridBackground'
 import { STATE_BREAK_RULES, STATE_CODES } from './data/stateBreakRules'
 import { Leaderboard } from './components/Leaderboard'
-import { Odometer } from './components/Odometer'
 
 const API_BASE = ''
 
@@ -3555,17 +3554,17 @@ export default function App() {
             <span>SwiftShift</span>
           </div>
         </div>
-        <div className="ta-navbar-user">
+        <div className="ta-navbar-user flex-1 min-w-0 justify-end">
           {/* Command palette trigger (⌘K) */}
           <button
             onClick={() => setCmdkOpen(true)}
             title="Search & jump (⌘K)"
             aria-label="Open command palette"
-            className="hidden sm:flex items-center gap-2 pl-2.5 pr-2 py-1.5 text-xs rounded-full border border-white/10 text-white/55 hover:text-white hover:border-white/25 hover:bg-white/5 transition-all"
+            className="hidden sm:flex items-center gap-2 pl-2.5 pr-2 py-1.5 text-xs rounded-full border border-white/10 text-white/55 hover:text-white hover:border-white/25 hover:bg-white/5 transition-all md:flex-1 md:min-w-0 md:max-w-md"
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <span className="hidden md:inline">Search</span>
-            <kbd className="hidden md:inline text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 border border-white/10 leading-none">⌘K</kbd>
+            <kbd className="hidden md:inline md:ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 border border-white/10 leading-none">⌘K</kbd>
           </button>
           {/* Upgrade CTA — prominent, left of achievements */}
           <button
@@ -3697,7 +3696,7 @@ export default function App() {
                   style={isMasterMode ? { backgroundColor: 'var(--accent-color)' } : {}}
                   aria-label="Toggle master mode"
                 >
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${isMasterMode ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                  <span className={`absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${isMasterMode ? 'translate-x-4' : 'translate-x-0'}`} />
                 </button>
               </div>
               <button
@@ -4128,17 +4127,8 @@ export default function App() {
               <div className="flex flex-col xl:flex-row gap-6 items-stretch max-w-[1200px] mx-auto">
               {/* Left: Dashboard */}
               <div className="flex-1 flex flex-col">
-                {/* Dashboard card — hero surface with cursor-tracked specular */}
-                <div
-                  className="glass glass--hero rounded-3xl p-5 sm:p-8 flex-1 flex flex-col"
-                  onMouseMove={e => {
-                    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
-                    const el = e.currentTarget
-                    const r = el.getBoundingClientRect()
-                    el.style.setProperty('--mx', `${e.clientX - r.left}px`)
-                    el.style.setProperty('--my', `${e.clientY - r.top}px`)
-                  }}
-                >
+                {/* Dashboard card — hero surface */}
+                <div className="glass glass--hero rounded-3xl p-5 sm:p-8 flex-1 flex flex-col">
                   <div className="flex flex-col sm:flex-row items-start gap-6 sm:gap-10">
                     {/* Left: Greeting, Time, Status, Buttons */}
                     <div className="flex-1">
@@ -4368,46 +4358,63 @@ export default function App() {
 
               {/* Right sidebar: Real Time Rewards (top) + This pay period */}
               <aside className="xl:w-80 shrink-0 flex flex-col sm:flex-row xl:flex-col gap-4">
-                {/* Real Time Rewards module - at top */}
-                <div className="glass rounded-3xl p-8 flex-1 flex flex-col">
-                  <div className="flex items-center justify-between mb-5">
-                    <div className="text-sm uppercase tracking-[2px] text-white">Real Time Rewards</div>
-                    {isClockedIn && (
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full animate-pulse inline-block"
+                {/* Real Time Rewards module - at top (styled to match the Rewards-tab ticker) */}
+                <div className="glass rounded-3xl p-6 flex-1 flex flex-col relative overflow-hidden">
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{ background: 'radial-gradient(ellipse at 50% 0%, rgba(var(--accent-color-rgb),0.1) 0%, transparent 65%)' }}
+                  />
+                  <div className="text-sm uppercase tracking-[2px] text-white mb-1 relative">Real Time Rewards</div>
+                  <div className="text-xs uppercase tracking-[2px] text-zinc-400 mb-3 relative">Today's Earnings</div>
+
+                  {isClockedIn ? (
+                    <div className="relative">
+                      <motion.div
+                        key={Math.floor(((todayTotalMs / 3600000) * clockHourlyRate) * 10)}
+                        initial={{ scale: 1.06 }}
+                        animate={{ scale: 1 }}
+                        transition={{ duration: 0.25 }}
+                        className="font-mono text-4xl font-semibold tabular-nums mb-2"
+                        style={{ color: isOvertimeOverdrive ? '#FFAA00' : 'var(--accent-color)' }}
+                      >
+                        ${((todayTotalMs / 3600000) * clockHourlyRate).toFixed(2)}
+                      </motion.div>
+
+                      {/* Live / Overtime badge */}
+                      <div className="flex items-center gap-1.5">
+                        <motion.div
+                          className="w-2.5 h-2.5 rounded-full"
                           style={{
-                            background: isOvertimeOverdrive ? '#FFD700' : '#22ff7a',
+                            background: isOvertimeOverdrive ? '#FFAA00' : '#22ff7a',
                             boxShadow: isOvertimeOverdrive
-                              ? '0 0 8px #FFD700, 0 0 16px #FFD70060'
+                              ? '0 0 8px #FFAA00, 0 0 16px #FFAA0060'
                               : '0 0 8px #22ff7a, 0 0 16px #22ff7a60',
                           }}
+                          animate={{ opacity: [1, 0.3, 1], scale: [1, 0.8, 1] }}
+                          transition={{ repeat: Infinity, duration: 1.0 }}
                         />
                         <span className="text-xs uppercase tracking-widest text-zinc-300 font-medium">
-                          {isOvertimeOverdrive ? 'overdrive' : 'live'}
+                          {isOvertimeOverdrive ? 'Overtime ×1.5' : 'live'}
                         </span>
                       </div>
-                    )}
-                  </div>
-                  <div className="mb-5">
-                    <Odometer
-                      value={(todayTotalMs / 3600000) * clockHourlyRate}
-                      format="currency"
-                      speed={isOvertimeOverdrive ? 1.5 : 1}
-                      color="var(--accent-color)"
-                      className="text-5xl"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <div className="text-3xl font-light text-zinc-700 tracking-widest mb-1 font-mono">- - -</div>
+                      <div className="text-xs text-zinc-600">Clock in to start earning</div>
+                    </div>
+                  )}
+
+                  <div className="mt-2 relative">
                     <button
                       onClick={navToRewardsWithHighlight}
-                      className="text-xs text-zinc-400 hover:text-white text-left underline decoration-zinc-600 hover:decoration-white transition-colors cursor-pointer leading-snug"
+                      className="text-xs text-zinc-500 hover:text-white text-left underline decoration-zinc-600 hover:decoration-white transition-colors cursor-pointer leading-snug"
                       title="Click to update your hourly rate on the Rewards tab"
                     >
                       Today's earnings so far at ${clockHourlyRate}/hr
                     </button>
                   </div>
-                  <div className="mt-auto pt-10">
+                  <div className="mt-auto pt-6 relative">
                     <div className="flex justify-between items-center mb-5">
                       <div className="text-sm text-zinc-400">PTO Accrued:</div>
                       <div className="text-sm font-semibold neon-green">

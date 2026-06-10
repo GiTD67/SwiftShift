@@ -183,11 +183,6 @@ void main(){
     warped-=normalize(rd+1e-5)*band*decay*0.012;
   }
   vec3 col=sampleScene(warped,t);
-  float r=length(uv-mouse);
-  float rim=exp(-pow((r-lensR*0.88)*16.0,2.0))*0.06*lensStr;
-  col+=vec3(0.9,0.95,1.0)*rim;
-  float sheen=exp(-r*r*140.0)*(0.05+u_mouseDown*0.08+u_clickPulse*0.15);
-  col+=vec3(0.75,0.85,1.0)*sheen;
   for(int i=0;i<6;i++){
     if(i>=u_rippleCount) break;
     vec2 rp=u_ripples[i].xy;

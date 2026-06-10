@@ -243,21 +243,6 @@ button, [role="button"] {
 /* Active/selected — the only place accent touches the material */
 .glass--active { border-color: rgba(var(--accent-color-rgb), 0.45); box-shadow: var(--shadow-2), var(--accent-spill); }
 
-/* Hero glass — a cursor-tracked specular highlight (JS sets --mx/--my on pointer move).
-   Sits above the base sheen, below content (.glass > * is z-index:1). */
-.glass--hero::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: radial-gradient(circle 220px at var(--mx, 70%) var(--my, 0%), rgba(255, 255, 255, 0.10), transparent 60%);
-  opacity: 0;
-  transition: opacity var(--dur-3) var(--ease-standard);
-}
-.glass--hero:hover::after { opacity: 1; }
-
 /* ============================================
    CRYSTAL VARIANTS
    ============================================ */
@@ -988,21 +973,68 @@ textarea:focus-visible,
 }
 
 /* ============================================
-   TOAST / NOTIFICATION GLOW EFFECT
+   TOAST / NOTIFICATION — LIQUID GLASS
+   Same material vocabulary as .glass: translucent
+   dark panel, backdrop blur, white/10 ring,
+   rounded-2xl, soft accent glow.
    ============================================ */
 
+[data-sonner-toaster] {
+  font-family: var(--font-sans) !important;
+}
+
 [data-sonner-toast] {
-  background: #000000 !important;
-  border: 1px solid rgba(var(--accent-color-rgb), 0.45) !important;
+  background: rgba(12, 18, 32, 0.72) !important; /* lighter cut of --glass-thick-bg tint */
+  -webkit-backdrop-filter: blur(var(--glass-reg-blur)) saturate(var(--glass-sat)) !important;
+  backdrop-filter: blur(var(--glass-reg-blur)) saturate(var(--glass-sat)) !important;
+  border: 1px solid var(--glass-ring) !important; /* white/10 */
+  border-radius: 16px !important; /* rounded-2xl, matches site cards */
   box-shadow:
-    0 0 40px -10px rgba(var(--accent-color-rgb), 0.25),
-    0 8px 24px -4px rgba(0, 0, 0, 0.8) !important;
+    var(--shadow-2),
+    inset 0 1px 0 var(--glass-spec-t),
+    inset 0 -1px 0 var(--glass-spec-b),
+    0 0 32px -12px rgba(var(--accent-color-rgb), 0.22) !important;
 }
 
 [data-sonner-toast] [data-title] {
-  color: var(--accent-color) !important;
+  color: var(--fg) !important;
+  font-weight: 600 !important;
 }
 
 [data-sonner-toast] [data-description] {
-  color: rgba(255, 255, 255, 0.55) !important;
+  color: var(--fg-2) !important;
+}
+
+/* Type accents: the icon carries the color, the glass stays neutral */
+[data-sonner-toast] [data-icon] {
+  color: var(--accent-color);
+}
+[data-sonner-toast][data-type="error"] [data-icon] {
+  color: var(--danger);
+}
+[data-sonner-toast][data-type="warning"] [data-icon] {
+  color: var(--warn);
+}
+
+/* Error/warning: same glass, status-tinted ring and glow */
+[data-sonner-toast][data-type="error"] {
+  border-color: rgba(248, 113, 113, 0.35) !important;
+  box-shadow:
+    var(--shadow-2),
+    inset 0 1px 0 var(--glass-spec-t),
+    inset 0 -1px 0 var(--glass-spec-b),
+    0 0 32px -12px rgba(248, 113, 113, 0.30) !important;
+}
+[data-sonner-toast][data-type="warning"] {
+  border-color: rgba(245, 158, 11, 0.30) !important;
+}
+
+/* Close button on glass */
+[data-sonner-toast] [data-close-button] {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  color: var(--fg) !important;
+}
+[data-sonner-toast] [data-close-button]:hover {
+  background: rgba(255, 255, 255, 0.16) !important;
 }
