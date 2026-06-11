@@ -184,7 +184,7 @@ export function EntryRow({ entry, onUpdate, onDelete, disabled }: EntryRowProps)
         <motion.button
           onClick={() => {
             onDelete(entry.id)
-            toast.error('Entry deleted')
+            toast.success('Entry deleted')
           }}
           className="text-red-500/60 hover:text-red-400 p-1 transition text-sm"
           whileHover={{ scale: 1.2 }}

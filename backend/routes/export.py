@@ -41,6 +41,17 @@ def _strip_password(user_row):
     return {k: v for k, v in dict(user_row).items() if k != "password_hash"}
 
 
+def _csv_safe(value):
+    """Guard against CSV formula injection: Excel/Sheets execute cells starting
+    with =, +, -, or @ as formulas, so prefix string cells with a single quote.
+    Non-string values (numbers, dates) are passed through untouched."""
+    if value is None:
+        return ""
+    if isinstance(value, str) and value and value[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + value
+    return value
+
+
 def _table_csv(rows):
     """Render a list of row dicts as a CSV string (column order from the query)."""
     buf = io.StringIO()
@@ -49,7 +60,7 @@ def _table_csv(rows):
         headers = list(rows[0].keys())
         writer.writerow(headers)
         for r in rows:
-            writer.writerow(["" if r.get(h) is None else r.get(h) for h in headers])
+            writer.writerow([_csv_safe(r.get(h)) for h in headers])
     return buf.getvalue()
 
 
@@ -100,12 +111,12 @@ def export_me_csv():
     for s in sessions:
         writer.writerow([
             "clock_session", s["id"], (s["clock_in"] or "")[:10], s["clock_in"] or "", s["clock_out"] or "",
-            s["duration_minutes"] if s["duration_minutes"] is not None else "", s["break_minutes"] or 0, "", "", s["notes"] or "",
+            s["duration_minutes"] if s["duration_minutes"] is not None else "", s["break_minutes"] or 0, "", "", _csv_safe(s["notes"]),
         ])
     for e in entries:
         writer.writerow([
             "time_entry", e["id"], e["date"] or "", e["start_time"] or "", e["end_time"] or "",
-            e["duration_minutes"] if e["duration_minutes"] is not None else "", "", e["project"] or "", e["task"] or "", e["description"] or "",
+            e["duration_minutes"] if e["duration_minutes"] is not None else "", "", _csv_safe(e["project"]), _csv_safe(e["task"]), _csv_safe(e["description"]),
         ])
     filename = f"swiftshift-my-time-{datetime.utcnow().date().isoformat()}.csv"
     return _attachment(buf.getvalue(), filename, "text/csv")

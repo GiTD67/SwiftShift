@@ -104,6 +104,7 @@ export function LootDrop({ isOpen, onClose, earnings, ptoHours, durationMin, the
     const burst = () => {
       if (hasFiredConfettiRef.current) return
       hasFiredConfettiRef.current = true
+      if (typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
       confetti({
         particleCount: 100,
         spread: 70,

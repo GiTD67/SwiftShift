@@ -50,6 +50,12 @@ def create_submission():
 
     if not all([user_id, period_start, period_end, total_hours is not None]):
         return jsonify({"error": "period_start, period_end, and total_hours are required"}), 400
+    try:
+        total_hours = float(total_hours)
+    except (TypeError, ValueError):
+        return jsonify({"error": "total_hours must be a number"}), 400
+    if total_hours < 0:
+        return jsonify({"error": "total_hours cannot be negative"}), 400
 
     with get_db() as db:
         _ensure_table(db)

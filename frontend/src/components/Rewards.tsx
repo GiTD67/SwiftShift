@@ -237,7 +237,7 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
         <div className="flex items-center justify-between mb-4">
           <div className="text-2xl font-semibold neon-green">Rewards</div>
           <div className="text-right">
-            <div className="text-[10px] text-zinc-500">Weekly earnings</div>
+            <div className="text-[10px] text-zinc-500">Today's earnings</div>
             <div className="font-semibold tabular-nums neon-green">${totalEarnings.toFixed(0)}</div>
           </div>
         </div>

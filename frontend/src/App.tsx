@@ -243,7 +243,7 @@ function OctopusChart({ node, expanded, setExpanded, search, expandedAll }: {
       {/* Click Modal */}
       {selected && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center" onClick={() => setSelected(null)} style={{ background: 'var(--scrim)', WebkitBackdropFilter: 'blur(4px)', backdropFilter: 'blur(4px)' }}>
-          <div className="glass--thick rounded-2xl p-6 w-80" onClick={(e) => e.stopPropagation()} style={{ boxShadow: '0 0 80px -20px rgba(var(--accent-color-rgb), 0.21), 0 28px 72px -14px rgba(0,0,0,0.85)' }}>
+          <div role="dialog" aria-modal="true" aria-label="Team member details" className="glass--thick rounded-2xl p-6 w-80" onClick={(e) => e.stopPropagation()} style={{ boxShadow: '0 0 80px -20px rgba(var(--accent-color-rgb), 0.21), 0 28px 72px -14px rgba(0,0,0,0.85)' }}>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center text-xl font-bold text-white/85 flex-shrink-0">{orgInitials(selected.name)}</div>
               <div>
@@ -1584,7 +1584,7 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
       {/* Holiday heads-up confirm — shown before certification when the period contains a company holiday */}
       {showHolidayConfirm && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowHolidayConfirm(false)}>
-          <div className="glass rounded-2xl p-6 w-full max-w-md mx-4 border border-white/20" onClick={e => e.stopPropagation()} style={{ boxShadow: '0 0 80px -20px rgba(var(--accent-color-rgb), 0.25), 0 28px 72px -14px rgba(0,0,0,0.85)' }}>
+          <div role="dialog" aria-modal="true" aria-label="Holiday in this pay period" className="glass rounded-2xl p-6 w-full max-w-md mx-4 border border-white/20" onClick={e => e.stopPropagation()} style={{ boxShadow: '0 0 80px -20px rgba(var(--accent-color-rgb), 0.25), 0 28px 72px -14px rgba(0,0,0,0.85)' }}>
             <h2 className="text-lg font-semibold mb-1 text-white">Holiday in this pay period</h2>
             <p className="text-xs text-zinc-500 mb-4">Pay period: {fmtRange(start, end)}</p>
             <div className="bg-black/30 border border-white/10 rounded-xl p-4 mb-4 space-y-1.5">
@@ -1617,7 +1617,7 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
       {/* Certification popup modal */}
       {showCertModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowCertModal(false)}>
-          <div className="glass rounded-2xl p-6 w-full max-w-lg mx-4 border border-white/20" onClick={e => e.stopPropagation()} style={{ boxShadow: '0 0 80px -20px rgba(var(--accent-color-rgb), 0.25), 0 28px 72px -14px rgba(0,0,0,0.85)' }}>
+          <div role="dialog" aria-modal="true" aria-label="Timesheet certification" className="glass rounded-2xl p-6 w-full max-w-lg mx-4 border border-white/20" onClick={e => e.stopPropagation()} style={{ boxShadow: '0 0 80px -20px rgba(var(--accent-color-rgb), 0.25), 0 28px 72px -14px rgba(0,0,0,0.85)' }}>
             <h2 className="text-lg font-semibold mb-1 text-white">Timesheet Certification</h2>
             <p className="text-xs text-zinc-500 mb-4">Pay period: {fmtRange(start, end)}</p>
 
@@ -2844,6 +2844,8 @@ export default function App() {
   const navTo = (view: View) => {
     setActiveView(view)
     setMobileMenuOpen(false)
+    // .ta-main is the scroll container (window never scrolls in this layout)
+    document.querySelector('.ta-main')?.scrollTo(0, 0)
   }
 
   // Appearance slide-over: focus trap, Escape to close, restore focus on close
@@ -3228,7 +3230,6 @@ export default function App() {
         })
         .catch(() => toast.error('Could not resume payout setup'))
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Load schedules data
@@ -6805,7 +6806,7 @@ export default function App() {
               {/* Add New Hire Modal */}
               {showAddHireModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setShowAddHireModal(false)}>
-                  <div className="glass rounded-3xl p-6 w-full max-w-md space-y-4" onClick={e => e.stopPropagation()}>
+                  <div role="dialog" aria-modal="true" aria-label="Add new hire" className="glass rounded-3xl p-6 w-full max-w-md space-y-4" onClick={e => e.stopPropagation()}>
                     <div>
                       <div className="text-lg font-bold" style={{ color: 'var(--accent-color)' }}>Add New Hire</div>
                       <div className="text-xs text-zinc-400 mt-0.5">Creates an invite code — share the code or signup link and they join your company when they sign up.</div>
@@ -6845,7 +6846,7 @@ export default function App() {
               {/* Import from CSV Modal */}
               {showImportModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => { setShowImportModal(false); setImportResult(null) }}>
-                  <div className="glass rounded-3xl p-6 w-full max-w-lg space-y-4" onClick={e => e.stopPropagation()}>
+                  <div role="dialog" aria-modal="true" aria-label="Import employees from CSV" className="glass rounded-3xl p-6 w-full max-w-lg space-y-4" onClick={e => e.stopPropagation()}>
                     <div>
                       <div className="text-lg font-bold" style={{ color: 'var(--accent-color)' }}>Import Employees from CSV</div>
                       <div className="text-xs text-zinc-400 mt-0.5">Paste or type CSV data to bulk-create invite codes for employees from another system.</div>
@@ -7822,7 +7823,7 @@ export default function App() {
               {/* Profile pic crop modal */}
               {showCropModal && profilePicUrl && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowCropModal(false)}>
-                  <div className="glass rounded-3xl p-6 w-full max-w-sm mx-4 border border-white/20" onClick={e => e.stopPropagation()}>
+                  <div role="dialog" aria-modal="true" aria-label="Adjust profile photo" className="glass rounded-3xl p-6 w-full max-w-sm mx-4 border border-white/20" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center justify-between mb-5">
                       <h3 className="text-lg font-semibold text-white">Adjust Photo</h3>
                       <button onClick={() => setShowCropModal(false)} className="text-zinc-400 hover:text-white transition-colors">
@@ -8952,6 +8953,7 @@ export default function App() {
             }}
             onNavigate={(viewId) => navTo(viewId as any)}
             onComplete={() => {
+              gamification.addXP(50)
               toast.success('Tour complete! +50 XP', { description: 'You unlocked the Explorer badge!' })
             }}
             accentHex={themeAccentHex}

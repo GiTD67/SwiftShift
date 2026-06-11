@@ -308,6 +308,11 @@ def _owner_edit(req_id, data):
             return jsonify({"error": "hours_requested must be a number"}), 400
         if hours_requested <= 0:
             return jsonify({"error": "hours_requested must be positive"}), 400
+        try:
+            if datetime.fromisoformat(str(start_date)) > datetime.fromisoformat(str(end_date)):
+                return jsonify({"error": "start_date must be on or before end_date"}), 400
+        except (TypeError, ValueError):
+            return jsonify({"error": "start_date and end_date must be valid dates (YYYY-MM-DD)"}), 400
 
         # Check balance against the edited amount
         balance_row = db.execute(

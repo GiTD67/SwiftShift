@@ -186,6 +186,9 @@ def signup():
     password = data.get("password")
     if not first_name or not last_name or not email or not password:
         return jsonify({"error": "first_name, last_name, email, password required"}), 400
+    if len(password) < 8:
+        # Matches the reset-password rule so signup can't create weaker passwords.
+        return jsonify({"error": "Password must be at least 8 characters"}), 400
     pw_hash = generate_password_hash(password)
     is_founder = email.strip().lower() == FOUNDER_EMAIL
     with get_db() as db:
