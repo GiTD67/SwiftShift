@@ -3,6 +3,7 @@ import json
 from flask import Blueprint, jsonify, request
 from werkzeug.security import generate_password_hash
 
+from audit import log_event
 from db import get_db
 from permissions import current_uid, is_manager, manager_required
 
@@ -14,7 +15,7 @@ _USER_COLS = "id, first_name, last_name, email, job_role, manager_name, is_fullt
 # Fields only a manager (or the user viewing their own record) may see.
 _SENSITIVE = ("pay", "salary", "hourly_rate")
 # Fields only a manager may change (even on their own record).
-_MANAGER_ONLY_FIELDS = {"pay", "salary", "hourly_rate", "job_role", "is_manager"}
+_MANAGER_ONLY_FIELDS = {"pay", "salary", "hourly_rate", "job_role", "is_manager", "pto_accrual_rate", "is_fulltime"}
 
 
 def _viewer_company_id(db, uid):
@@ -27,10 +28,10 @@ def _viewer_company_id(db, uid):
 
 def _redact(row, viewer_uid, viewer_is_manager, viewer_company_id=None):
     """Hide pay/salary/hourly_rate unless the viewer is a same-company manager
-    or it's their own row. Legacy (NULL-company) managers keep the original
-    global visibility — consistent with update_user, which lets them edit pay."""
+    or it's their own row. Legacy (NULL-company) viewers count as one tenant:
+    they match only other NULL-company rows."""
     d = dict(row)
-    same_company = viewer_company_id is None or d.get("company_id") == viewer_company_id
+    same_company = d.get("company_id") == viewer_company_id
     if (viewer_is_manager and same_company) or d.get("id") == viewer_uid:
         return d
     return {k: (None if k in _SENSITIVE else v) for k, v in d.items()}
@@ -49,8 +50,13 @@ def list_users():
                 (viewer_company,),
             ).fetchall()
         else:
-            # Legacy pre-company viewers keep the original global behavior.
-            rows = db.execute(f"SELECT {_USER_COLS} FROM users ORDER BY id").fetchall()
+            # Legacy pre-company viewers are their own tenant: they see only
+            # other NULL-company accounts, never company rosters. (Every fresh
+            # signup starts with company_id NULL, so the old global fallback
+            # let any new account enumerate the entire user table.)
+            rows = db.execute(
+                f"SELECT {_USER_COLS} FROM users WHERE company_id IS NULL ORDER BY id"
+            ).fetchall()
     return jsonify([_redact(r, viewer, viewer_is_manager, viewer_company) for r in rows])
 
 
@@ -69,6 +75,9 @@ def create_user():
         return jsonify({"error": "first_name, last_name, email required"}), 400
     if not password:
         return jsonify({"error": "password required"}), 400
+    if not isinstance(password, str) or len(password) < 8:
+        # Same rule as /api/auth/signup — the admin path must not mint weaker accounts.
+        return jsonify({"error": "password must be at least 8 characters"}), 400
     pw_hash = generate_password_hash(password)
     with get_db() as db:
         # Stamp the new account with the creating manager's company so it
@@ -83,8 +92,12 @@ def create_user():
                 (first_name, last_name, email, pw_hash, company_id),
             ).fetchone()
             db.commit()
-        except Exception:
-            return jsonify({"error": "email already exists"}), 409
+        except Exception as e:
+            # Only report duplicates as duplicates; let real DB failures surface
+            # as 500s instead of a misleading "email already exists".
+            if "duplicate" in str(e).lower() or "unique" in str(e).lower():
+                return jsonify({"error": "email already exists"}), 409
+            raise
     return jsonify(dict(row)), 201
 
 
@@ -101,8 +114,10 @@ def get_user(target_id):
                 (target_id, viewer_company),
             ).fetchone()
         else:
+            # Legacy (NULL-company) viewers can look up themselves and other
+            # NULL-company accounts only — never company-scoped users.
             row = db.execute(
-                f"SELECT {_USER_COLS} FROM users WHERE id = ?",
+                f"SELECT {_USER_COLS} FROM users WHERE id = ? AND company_id IS NULL",
                 (target_id,),
             ).fetchone()
     if not row:
@@ -139,22 +154,24 @@ def update_user(target_id):
         ).fetchone()
         if not target:
             return jsonify({"error": "not found"}), 404
-        # Company accounts may only edit their own company's users (same
-        # scoping as the read endpoints); editing yourself is always allowed.
-        if (
-            not editing_self
-            and caller_company is not None
-            and target["company_id"] != caller_company
-        ):
+        # Managers may only edit users in their own tenant (NULL-company
+        # callers match only NULL-company targets); editing yourself is
+        # always allowed.
+        if not editing_self and target["company_id"] != caller_company:
             return jsonify({"error": "not found"}), 404
         db.execute(f"UPDATE users SET {set_clause} WHERE id = ?", values)
         db.commit()
+        sensitive_changed = sorted(f for f in fields if f in _MANAGER_ONLY_FIELDS)
         row = db.execute(
             f"SELECT {_USER_COLS} FROM users WHERE id = ?",
             (target_id,),
         ).fetchone()
     if not row:
         return jsonify({"error": "not found"}), 404
+    if sensitive_changed:
+        # Pay, role, and admin-status changes belong in the audit trail.
+        log_event(caller, None, "user_update",
+                  f"Changed {', '.join(sensitive_changed)} on user #{target_id}")
     return jsonify(_redact(row, caller, caller_is_manager, caller_company))
 
 
@@ -281,12 +298,14 @@ def delete_user(target_id):
         ).fetchone()
         if not row:
             return jsonify({"error": "not found"}), 404
-        # Company accounts may only delete their own company's users (same
-        # scoping as the read endpoints); deleting yourself is always allowed.
+        # Managers may only delete users in their own tenant (NULL-company
+        # callers match only NULL-company targets); deleting yourself is
+        # always allowed.
         if caller != target_id:
             caller_company = _viewer_company_id(db, caller)
-            if caller_company is not None and row["company_id"] != caller_company:
+            if row["company_id"] != caller_company:
                 return jsonify({"error": "not found"}), 404
         db.execute("DELETE FROM users WHERE id = ?", (target_id,))
         db.commit()
+    log_event(caller, None, "user_delete", f"Deleted user #{target_id}")
     return jsonify({"ok": True})

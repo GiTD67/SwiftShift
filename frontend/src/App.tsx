@@ -49,7 +49,11 @@ function longDate(d: Date): string {
 
 function downloadCSV(filename: string, headers: string[], rows: (string | number)[][]) {
   const escape = (v: string | number) => {
-    const s = String(v ?? '')
+    let s = String(v ?? '')
+    // Neutralize spreadsheet formula injection (same guard as the backend
+    // exporter): user-controlled text like a name of "=HYPERLINK(...)" must
+    // not execute when the CSV is opened in Excel/Sheets.
+    if (typeof v !== 'number' && /^[=+\-@\t\r]/.test(s)) s = `'${s}`
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
   }
   const csv = [headers, ...rows].map(row => row.map(escape).join(',')).join('\n')
@@ -1617,7 +1621,7 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
       {/* Certification popup modal */}
       {showCertModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowCertModal(false)}>
-          <div role="dialog" aria-modal="true" aria-label="Timesheet certification" className="glass rounded-2xl p-6 w-full max-w-lg mx-4 border border-white/20" onClick={e => e.stopPropagation()} style={{ boxShadow: '0 0 80px -20px rgba(var(--accent-color-rgb), 0.25), 0 28px 72px -14px rgba(0,0,0,0.85)' }}>
+          <div role="dialog" aria-modal="true" aria-label="Timesheet certification" className="glass rounded-2xl p-6 w-full max-w-lg mx-4 border border-white/20 max-h-[85dvh] !overflow-y-auto" onClick={e => e.stopPropagation()} style={{ boxShadow: '0 0 80px -20px rgba(var(--accent-color-rgb), 0.25), 0 28px 72px -14px rgba(0,0,0,0.85)' }}>
             <h2 className="text-lg font-semibold mb-1 text-white">Timesheet Certification</h2>
             <p className="text-xs text-zinc-500 mb-4">Pay period: {fmtRange(start, end)}</p>
 
@@ -1740,9 +1744,15 @@ function ForgotPasswordModal({ onClose, accentHex }: { onClose: () => void; acce
     }
   }
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="glass w-full max-w-[360px] max-h-[85dvh] !overflow-y-auto rounded-3xl p-8 border border-white/10 mx-4" onClick={e => e.stopPropagation()} style={{ boxShadow: `0 0 80px -20px ${accentHex}35, 0 28px 72px -14px rgba(0,0,0,0.85)` }}>
+      <div role="dialog" aria-modal="true" aria-label="Reset password" className="glass w-full max-w-[360px] max-h-[85dvh] !overflow-y-auto rounded-3xl p-8 border border-white/10 mx-4" onClick={e => e.stopPropagation()} style={{ boxShadow: `0 0 80px -20px ${accentHex}35, 0 28px 72px -14px rgba(0,0,0,0.85)` }}>
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-xl font-semibold">Reset Password</h2>
           <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors" aria-label="Close">
@@ -1889,7 +1899,7 @@ function ResetPasswordPage() {
                     minLength={8}
                     autoFocus
                   />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white transition-colors" tabIndex={-1} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white transition-colors" aria-label={showPassword ? 'Hide password' : 'Show password'}>
                     {showPassword ? (
                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/>
@@ -2126,9 +2136,10 @@ function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email */}
             <div>
-              <label className="block text-sm text-zinc-400 mb-1 tracking-wide">EMAIL</label>
+              <label htmlFor="signin-email" className="block text-sm text-zinc-400 mb-1 tracking-wide">EMAIL</label>
               <div className={`relative transition-all ${focusedField === 'email' ? 'scale-[1.01]' : ''}`}>
                 <input
+                  id="signin-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -2145,9 +2156,10 @@ function LoginPage() {
 
             {/* Password */}
             <div>
-              <label className="block text-sm text-zinc-400 mb-1 tracking-wide">PASSWORD</label>
+              <label htmlFor="signin-password" className="block text-sm text-zinc-400 mb-1 tracking-wide">PASSWORD</label>
               <div className={`relative transition-all ${focusedField === 'password' ? 'scale-[1.01]' : ''}`}>
                 <input
+                  id="signin-password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -2162,7 +2174,6 @@ function LoginPage() {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white transition-colors"
-                  tabIndex={-1}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? (
@@ -2396,8 +2407,9 @@ function SignupPage() {
             {/* Name row */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm text-zinc-400 mb-1 tracking-wide">FIRST NAME</label>
+                <label htmlFor="signup-first-name" className="block text-sm text-zinc-400 mb-1 tracking-wide">FIRST NAME</label>
                 <input
+                  id="signup-first-name"
                   type="text"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
@@ -2411,8 +2423,9 @@ function SignupPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-zinc-400 mb-1 tracking-wide">LAST NAME</label>
+                <label htmlFor="signup-last-name" className="block text-sm text-zinc-400 mb-1 tracking-wide">LAST NAME</label>
                 <input
+                  id="signup-last-name"
                   type="text"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
@@ -2428,9 +2441,10 @@ function SignupPage() {
 
             {/* Invite code (optional) — links the new account to its company */}
             <div>
-              <label className="block text-sm text-zinc-400 mb-1 tracking-wide">INVITE CODE <span className="text-zinc-600">— OPTIONAL</span></label>
+              <label htmlFor="signup-invite-code" className="block text-sm text-zinc-400 mb-1 tracking-wide">INVITE CODE <span className="text-zinc-600">— OPTIONAL</span></label>
               <div className={`relative transition-all ${focusedField === 'invite' ? 'scale-[1.01]' : ''}`}>
                 <input
+                  id="signup-invite-code"
                   type="text"
                   value={inviteCode}
                   onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
@@ -2463,9 +2477,10 @@ function SignupPage() {
 
             {/* Email */}
             <div>
-              <label className="block text-sm text-zinc-400 mb-1 tracking-wide">WORK EMAIL</label>
+              <label htmlFor="signup-email" className="block text-sm text-zinc-400 mb-1 tracking-wide">WORK EMAIL</label>
               <div className={`relative transition-all ${focusedField === 'email' ? 'scale-[1.01]' : ''}`}>
                 <input
+                  id="signup-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -2481,9 +2496,10 @@ function SignupPage() {
 
             {/* Password */}
             <div>
-              <label className="block text-sm text-zinc-400 mb-1 tracking-wide">PASSWORD</label>
+              <label htmlFor="signup-password" className="block text-sm text-zinc-400 mb-1 tracking-wide">PASSWORD</label>
               <div className={`relative transition-all ${focusedField === 'password' ? 'scale-[1.01]' : ''}`}>
                 <input
+                  id="signup-password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -2499,7 +2515,6 @@ function SignupPage() {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white transition-colors"
-                  tabIndex={-1}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? (
@@ -3615,9 +3630,16 @@ export default function App() {
     }
   }, [Math.floor(now.getTime() / 60000)])
 
-  // Pay period
-  const period = useMemo(() => payPeriodFor(now), [now])
-  const periodLabel = `${period.start.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })} to ${period.end.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })}`
+  // Pay period — keyed on the calendar day, not the 1-second `now` tick:
+  // the period only changes at a day boundary, and recomputing the two
+  // toLocaleDateString calls every second is needless work.
+  const { period, periodLabel } = useMemo(() => {
+    const p = payPeriodFor(now)
+    return {
+      period: p,
+      periodLabel: `${p.start.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })} to ${p.end.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })}`,
+    }
+  }, [now.toDateString()])
 
   // Overtime 1.5× earnings calculation for pay period sidebar
   const periodEarnings = useMemo(() => {
@@ -3662,8 +3684,12 @@ export default function App() {
             description: 'Your clock-in is queued with its original time.',
           })
         }
-        if (!navigator.onLine) {
+        if (!navigator.onLine || hasQueuedPunches()) {
+          // Offline, or earlier punches are still queued — keep FIFO order so
+          // a queued clock-out can't be replayed after this clock-in and
+          // close the wrong session. If we're actually online, flush now.
           queueOffline()
+          if (navigator.onLine) window.dispatchEvent(new Event('online'))
         } else {
           fetch(`${API_BASE}/api/clock-sessions`, {
             method: 'POST',
@@ -3865,6 +3891,7 @@ export default function App() {
         if (!navigator.onLine || (!sid && hasQueuedPunches())) {
           // Offline, or the matching clock-in is itself still queued — keep order
           queueOffline()
+          if (navigator.onLine) window.dispatchEvent(new Event('online'))
         } else if (sid) {
           fetch(`${API_BASE}/api/clock-sessions/${sid}`, {
             method: 'PUT',
@@ -3881,13 +3908,21 @@ export default function App() {
           })
             .then(r => { if (!r.ok) throw new Error('accrual not saved') })
             .catch(() => toast.error("Couldn't record your PTO accrual for this session"))
+        } else {
+          // Online but no known session id (e.g. clock-out right after a
+          // refresh, before the active-session fetch resolves) — queue the
+          // punch instead of silently dropping it, then flush right away:
+          // the replay path resolves the open session server-side.
+          queuePunch({ action: 'clock_out', timestamp: punchTs, sessionId: sid, breakMinutes: unpaidBreakMin })
+          setOfflinePunchPending(true)
+          window.dispatchEvent(new Event('online'))
         }
       }
     }
   }
 
-  const handleSendChat = async () => {
-    const msg = chatMessage.trim()
+  const handleSendChat = async (text?: string) => {
+    const msg = (text ?? chatMessage).trim()
     if ((!msg && !attachedFile) || chatLoading) return
     setChatLoading(true)
     const display = attachedFile ? `${msg ? msg + ' ' : ''}[${attachedFile.filename}]` : msg
@@ -3913,10 +3948,10 @@ export default function App() {
   }
 
   const handleSuggestion = (suggestion: string) => {
-    setChatMessage(suggestion)
-    setTimeout(() => {
-      handleSendChat()
-    }, 50)
+    // Pass the text directly — setChatMessage + deferred send reads a stale
+    // closure where chatMessage is still the pre-click value, so the chip
+    // would silently do nothing.
+    handleSendChat(suggestion)
   }
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -4007,7 +4042,15 @@ export default function App() {
     setOnboardingStatus((s: any) => ({ ...(s || {}), needs: null, onboarding_complete: true }))
   }
   // Session-memory dismissal only — no persistence, so the prompt returns next login.
-  const handleOnboardingSkip = () => setOnboardingDismissed(true)
+  // Also drop the create-company intent: an employee who misclicked
+  // "Create a company" and skipped out would otherwise be locked into the
+  // manager wizard on every future login, with no way back to the invite-code
+  // screen.
+  const handleOnboardingSkip = () => {
+    localStorage.removeItem('swiftshift-onboarding-intent')
+    setOnboardingIntent(null)
+    setOnboardingDismissed(true)
+  }
 
   async function handleAddHire() {
     const { first_name, last_name, email, job_role, hourly_rate } = addHireForm
@@ -4103,7 +4146,7 @@ export default function App() {
             <span />
             <span />
           </button>
-          <div className="ta-navbar-brand cursor-pointer" onClick={() => navTo('clock')}>
+          <div className="ta-navbar-brand cursor-pointer" role="button" tabIndex={0} aria-label="Go to Time Clock" onClick={() => navTo('clock')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navTo('clock') } }}>
             <LogoSVG className="h-10 w-auto" />
             <span>SwiftShift</span>
           </div>
@@ -4651,8 +4694,11 @@ export default function App() {
           { g: 'Action', label: 'Take a tour', run: () => setShowTour(true) },
           { g: 'Action', label: 'Log out', run: () => handleLogout() },
         ]
+        // Manager destinations render nothing for non-managers (blank screen),
+        // so hide them from the palette — same gating as the sidebar.
+        const visibleCmds = isManager ? cmds : cmds.filter(c => c.g !== 'Manager')
         const q = cmdkQuery.trim().toLowerCase()
-        const filtered = q ? cmds.filter(c => c.label.toLowerCase().includes(q) || c.g.toLowerCase().includes(q)) : cmds
+        const filtered = q ? visibleCmds.filter(c => c.label.toLowerCase().includes(q) || c.g.toLowerCase().includes(q)) : visibleCmds
         const idx = Math.min(cmdkIndex, Math.max(0, filtered.length - 1))
         const runCmd = (c?: { run: () => void }) => { if (!c) return; setCmdkOpen(false); c.run() }
         return (
@@ -5197,7 +5243,11 @@ export default function App() {
 
             const deleteHoliday = (id: number) => {
               fetch(`${API_BASE}/api/holidays/${id}`, { method: 'DELETE' })
-                .then(() => { setHolidays(prev => prev.filter(h => h.id !== id)); toast.success('Holiday deleted') })
+                .then(r => {
+                  if (!r.ok) throw new Error('delete failed')
+                  setHolidays(prev => prev.filter(h => h.id !== id))
+                  toast.success('Holiday deleted')
+                })
                 .catch(() => toast.error('Failed to delete'))
             }
 
@@ -5378,12 +5428,16 @@ export default function App() {
                   </button>
                   <button
                     onClick={() => {
-                      users.forEach(u => {
+                      Promise.allSettled(users.map(u =>
                         fetch(`${API_BASE}/api/users/${u.id}`, {
                           method: 'PUT',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ first_name: u.first_name, last_name: u.last_name, email: u.email, job_role: u.job_role, manager_name: u.manager_name, is_fulltime: u.is_fulltime, pay: u.pay, salary: u.salary }),
-                        })
+                        }).then(r => { if (!r.ok) throw new Error('save failed') })
+                      )).then(results => {
+                        const failed = results.filter(r => r.status === 'rejected').length
+                        if (failed === 0) toast.success('Team changes saved')
+                        else toast.error(`Couldn't save changes for ${failed} of ${results.length} people — try again`)
                       })
                     }}
                     className="px-4 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
@@ -5501,7 +5555,12 @@ export default function App() {
                             onClick={() => {
                               if (!confirm(`Delete ${u.first_name} ${u.last_name}?`)) return
                               fetch(`${API_BASE}/api/users/${u.id}`, { method: 'DELETE' })
-                                .then(() => setUsers(users.filter(x => x.id !== u.id)))
+                                .then(r => {
+                                  if (!r.ok) throw new Error('delete failed')
+                                  setUsers(users.filter(x => x.id !== u.id))
+                                  toast.success(`${u.first_name} ${u.last_name} removed`)
+                                })
+                                .catch(() => toast.error(`Couldn't delete ${u.first_name} ${u.last_name}`))
                             }}
                             className="px-2 py-0.5 rounded bg-red-600/80 hover:bg-red-600 text-xs text-white"
                           >
@@ -5671,7 +5730,8 @@ export default function App() {
                                     method: 'PUT',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ status: 'accepted' }),
-                                  }).then(() => {
+                                  }).then(r => {
+                                    if (!r.ok) throw new Error('approve failed')
                                     setAllShiftSwaps(prev => prev.map(s => s.id === sw.id ? { ...s, status: 'accepted' } : s))
                                     setShiftSwaps(prev => prev.map(s => s.id === sw.id ? { ...s, status: 'accepted' } : s))
                                     notify('swaps', 'success', 'Shift swap approved')
@@ -5687,7 +5747,8 @@ export default function App() {
                                     method: 'PUT',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ status: 'denied' }),
-                                  }).then(() => {
+                                  }).then(r => {
+                                    if (!r.ok) throw new Error('deny failed')
                                     setAllShiftSwaps(prev => prev.map(s => s.id === sw.id ? { ...s, status: 'denied' } : s))
                                     setShiftSwaps(prev => prev.map(s => s.id === sw.id ? { ...s, status: 'denied' } : s))
                                     notify('swaps', 'success', 'Shift swap denied')
@@ -6806,7 +6867,7 @@ export default function App() {
               {/* Add New Hire Modal */}
               {showAddHireModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setShowAddHireModal(false)}>
-                  <div role="dialog" aria-modal="true" aria-label="Add new hire" className="glass rounded-3xl p-6 w-full max-w-md space-y-4" onClick={e => e.stopPropagation()}>
+                  <div role="dialog" aria-modal="true" aria-label="Add new hire" className="glass rounded-3xl p-6 w-full max-w-md space-y-4 max-h-[85dvh] !overflow-y-auto" onClick={e => e.stopPropagation()}>
                     <div>
                       <div className="text-lg font-bold" style={{ color: 'var(--accent-color)' }}>Add New Hire</div>
                       <div className="text-xs text-zinc-400 mt-0.5">Creates an invite code — share the code or signup link and they join your company when they sign up.</div>
@@ -6846,7 +6907,7 @@ export default function App() {
               {/* Import from CSV Modal */}
               {showImportModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => { setShowImportModal(false); setImportResult(null) }}>
-                  <div role="dialog" aria-modal="true" aria-label="Import employees from CSV" className="glass rounded-3xl p-6 w-full max-w-lg space-y-4" onClick={e => e.stopPropagation()}>
+                  <div role="dialog" aria-modal="true" aria-label="Import employees from CSV" className="glass rounded-3xl p-6 w-full max-w-lg space-y-4 max-h-[85dvh] !overflow-y-auto" onClick={e => e.stopPropagation()}>
                     <div>
                       <div className="text-lg font-bold" style={{ color: 'var(--accent-color)' }}>Import Employees from CSV</div>
                       <div className="text-xs text-zinc-400 mt-0.5">Paste or type CSV data to bulk-create invite codes for employees from another system.</div>
@@ -7534,7 +7595,7 @@ export default function App() {
           )})()}
           {activeView === 'groktax' && (
             <div className="max-w-5xl mx-auto">
-              <div className="glass rounded-3xl flex flex-col h-[calc(100vh-140px)] overflow-hidden">
+              <div className="glass rounded-3xl flex flex-col h-[calc(100dvh-140px)] overflow-hidden">
                 {/* Header */}
                 <div className="px-6 py-5 border-b border-white/10 flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center">
@@ -7648,7 +7709,7 @@ export default function App() {
             </div>
           )}
           {activeView === 'grokky' && (
-            <div className="max-w-3xl mx-auto h-[calc(100vh-140px)] flex flex-col">
+            <div className="max-w-3xl mx-auto h-[calc(100dvh-140px)] flex flex-col">
               <div className="glass rounded-3xl flex flex-col h-full overflow-hidden">
                 {/* HEADER - simplified */}
                 <div className="px-6 py-5 border-b border-white/10 flex items-center gap-3">
@@ -7733,7 +7794,7 @@ export default function App() {
                       disabled={chatLoading}
                     />
                     <button
-                      onClick={handleSendChat}
+                      onClick={() => handleSendChat()}
                       disabled={chatLoading || (!chatMessage.trim() && !attachedFile)}
                       className="px-5 rounded-xl text-sm font-medium disabled:opacity-40" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
                     >
@@ -8022,7 +8083,10 @@ export default function App() {
                   <button onClick={() => {
                     if (!user?.id || !scheduleEdit) return
                     fetch(`${API_BASE}/api/work-schedule`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: user.id, ...scheduleEdit }) })
-                      .then(r => r.json()).then(d => { setWorkSchedule(d); toast.success('Work schedule saved!') }).catch(() => toast.error('Failed to save'))
+                      .then(r => r.json()).then(d => {
+                        if (d?.error) { toast.error(d.error); return }
+                        setWorkSchedule(d); toast.success('Work schedule saved!')
+                      }).catch(() => toast.error('Failed to save'))
                   }} className="px-5 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
                     Save Schedule
                   </button>
@@ -8143,7 +8207,10 @@ export default function App() {
                   <button onClick={() => {
                     if (!user?.id || !availabilityEdit) return
                     fetch(`${API_BASE}/api/availability`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: user.id, ...availabilityEdit }) })
-                      .then(r => r.json()).then(d => { setWorkAvailability(d); toast.success('Availability saved!') }).catch(() => toast.error('Failed to save'))
+                      .then(r => r.json()).then(d => {
+                        if (d?.error) { toast.error(d.error); return }
+                        setWorkAvailability(d); toast.success('Availability saved!')
+                      }).catch(() => toast.error('Failed to save'))
                   }} className="px-5 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
                     Save Availability
                   </button>
@@ -8367,7 +8434,7 @@ export default function App() {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(data),
                       })
-                        .then(r => r.json())
+                        .then(r => { if (!r.ok) throw new Error('post failed'); return r.json() })
                         .then(() => { toast.success('Job posted!'); form.reset() })
                         .catch(() => toast.error('Failed to post job'))
                     }}

@@ -236,36 +236,42 @@ def update_request(req_id):
             if owner_company != caller_company:
                 return jsonify({"error": "not found"}), 404
 
-        # Re-check the balance at approval time, before any writes: several pending
-        # requests can each pass the check at creation, but they can't all be approved.
+        # Cancelled is terminal: the employee withdrew the request, so it can't
+        # be approved, denied, or reopened afterwards.
+        if row["status"] == "cancelled":
+            return jsonify({"error": "cancelled requests cannot be reviewed"}), 400
+
+        # Deduct hours from balance when approving. The balance check lives in
+        # the UPDATE's WHERE clause (not a separate read) so two concurrent
+        # approvals can't both pass the check and drive the balance negative.
+        # This runs before the status write: if it fails, nothing has changed.
         if status == "approved" and row["status"] != "approved":
-            balance_row = db.execute(
-                "SELECT hours_available FROM pto_balances WHERE user_id = ?",
-                (row["user_id"],),
+            deducted = db.execute(
+                """
+                UPDATE pto_balances
+                SET hours_available = hours_available - ?,
+                    hours_used = hours_used + ?,
+                    updated_at = NOW()::text
+                WHERE user_id = ? AND hours_available >= ?
+                RETURNING hours_available
+                """,
+                (row["hours_requested"], row["hours_requested"], row["user_id"],
+                 row["hours_requested"]),
             ).fetchone()
-            available = float(balance_row["hours_available"]) if balance_row else 0
-            if available < float(row["hours_requested"]):
+            if deducted is None:
+                balance_row = db.execute(
+                    "SELECT hours_available FROM pto_balances WHERE user_id = ?",
+                    (row["user_id"],),
+                ).fetchone()
+                available = float(balance_row["hours_available"]) if balance_row else 0
                 return jsonify({"error": "insufficient PTO balance", "available": available}), 400
 
         db.execute(
             "UPDATE pto_requests SET status = ?, reviewed_by = ?, reviewed_at = ? WHERE id = ?",
             (status, current_uid(), now, req_id),
         )
-
-        # Deduct hours from balance when approved
-        if status == "approved" and row["status"] != "approved":
-            db.execute(
-                """
-                UPDATE pto_balances
-                SET hours_available = hours_available - ?,
-                    hours_used = hours_used + ?,
-                    updated_at = NOW()::text
-                WHERE user_id = ?
-                """,
-                (row["hours_requested"], row["hours_requested"], row["user_id"]),
-            )
         # Refund if un-approving a previously approved request
-        elif status != "approved" and row["status"] == "approved":
+        if status != "approved" and row["status"] == "approved":
             db.execute(
                 """
                 UPDATE pto_balances

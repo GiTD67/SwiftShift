@@ -5,6 +5,7 @@ import requests
 
 from flask import Flask, jsonify, send_from_directory, request, session
 from flask_cors import CORS
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from db import get_db  # noqa: F401  # ensure db module is loaded
 from limiter import limiter
@@ -14,6 +15,9 @@ from auth import bp as auth_bp
 frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 
 app = Flask(__name__, static_folder=None)
+# One reverse-proxy hop (Render) sets X-Forwarded-For; without this the rate
+# limiter would key every client on the proxy's IP — a single shared bucket.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB uploads
 
 # Login sessions: sign the cookie with SECRET_KEY (falls back to a random key so

@@ -8,6 +8,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from audit import log_event
 from db import get_db
+from limiter import limiter
 
 bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
@@ -178,6 +179,7 @@ _ensure_password_reset_tokens_table()
 
 
 @bp.route("/signup", methods=["POST"])
+@limiter.limit("10 per minute")
 def signup():
     data = request.get_json() or {}
     first_name = data.get("first_name")
@@ -208,6 +210,7 @@ def signup():
 
 
 @bp.route("/signin", methods=["POST"])
+@limiter.limit("10 per minute")
 def signin():
     data = request.get_json() or {}
     email = data.get("email")
@@ -240,6 +243,7 @@ def signin():
 
 
 @bp.route("/google", methods=["POST"])
+@limiter.limit("10 per minute")
 def google_auth():
     data = request.get_json() or {}
     access_token = data.get("access_token")
@@ -297,6 +301,7 @@ def google_auth():
 
 
 @bp.route("/forgot-password", methods=["POST"])
+@limiter.limit("5 per minute")
 def forgot_password():
     data = request.get_json() or {}
     email = (data.get("email") or "").strip().lower()
@@ -331,6 +336,7 @@ def logout():
 
 
 @bp.route("/reset-password", methods=["POST"])
+@limiter.limit("10 per minute")
 def reset_password():
     data = request.get_json() or {}
     token = (data.get("token") or "").strip()

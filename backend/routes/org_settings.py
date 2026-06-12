@@ -1,3 +1,4 @@
+import math
 from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, jsonify, request
@@ -95,14 +96,16 @@ def update_settings():
                 auto_hours = float(auto_hours)
             except (TypeError, ValueError):
                 return jsonify({"error": "auto_approve_swap_hours must be a number or null"}), 400
-            if auto_hours < 0:
+            if not math.isfinite(auto_hours) or auto_hours < 0:
                 return jsonify({"error": "auto_approve_swap_hours must be >= 0"}), 400
         try:
             ot_hours = float(data.get("ot_alert_daily_hours", current["ot_alert_daily_hours"]))
             missed_hours = float(data.get("missed_clockout_hours", current["missed_clockout_hours"]))
         except (TypeError, ValueError):
             return jsonify({"error": "ot_alert_daily_hours and missed_clockout_hours must be numbers"}), 400
-        if ot_hours <= 0 or missed_hours <= 0:
+        # NaN slips past a plain <= 0 check (all NaN comparisons are False) and
+        # would silently disable OT / missed-clockout alerts once stored.
+        if not math.isfinite(ot_hours) or not math.isfinite(missed_hours) or ot_hours <= 0 or missed_hours <= 0:
             return jsonify({"error": "ot_alert_daily_hours and missed_clockout_hours must be positive"}), 400
 
         db.execute(

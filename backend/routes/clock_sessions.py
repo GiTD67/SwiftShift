@@ -54,6 +54,23 @@ def clock_in():
         return jsonify({"error": "authentication required"}), 401
     now = _resolve_punch_ts(data.get("client_ts")).isoformat()
     with get_db() as db:
+        # Idempotent: a double-tap, second device, or replayed offline punch
+        # must not open a second concurrent session (each would later be
+        # closed for its full duration — double-counted paid time). Only
+        # recent sessions are reused: a forgotten open session from yesterday
+        # should stay open so the missed-clockout flag surfaces it for
+        # correction, not silently absorb today's shift.
+        existing = db.execute(
+            "SELECT * FROM clock_sessions WHERE employee_id = ? AND clock_out IS NULL ORDER BY id DESC",
+            (employee_id,),
+        ).fetchone()
+        if existing:
+            try:
+                recent = datetime.utcnow() - datetime.fromisoformat(str(existing["clock_in"])) <= timedelta(hours=20)
+            except (TypeError, ValueError):
+                recent = True
+            if recent:
+                return jsonify(dict(existing)), 200
         row = db.execute(
             "INSERT INTO clock_sessions (employee_id, clock_in, notes) VALUES (?, ?, ?) RETURNING *",
             (employee_id, now, data.get("notes")),
@@ -85,6 +102,15 @@ def clock_out(session_id):
             return jsonify({"error": "forbidden"}), 403
         if row["clock_out"]:
             return jsonify({"error": "already clocked out"}), 400
+        try:
+            # A replayed offline punch can carry a timestamp older than the
+            # clock-in; never store a session that ends before it starts.
+            clock_in_dt = datetime.fromisoformat(row["clock_in"])
+            if punch_ts < clock_in_dt:
+                punch_ts = clock_in_dt
+                now = punch_ts.isoformat()
+        except (TypeError, ValueError):
+            pass
         total_minutes = max(0, _compute_session_duration(row["clock_in"], punch_ts))
         net_minutes = max(0, total_minutes - unpaid_break_minutes)
         db.execute(

@@ -93,11 +93,11 @@ export function BreakReminderModal({
             {/* Message */}
             <div className="glass rounded-2xl p-4 mb-5">
               <p className="text-sm text-zinc-300 leading-relaxed">
-                You've worked <span className="font-semibold text-white">{workedLabel}</span> - {rule.name} requires a{' '}
+                You've worked <span className="font-semibold text-white">{workedLabel}</span> — for qualifying shifts, {rule.name} requires a{' '}
                 <span className="font-semibold text-white">
                   {rule.mealBreakMinutes}-minute {rule.isPaid ? 'paid' : 'unpaid'}
                 </span>{' '}
-                meal break before the {isSecondBreak ? '10th' : `${rule.triggerAfterHours + 1}th`} hour of work.
+                meal break starting before hour {isSecondBreak ? 10 : rule.triggerAfterHours + 1} of work. See the rule below for when it applies.
               </p>
             </div>
 

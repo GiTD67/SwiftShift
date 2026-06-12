@@ -5,6 +5,9 @@
 .ta-app {
   display: flex;
   height: 100vh;
+  /* dvh tracks the iOS Safari toolbar so the bottom of the app isn't
+     permanently clipped behind it; vh above is the fallback. */
+  height: 100dvh;
   overflow: hidden;
   /* Near-black depth gradient + accent-tinted aurora — this is the canonical
      base the default background uses and what every .glass panel refracts.

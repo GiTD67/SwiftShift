@@ -128,7 +128,7 @@ function loadSalesState(): any {
 function StreakFire({ count }: { count: number }) {
   if (count === 0) return <span className="text-zinc-500 text-xs">No streak</span>
   return (
-    <span className="flex items-center gap-1 text-sm font-semibold text-amber-400">
+    <span className="inline-flex items-center gap-1 text-sm font-semibold text-amber-400">
       🔥 {count}d
     </span>
   )
@@ -800,7 +800,7 @@ export function SalesKPI({ isAdmin = true, accentColor = '#22c55e', addXP }: Sal
                             <div className="text-lg font-bold" style={{ color: 'var(--accent-color)' }}>{fmt(val)}</div>
                             {delta !== null && (
                               <div className={`text-xs font-medium ${delta >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                {delta >= 0 ? '+' : ''}{label === 'Revenue' ? formatCurrency(Math.abs(delta)) : delta} vs prev
+                                {delta >= 0 ? '+' : '-'}{label === 'Revenue' ? formatCurrency(Math.abs(delta)) : Math.abs(delta)} vs prev
                               </div>
                             )}
                           </div>

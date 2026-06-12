@@ -64,7 +64,7 @@ function computeHourlyRate(user: any): number {
 
 const LEVEL_NAMES = ['Rookie', 'Associate', 'Pro', 'Senior', 'Expert', 'Elite', 'Master', 'Legend']
 
-export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'green', user, onFocus, highlightRate, onRateChange, xpTotalForPTO }: RewardsProps) {
+export function Rewards({ totalHours, isClockedIn, theme = 'green', user, onFocus, highlightRate, onRateChange, xpTotalForPTO }: RewardsProps) {
   const [hourlyRate, setHourlyRate] = useState(() => computeHourlyRate(user))
   const [ptoAccrualRate, setPtoAccrualRate] = useState(1 / 30)
   const [dailyGoalHours, setDailyGoalHours] = useState(() => {
@@ -78,8 +78,9 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
   const rateInputRef = useRef<HTMLInputElement>(null)
   const rateCardRef = useRef<HTMLDivElement>(null)
 
-  const liveTodayEarnings = isClockedIn ? (elapsedSeconds / 3600) * hourlyRate : 0
-  const earnedToday = liveTodayEarnings
+  // totalHours is today's total (live session included), so this keeps the
+  // Daily Mission / achievements from resetting to $0 the moment you clock out.
+  const earnedToday = totalHours * hourlyRate
   const totalEarnings = totalHours * hourlyRate
   const accruedPTO = totalHours * ptoAccrualRate
   const isOvertime = totalHours > 8
@@ -142,7 +143,9 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
   }
 
   const daysUntil = daysUntilNextPaycheck()
-  const paycheckProgress = Math.min(100, ((14 - daysUntil) / 14) * 100)
+  // Semi-monthly paydays can be up to ~20 days apart, so clamp at 0 or the
+  // bar renders empty with a negative percentage label.
+  const paycheckProgress = Math.max(0, Math.min(100, ((14 - daysUntil) / 14) * 100))
 
   // Streak tracking via localStorage
   useEffect(() => {
@@ -281,7 +284,7 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
                     transition={{ repeat: Infinity, duration: 1.0 }}
                   />
                   <span className="text-xs uppercase tracking-widest text-zinc-300 font-medium">
-                    {isOvertime ? 'Overtime ×1.5' : 'live'}
+                    {isOvertime ? 'Overtime' : 'live'}
                   </span>
                 </div>
               </div>
@@ -345,7 +348,7 @@ export function Rewards({ totalHours, elapsedSeconds, isClockedIn, theme = 'gree
           <div className="glass rounded-3xl p-6 relative overflow-hidden">
             <div className="text-xs uppercase tracking-[3px] text-zinc-400 mb-3">Estimated Next Paycheck</div>
             <div className="text-4xl font-medium mb-2 neon-green">${Math.round(totalEarnings).toLocaleString()}</div>
-            <div className="text-xs text-zinc-500 mb-3">{daysUntil} days away</div>
+            <div className="text-xs text-zinc-500 mb-3">{daysUntil === 0 ? 'Payday today' : daysUntil === 1 ? '1 day away' : `${daysUntil} days away`}</div>
             <div className="crystal-progress">
               <div
                 className="h-full rounded-full transition-all duration-1000"

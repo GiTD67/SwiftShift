@@ -76,7 +76,11 @@ export const STATE_BREAK_RULES: Record<string, StateBreakRule> = {
   },
   IL: {
     state: 'IL', name: 'Illinois',
-    mealBreakMinutes: 20, triggerAfterHours: 7.5, secondBreakTriggerHours: 0, isPaid: false,
+    // Trigger is the reminder point, one hour before the legal deadline (the
+    // CA convention above): the break must START no later than 5 hrs in, so
+    // reminding at 7.5 hrs (shift-length eligibility) fired after the
+    // violation had already happened.
+    mealBreakMinutes: 20, triggerAfterHours: 4, secondBreakTriggerHours: 0, isPaid: false,
     note: '20-min unpaid break for shifts over 7.5 hours; break must begin no later than 5 hrs after shift start. (820 ILCS 140/3)',
   },
   IN: {
