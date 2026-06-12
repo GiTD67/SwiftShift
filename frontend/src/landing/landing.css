@@ -1,0 +1,303 @@
+/* ============================================================
+   SwiftShift scrollytelling landing + auth pages.
+   Aesthetic: pure black, hairline borders, big grotesque type,
+   one lime accent. All motion is added by GSAP; every element
+   must read correctly with JS disabled or reduced motion.
+   ============================================================ */
+
+.lp-root {
+  --lp-bg: #000;
+  --lp-fg: #f4f4f5;
+  --lp-dim: rgba(244, 244, 245, 0.38);
+  --lp-faint: rgba(244, 244, 245, 0.16);
+  --lp-hairline: rgba(255, 255, 255, 0.09);
+  --lp-accent: #d7fe51;
+  --lp-amber: #ff9a3c;
+  background: var(--lp-bg);
+  color: var(--lp-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+
+/* Fine dot texture, terafab-style (right-weighted) */
+.lp-dots {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.14) 1px, transparent 1px);
+  background-size: 22px 22px;
+  -webkit-mask-image: linear-gradient(100deg, transparent 35%, rgba(0, 0, 0, 0.5) 70%, #000 100%);
+  mask-image: linear-gradient(100deg, transparent 35%, rgba(0, 0, 0, 0.5) 70%, #000 100%);
+}
+
+/* ---------- type ---------- */
+.lp-h1 {
+  font-size: clamp(1.9rem, 4.6vw, 3.6rem);
+  line-height: 1.16;
+  font-weight: 500;
+  letter-spacing: -0.022em;
+}
+.lp-h2 {
+  font-size: clamp(1.7rem, 3.8vw, 3rem);
+  line-height: 1.14;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.lp-eyebrow {
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--lp-dim);
+}
+.lp-word { color: var(--lp-dim); }
+.lp-word--em { color: var(--lp-fg); }
+
+/* ---------- nav ---------- */
+.lp-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px clamp(20px, 4vw, 48px);
+  transition: background-color 0.35s ease, backdrop-filter 0.35s ease;
+}
+.lp-nav.is-scrolled {
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* ---------- buttons ---------- */
+.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  color: #000;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 11px 22px;
+  border-radius: 4px;
+  white-space: nowrap;
+  transition: transform 0.25s var(--ease-out, ease), box-shadow 0.25s ease;
+}
+@media (max-width: 640px) {
+  .lp-nav { padding: 13px 16px; }
+  .lp-btn { padding: 9px 14px; font-size: 0.8rem; }
+}
+.lp-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 36px -8px rgba(255, 255, 255, 0.45);
+}
+.lp-btn--ghost {
+  background: transparent;
+  color: var(--lp-dim);
+  border: none;
+}
+.lp-btn--ghost:hover {
+  color: var(--lp-fg);
+  box-shadow: none;
+}
+
+/* ---------- hero clock ring (rotates with scroll) ---------- */
+.lp-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px dashed rgba(255, 255, 255, 0.10);
+  pointer-events: none;
+}
+.lp-ring--inner { border-style: solid; border-color: rgba(255, 255, 255, 0.06); }
+
+/* ---------- friction scale (pinned) ---------- */
+.lp-step {
+  display: grid;
+  grid-template-columns: 86px 1fr;
+  gap: 18px;
+  padding: 16px 4px;
+  border-top: 1px solid var(--lp-hairline);
+  opacity: 0.3;
+}
+.lp-step:last-child { border-bottom: 1px solid var(--lp-hairline); }
+.lp-step .lp-step-tap { color: var(--lp-dim); font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; padding-top: 2px; }
+.lp-step .lp-step-name { font-weight: 600; font-size: 0.95rem; }
+.lp-step .lp-step-desc { color: var(--lp-dim); font-size: 0.9rem; margin-top: 2px; }
+
+/* the orb — lime ring state */
+.lp-orb-ring {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 1.5px solid rgba(215, 254, 81, 0.85);
+  box-shadow:
+    0 0 24px rgba(215, 254, 81, 0.35),
+    0 0 90px rgba(215, 254, 81, 0.18),
+    inset 0 0 36px rgba(215, 254, 81, 0.12);
+}
+/* the orb — molten "sun" state */
+.lp-orb-sun {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 42% 38%, #fff7d8 0%, #ffd36e 18%, #ff9a3c 45%, #c2440a 72%, rgba(60, 12, 0, 0.9) 100%);
+  box-shadow:
+    0 0 60px rgba(255, 154, 60, 0.55),
+    0 0 180px rgba(255, 120, 30, 0.35),
+    0 0 320px rgba(255, 100, 20, 0.18);
+}
+.lp-orb-sun::after {
+  /* slow-turning surface detail so the sun feels alive */
+  content: '';
+  position: absolute;
+  inset: -2%;
+  border-radius: 50%;
+  background:
+    radial-gradient(18% 14% at 64% 30%, rgba(120, 30, 0, 0.55), transparent 70%),
+    radial-gradient(22% 16% at 30% 62%, rgba(140, 40, 0, 0.5), transparent 70%),
+    radial-gradient(12% 10% at 52% 74%, rgba(255, 235, 180, 0.5), transparent 70%);
+  animation: lp-sun-turn 26s linear infinite;
+  mix-blend-mode: soft-light;
+}
+@keyframes lp-sun-turn {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ---------- live pay ---------- */
+.lp-glow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 70vh;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 90% at 50% 120%, rgba(255, 154, 60, 0.34) 0%, rgba(255, 120, 30, 0.16) 38%, transparent 70%),
+    radial-gradient(80% 60% at 50% 130%, rgba(215, 254, 81, 0.10) 0%, transparent 60%);
+}
+.lp-money {
+  font-variant-numeric: tabular-nums;
+  font-weight: 550;
+  letter-spacing: -0.03em;
+}
+.lp-handwrite {
+  font-family: 'Caveat', 'Bradley Hand', cursive;
+  font-weight: 600;
+  font-size: clamp(1.3rem, 2.2vw, 1.8rem);
+  color: rgba(244, 244, 245, 0.85);
+  transform: rotate(-4deg);
+}
+.lp-handwrite-clip {
+  display: inline-block;
+  clip-path: inset(-20% 100% -20% 0);
+}
+
+/* ---------- comparison table ---------- */
+.lp-cmp-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1.3fr 1fr 1fr;
+  gap: clamp(10px, 2vw, 28px);
+  padding: 15px 4px;
+  border-top: 1px solid var(--lp-hairline);
+  font-size: 0.9rem;
+  align-items: baseline;
+}
+.lp-cmp-row:last-child { border-bottom: 1px solid var(--lp-hairline); }
+.lp-cmp-row > :first-child { color: var(--lp-dim); font-size: 0.82rem; }
+.lp-cmp-swift { color: var(--lp-fg); font-weight: 500; }
+.lp-cmp-swift .lp-check { color: var(--lp-accent); margin-right: 6px; }
+.lp-cmp-other { color: var(--lp-dim); }
+@media (max-width: 640px) {
+  .lp-cmp-row { grid-template-columns: 1fr 1.25fr; row-gap: 4px; }
+  .lp-cmp-row > .lp-cmp-other { display: none; }
+  .lp-cmp-row.lp-cmp-head > .lp-cmp-other { display: none; }
+}
+
+/* ---------- stats ---------- */
+.lp-stat-num {
+  font-size: clamp(2.6rem, 6vw, 4.6rem);
+  font-weight: 550;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.lp-bar {
+  width: clamp(34px, 4vw, 52px);
+  border-radius: 3px 3px 0 0;
+  transform-origin: bottom;
+}
+
+/* ---------- finale mock app slab ---------- */
+.lp-letterbox {
+  position: relative;
+  overflow: hidden;
+  background: #000;
+}
+.lp-slab {
+  background: linear-gradient(165deg, #16181d 0%, #0a0b0e 70%);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 18px;
+  box-shadow:
+    0 60px 120px -40px rgba(0, 0, 0, 0.9),
+    0 0 80px -30px rgba(215, 254, 81, 0.12);
+}
+
+/* ============================================================
+   Auth pages (sign in / create account)
+   ============================================================ */
+.lpa-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--lp-hairline);
+  border-radius: 6px;
+  padding: 12px 16px;
+  font-size: 0.9rem;
+  color: var(--lp-fg);
+  outline: none;
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+.lpa-input::placeholder { color: rgba(244, 244, 245, 0.22); }
+.lpa-input:focus {
+  border-color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.07);
+}
+.lpa-label {
+  display: block;
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--lp-dim);
+  margin-bottom: 7px;
+}
+.lpa-submit {
+  width: 100%;
+  background: #fff;
+  color: #000;
+  font-weight: 600;
+  font-size: 0.92rem;
+  padding: 13px;
+  border-radius: 6px;
+  transition: box-shadow 0.25s ease, transform 0.15s ease;
+}
+.lpa-submit:hover:not(:disabled) { box-shadow: 0 0 40px -10px rgba(255, 255, 255, 0.5); }
+.lpa-submit:active:not(:disabled) { transform: scale(0.985); }
+.lpa-submit:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* staggered entrance for auth page content */
+@keyframes lpa-rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.lpa-rise { animation: lpa-rise 0.7s var(--ease-out, ease) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lpa-rise { animation: none; }
+  .lp-orb-sun::after { animation: none; }
+}

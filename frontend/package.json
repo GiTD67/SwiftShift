@@ -12,10 +12,13 @@
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",
+    "@fontsource/caveat": "^5.2.8",
     "boxicons": "^2.1.4",
     "canvas-confetti": "^1.9.3",
     "date-fns": "^3.6.0",
     "framer-motion": "^11.2.10",
+    "gsap": "^3.15.0",
+    "lenis": "^1.3.23",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-markdown": "^10.1.0",

@@ -15,3 +15,6 @@ push-nightly-workflow.command
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Local design-reference material (not part of the app)
+Screenshots/
