@@ -1,0 +1,14 @@
+# Keep the Docker build context small and force a clean frontend build
+.git
+.github
+**/node_modules
+**/dist
+**/__pycache__
+*.pyc
+.DS_Store
+**/.DS_Store
+*.command
+/test
+/venv
+backend/s3
+frontend/single.html

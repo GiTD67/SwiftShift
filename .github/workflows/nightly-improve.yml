@@ -69,10 +69,16 @@ jobs:
             A push to main = a live deploy. Treat that seriously.
 
             ## Your mission (do ALL of it)
-            1. EXPLORE WITH ~30 AGENTS: Use the Task tool to spawn a team of about
-               THIRTY independent sub-agents, run in parallel batches (e.g. 6-8 at a
-               time so you don't exhaust resources). Give each agent its OWN focus
-               area so coverage is broad. Spread them across, at minimum:
+            1. EXPLORE WITH ~30 CHEAP AGENTS: Use the Task tool to spawn a team of
+               about THIRTY independent sub-agents, run in parallel batches (e.g. 6-8
+               at a time so you don't exhaust resources). NEVER spawn default-model
+               (Fable) sub-agents — use the agents defined in `.claude/agents/`:
+               `code-scout` (Haiku) for mechanical sweeps (copy/microcopy, dead code
+               and duplication, simple accessibility attribute scans, dead
+               links/assets) and `code-analyst` (Sonnet) for judgment-heavy areas
+               (correctness, security, performance, UX flows, error handling). Give
+               each agent its OWN focus area so coverage is broad. Spread them
+               across, at minimum:
                  - Visual / UI polish (spacing, alignment, color, hierarchy)
                  - UX & logistics (flows, navigation, confusing steps, empty/loading/error states)
                  - Accessibility (WCAG: labels, contrast, keyboard, focus, ARIA)
@@ -90,8 +96,8 @@ jobs:
                low-risk wins over one big risky rewrite. Make the smallest change that
                delivers each improvement.
             3. IMPLEMENT the chosen changes.
-            4. REVIEW WITH A SECOND WAVE OF AGENTS: Spawn a separate team of reviewer
-               sub-agents to independently audit the changes — correctness,
+            4. REVIEW WITH A SECOND WAVE OF AGENTS: Spawn a separate team of
+               `change-reviewer` (Sonnet) sub-agents to independently audit the changes — correctness,
                regressions, scope creep, accessibility, and the SECURITY INVARIANTS
                below. Fix or revert anything they flag. Not done until reviewers pass.
             5. GATE ON BUILD/LINT/TEST — MANDATORY. From `frontend/`, run:
@@ -125,3 +131,12 @@ jobs:
             - Keep total changes for one night modest and reviewable.
             - If you find nothing worth changing, make no commit and say so. Do not
               invent busywork or churn files.
+            - MODEL ECONOMY: sub-agents run ONLY as the Haiku/Sonnet agents defined in
+              `.claude/agents/`, never as the default top-level model. You (the
+              orchestrator) keep consolidation, implementation, the build gate, and
+              the push. If tonight's split wasted effort (scout findings mostly noise,
+              a focus area always empty) or a cheap tier clearly missed things, append
+              one dated bullet to `.claude/orchestration-notes.md` (create if
+              missing), read that file at the start of future runs, and include it in
+              tonight's commit if you make one. Do not create any other tracking
+              files.

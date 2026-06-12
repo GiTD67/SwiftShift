@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh auth *)",
+      "Bash(gh workflow *)",
+      "Bash(gh run *)",
+      "Bash(gh secret *)",
+      "Bash(claude --version)",
+      "Bash(awk '{print $5\" bytes\"}')",
+      "Bash(python3 -c \"import json;d=json.load\\(open\\('/Users/trevordixon/.claude.json'\\)\\);print\\('\\\\n'.join\\(sorted\\(d.keys\\(\\)\\)\\)\\)\")",
+      "Bash(python3 -c \"import json;d=json.load\\(open\\('/Users/trevordixon/.claude.json'\\)\\);ps=d.get\\('projects',{}\\);print\\('projects count:',len\\(ps\\)\\);[print\\('KEY:',k\\) for k in ps if 'SwiftShift' in k]\")",
+      "Bash(python3 *)",
+      "Bash(git pull *)",
+      "Bash(rm -f .git/index.lock)",
+      "Bash(git stash *)",
+      "Bash(mkdir -p /tmp/swiftshift-local-backup)",
+      "Bash(cp Dockerfile render.yaml /tmp/swiftshift-local-backup/)",
+      "Bash(mv Dockerfile render.yaml /tmp/swiftshift-local-backup/)",
+      "Bash(sed -n '3755,3792p' App.tsx)",
+      "Bash(sed -n '4965,5020p' App.tsx)",
+      "Bash(sed -n '5300,5312p' App.tsx)",
+      "Bash(sed -n '5618,5635p' App.tsx)",
+      "Bash(sed -n '5648,5675p' App.tsx)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(JSON.stringify\\(p.scripts,null,2\\)\\)\")",
+      "Bash(npm run *)",
+      "Bash(npx vitest *)",
+      "Bash(git add *)",
+      "Bash(git commit -q -m 'Secure the API: login sessions, per-user data, and a manager role *)",
+      "Bash(git push *)",
+      "Bash(awk 'NR==1 || /\\\\/$|tmp/')",
+      "Bash(awk 'NR==2{print $4\" free \\(\"$5\" used\\)\"}')",
+      "Bash(rm -rf ~/Library/Caches/Homebrew/*)",
+      "Bash(rm -f ~/.claude.json.bak-1780974158)",
+      "Bash(rm -rf /Users/trevordixon/Documents/SwiftShift/backend/__pycache__ /Users/trevordixon/Documents/SwiftShift/backend/routes/__pycache__/*.cpython-314.pyc)",
+      "Bash(echo \"lint exit: $?\")",
+      "Bash(echo \"build exit: $?\")",
+      "Bash(echo \"test exit: $?\")",
+      "Read(//private/tmp/**)"
+    ]
+  }
+}
