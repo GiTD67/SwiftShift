@@ -1,6 +1,13 @@
 #!/bin/bash
 # One-shot: push the already-made local commit to GitHub main (triggers Render deploy).
 cd "$(dirname "$0")" || exit 1
+echo "Syncing with GitHub first (pull --rebase)..."
+if ! git pull --rebase origin main; then
+  echo
+  echo "Sync failed — fix the conflict above (or ask Claude), then re-run."
+  read -r -p "Press Return to close this window."
+  exit 1
+fi
 echo "Pushing local commits to GitHub main..."
 if git push origin main; then
   echo
