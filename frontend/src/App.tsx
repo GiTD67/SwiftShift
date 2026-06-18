@@ -1756,6 +1756,7 @@ function ResetPasswordPage() {
             <div className="mb-5">
               <div className="text-xs tracking-[2px] mb-1.5 uppercase" style={{ color: accentHex }}>Set New Password</div>
               <h2 className="text-2xl font-semibold tracking-tight">Choose a new password</h2>
+              <p className="text-sm text-zinc-500 mt-1.5">We emailed you this link — it expires one hour after it was sent.</p>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -1824,6 +1825,76 @@ function ResetPasswordPage() {
   )
 }
 
+// ===== Verify Email Page =====
+function VerifyEmailPage() {
+  const token = new URLSearchParams(window.location.search).get('token') || ''
+  const [status, setStatus] = useState<'verifying' | 'success' | 'error'>(token ? 'verifying' : 'error')
+  const [message, setMessage] = useState(token ? '' : 'Invalid verification link.')
+  const accentHex = getThemeAccentHex(localStorage.getItem('theme') || 'green')
+
+  useEffect(() => {
+    if (!token) return
+    let cancelled = false
+    fetch(`${API_BASE}/api/auth/verify-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
+      .then(async res => {
+        const data = await res.json().catch(() => ({}))
+        if (cancelled) return
+        if (res.ok) {
+          setStatus('success')
+          // Keep the cached user in sync so any "unverified" prompt clears.
+          try {
+            const u = JSON.parse(localStorage.getItem('user') || 'null')
+            if (u) { u.email_verified = true; localStorage.setItem('user', JSON.stringify(u)) }
+          } catch { /* ignore */ }
+        } else {
+          setStatus('error')
+          setMessage(data.error || 'Verification failed. The link may have expired.')
+        }
+      })
+      .catch(() => { if (!cancelled) { setStatus('error'); setMessage('Connection failed. Please try again.') } })
+    return () => { cancelled = true }
+  }, [token])
+
+  return (
+    <div className="h-[100dvh] overflow-y-auto auth-bg text-white relative">
+      <div className="min-h-full flex items-center justify-center p-4 relative">
+        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(#0a1629_0.8px,transparent_1px)] bg-[length:4px_4px]" />
+        <div className="glass w-full max-w-[380px] rounded-3xl p-8 border border-white/10 relative z-10 text-center" style={{ boxShadow: `0 0 80px -20px ${accentHex}35, 0 28px 72px -14px rgba(0,0,0,0.85)` }}>
+          <div className="flex items-center justify-center gap-3 mb-6">
+            <LogoSVG className="h-8 w-auto" />
+            <span className="font-semibold text-xl tracking-[1px]">SWIFTSHIFT</span>
+          </div>
+          {status === 'verifying' && (
+            <p className="text-sm text-zinc-400 py-4">Verifying your email…</p>
+          )}
+          {status === 'success' && (
+            <div className="py-4 space-y-3">
+              <div className="flex justify-center mb-1">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              </div>
+              <p className="text-sm text-zinc-400">Your email is verified. Thanks!</p>
+              <a href="." className="inline-block text-sm underline underline-offset-4 text-zinc-400 hover:text-white transition-colors">Continue to SwiftShift</a>
+            </div>
+          )}
+          {status === 'error' && (
+            <div className="py-4 space-y-3">
+              <div className="flex justify-center mb-1">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              </div>
+              <p className="text-sm text-zinc-400">{message}</p>
+              <a href="." className="inline-block text-sm underline underline-offset-4 text-zinc-400 hover:text-white transition-colors">Back to SwiftShift</a>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ===== Main App (existing) =====
 export default function App() {
   const pathname = window.location.pathname
@@ -1844,8 +1915,10 @@ export default function App() {
   const isSignup = pathname === '/signup' || pathname.endsWith('/signup')
   const isAdmin = pathname === '/admin' || pathname.endsWith('/admin')
   const isResetPassword = pathname === '/reset-password' || pathname.endsWith('/reset-password')
+  const isVerifyEmail = pathname === '/verify-email' || pathname.endsWith('/verify-email')
 
   if (isResetPassword) return <ResetPasswordPage />
+  if (isVerifyEmail) return <VerifyEmailPage />
   if (isSignup) return <SignupPage />
 
   // Gate: nothing visible without login

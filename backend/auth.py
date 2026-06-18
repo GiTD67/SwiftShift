@@ -10,6 +10,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from audit import log_event
 from db import get_db
 from limiter import limiter
+from mailer import APP_BASE_URL, send_reset_email, send_verification_email
 
 bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
@@ -100,6 +101,7 @@ def _ensure_users_table():
             "streak_count INTEGER DEFAULT 0",
             "streak_last_date TEXT",
             "is_manager BOOLEAN DEFAULT FALSE",
+            "email_verified BOOLEAN DEFAULT FALSE",
             "phone TEXT",
             "address_line1 TEXT",
             "address_line2 TEXT",
@@ -228,6 +230,41 @@ def _ensure_password_reset_tokens_table():
 _ensure_password_reset_tokens_table()
 
 
+def _ensure_email_verification_tokens_table():
+    with get_db() as db:
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS email_verification_tokens (
+              id SERIAL PRIMARY KEY,
+              user_id INTEGER NOT NULL,
+              token TEXT UNIQUE NOT NULL,
+              expires_at INTEGER NOT NULL,
+              used INTEGER DEFAULT 0
+            )
+            """
+        )
+
+
+_ensure_email_verification_tokens_table()
+
+
+def _issue_verification_email(user_id, email):
+    """Create a 24h verification token and email the confirmation link.
+
+    Best-effort: returns whether Resend accepted the message (False if email
+    isn't configured), but never raises into the caller.
+    """
+    token = str(uuid.uuid4())
+    expires_at = int(time.time()) + 86400  # 24 hours
+    with get_db() as db:
+        db.execute(
+            "INSERT INTO email_verification_tokens (user_id, token, expires_at) VALUES (?, ?, ?)",
+            (user_id, token, expires_at),
+        )
+        db.commit()
+    return send_verification_email(email, f"{APP_BASE_URL}/verify-email?token={token}")
+
+
 @bp.route("/signup", methods=["POST"])
 @limiter.limit("10 per minute")
 def signup():
@@ -257,6 +294,14 @@ def signup():
     user = dict(user)
     session.permanent = True
     session["uid"] = user["id"]
+    # Best-effort verification email. The account is usable immediately so the
+    # invite-accept step right after signup still works; the app shows an
+    # "unverified" banner until the link is clicked.
+    try:
+        _issue_verification_email(user["id"], email)
+    except Exception:
+        pass
+    user["email_verified"] = False
     return jsonify(user), 201
 
 
@@ -297,6 +342,7 @@ def signin():
         "streak_count": row.get("streak_count"),
         "streak_last_date": row.get("streak_last_date"),
         "is_manager": bool(row.get("is_manager")),
+        "email_verified": bool(row.get("email_verified")),
     })
 
 
@@ -358,6 +404,7 @@ def google_auth():
         "streak_count": row.get("streak_count"),
         "streak_last_date": row.get("streak_last_date"),
         "is_manager": bool(row.get("is_manager")),
+        "email_verified": bool(row.get("email_verified")),
     })
 
 
@@ -374,7 +421,7 @@ def forgot_password():
     generic = {"message": "If that email is registered, a reset link has been sent."}
 
     with get_db() as db:
-        row = db.execute("SELECT id FROM users WHERE LOWER(email) = ?", (email,)).fetchone()
+        row = db.execute("SELECT id, email FROM users WHERE LOWER(email) = ?", (email,)).fetchone()
         if not row:
             return jsonify(generic)
 
@@ -385,8 +432,12 @@ def forgot_password():
             (row["id"], token, expires_at),
         )
         db.commit()
+        target_email = row["email"]
 
-    # NOTE: token is stored, not returned. Email delivery wires up the reset link.
+    # Email the reset link (best-effort). The token is never returned in the
+    # response, so this endpoint can't be used to harvest tokens or to tell
+    # whether an email is registered (the response is identical either way).
+    send_reset_email(target_email, f"{APP_BASE_URL}/reset-password?token={token}")
     return jsonify(generic)
 
 
@@ -426,3 +477,45 @@ def reset_password():
         db.commit()
 
     return jsonify({"message": "Password updated successfully."})
+
+
+@bp.route("/verify-email", methods=["POST"])
+@limiter.limit("10 per minute")
+def verify_email():
+    data = request.get_json() or {}
+    token = (data.get("token") or "").strip()
+    if not token:
+        return jsonify({"error": "token required"}), 400
+
+    with get_db() as db:
+        row = db.execute(
+            "SELECT * FROM email_verification_tokens WHERE token = ? AND used = 0",
+            (token,),
+        ).fetchone()
+        if not row:
+            return jsonify({"error": "Invalid or already-used verification link"}), 400
+        if int(time.time()) > row["expires_at"]:
+            return jsonify({"error": "Verification link has expired. Please request a new one."}), 400
+        db.execute("UPDATE users SET email_verified = TRUE WHERE id = ?", (row["user_id"],))
+        db.execute("UPDATE email_verification_tokens SET used = 1 WHERE token = ?", (token,))
+        db.commit()
+
+    return jsonify({"message": "Email verified.", "email_verified": True})
+
+
+@bp.route("/resend-verification", methods=["POST"])
+@limiter.limit("3 per minute")
+def resend_verification():
+    # Lives under the public /api/auth prefix, so enforce a logged-in session
+    # explicitly (the in-app "verify your email" prompt triggers this).
+    uid = session.get("uid")
+    if not uid:
+        return jsonify({"error": "authentication required"}), 401
+    with get_db() as db:
+        row = db.execute("SELECT email, email_verified FROM users WHERE id = ?", (uid,)).fetchone()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    if row.get("email_verified"):
+        return jsonify({"message": "Email already verified.", "email_verified": True})
+    _issue_verification_email(uid, row["email"])
+    return jsonify({"message": "Verification email sent."})

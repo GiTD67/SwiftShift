@@ -253,7 +253,7 @@ function ForgotPasswordModal({ onClose, accentHex }: { onClose: () => void; acce
           <div className="text-center py-4 space-y-3">
             <div className="text-4xl">📬</div>
             <p className="text-sm text-zinc-400">
-              If that email is registered, a reset link has been generated.
+              If that email is registered, a reset link is on its way to your inbox.
             </p>
             {resetUrl && (
               <div className="mt-3 p-3 rounded-lg bg-white/5 border border-white/10 text-left">
@@ -269,7 +269,7 @@ function ForgotPasswordModal({ onClose, accentHex }: { onClose: () => void; acce
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <p className="text-sm text-zinc-400">Enter your email and we'll generate a password reset link.</p>
+            <p className="text-sm text-zinc-400">Enter your email and we'll send you a reset link.</p>
             <div>
               <label htmlFor="forgot-email" className="lpa-label">Email</label>
               <input
@@ -290,7 +290,7 @@ function ForgotPasswordModal({ onClose, accentHex }: { onClose: () => void; acce
               </div>
             )}
             <button type="submit" disabled={loading} className="lpa-submit">
-              {loading ? 'Generating link…' : 'Send Reset Link'}
+              {loading ? 'Sending…' : 'Send Reset Link'}
             </button>
           </form>
         )}
