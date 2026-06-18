@@ -1,5 +1,7 @@
-"""Auth routes: signup, signin, Google OAuth, forgot/reset password."""
+"""Auth routes: signup, signin, Google OAuth, forgot/reset password, 2FA."""
 import hashlib
+import json
+import secrets
 import time
 import uuid
 
@@ -11,6 +13,8 @@ from audit import log_event
 from db import get_db
 from limiter import limiter
 from mailer import APP_BASE_URL, send_reset_email, send_verification_email
+from totp import generate_secret, provisioning_uri
+from totp import verify as totp_verify
 
 bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
@@ -68,6 +72,65 @@ def _password_problem(password, email=None):
     return None
 
 
+def _auth_user_payload(row):
+    """The user object returned by signin / google / 2FA login-verify."""
+    return {
+        "id": row["id"],
+        "first_name": row["first_name"],
+        "last_name": row["last_name"],
+        "email": row["email"],
+        "job_role": row.get("job_role"),
+        "manager_name": row.get("manager_name"),
+        "is_fulltime": row.get("is_fulltime", 1),
+        "pay": row.get("pay"),
+        "salary": row.get("salary"),
+        "hourly_rate": row.get("hourly_rate"),
+        "pto_accrual_rate": row.get("pto_accrual_rate"),
+        "streak_count": row.get("streak_count"),
+        "streak_last_date": row.get("streak_last_date"),
+        "is_manager": bool(row.get("is_manager")),
+        "email_verified": bool(row.get("email_verified")),
+    }
+
+
+def _gen_backup_code():
+    raw = secrets.token_hex(5)  # 10 lowercase hex chars
+    return f"{raw[:5]}-{raw[5:]}"
+
+
+def _check_totp_or_backup(row, code):
+    """True if `code` is a valid current TOTP code or an unused backup code.
+
+    A matched backup code is consumed (removed from the stored list) so it can
+    never be replayed.
+    """
+    code = (code or "").strip()
+    if not code:
+        return False
+    secret = row.get("totp_secret")
+    if secret and totp_verify(secret, code):
+        return True
+    raw = row.get("totp_backup_codes")
+    if not raw:
+        return False
+    try:
+        hashes = json.loads(raw)
+    except Exception:
+        return False
+    normalized = code.replace("-", "").replace(" ", "").lower()
+    for i, h in enumerate(hashes):
+        if check_password_hash(h, normalized):
+            remaining = hashes[:i] + hashes[i + 1:]
+            with get_db() as db:
+                db.execute(
+                    "UPDATE users SET totp_backup_codes = ? WHERE id = ?",
+                    (json.dumps(remaining), row["id"]),
+                )
+                db.commit()
+            return True
+    return False
+
+
 def _ensure_users_table():
     with get_db() as db:
         db.execute(
@@ -102,6 +165,9 @@ def _ensure_users_table():
             "streak_last_date TEXT",
             "is_manager BOOLEAN DEFAULT FALSE",
             "email_verified BOOLEAN DEFAULT FALSE",
+            "totp_secret TEXT",
+            "totp_enabled BOOLEAN DEFAULT FALSE",
+            "totp_backup_codes TEXT",
             "phone TEXT",
             "address_line1 TEXT",
             "address_line2 TEXT",
@@ -324,26 +390,18 @@ def signin():
         ).fetchone()
     if not row or not check_password_hash(row["password_hash"], password):
         return jsonify({"error": "invalid credentials"}), 401
+    if row.get("totp_enabled"):
+        # Password is correct but 2FA is on: don't authenticate yet. Stash a
+        # pending marker (NOT an authed session) for /totp/login-verify, and
+        # don't leak the user object before the second factor is provided.
+        session["pending_2fa_uid"] = row["id"]
+        session.pop("uid", None)
+        return jsonify({"totp_required": True})
     session.permanent = True
     session["uid"] = row["id"]
+    session.pop("pending_2fa_uid", None)
     log_event(row["id"], f"{row['first_name']} {row['last_name']}", "login", f"Signed in as {row['email']}")
-    return jsonify({
-        "id": row["id"],
-        "first_name": row["first_name"],
-        "last_name": row["last_name"],
-        "email": row["email"],
-        "job_role": row.get("job_role"),
-        "manager_name": row.get("manager_name"),
-        "is_fulltime": row.get("is_fulltime", 1),
-        "pay": row.get("pay"),
-        "salary": row.get("salary"),
-        "hourly_rate": row.get("hourly_rate"),
-        "pto_accrual_rate": row.get("pto_accrual_rate"),
-        "streak_count": row.get("streak_count"),
-        "streak_last_date": row.get("streak_last_date"),
-        "is_manager": bool(row.get("is_manager")),
-        "email_verified": bool(row.get("email_verified")),
-    })
+    return jsonify(_auth_user_payload(row))
 
 
 @bp.route("/google", methods=["POST"])
@@ -386,26 +444,17 @@ def google_auth():
                  email.strip().lower() == FOUNDER_EMAIL),
             ).fetchone()
 
+    if row.get("totp_enabled"):
+        # Same 2FA gate as password signin — Google proving the email must not
+        # let a 2FA-protected account skip the second factor.
+        session["pending_2fa_uid"] = row["id"]
+        session.pop("uid", None)
+        return jsonify({"totp_required": True})
     session.permanent = True
     session["uid"] = row["id"]
+    session.pop("pending_2fa_uid", None)
     log_event(row["id"], f"{row['first_name']} {row['last_name']}", "login", f"Signed in with Google as {row['email']}")
-    return jsonify({
-        "id": row["id"],
-        "first_name": row["first_name"],
-        "last_name": row["last_name"],
-        "email": row["email"],
-        "job_role": row.get("job_role"),
-        "manager_name": row.get("manager_name"),
-        "is_fulltime": row.get("is_fulltime", 1),
-        "pay": row.get("pay"),
-        "salary": row.get("salary"),
-        "hourly_rate": row.get("hourly_rate"),
-        "pto_accrual_rate": row.get("pto_accrual_rate"),
-        "streak_count": row.get("streak_count"),
-        "streak_last_date": row.get("streak_last_date"),
-        "is_manager": bool(row.get("is_manager")),
-        "email_verified": bool(row.get("email_verified")),
-    })
+    return jsonify(_auth_user_payload(row))
 
 
 @bp.route("/forgot-password", methods=["POST"])
@@ -519,3 +568,119 @@ def resend_verification():
         return jsonify({"message": "Email already verified.", "email_verified": True})
     _issue_verification_email(uid, row["email"])
     return jsonify({"message": "Verification email sent."})
+
+
+@bp.route("/account-status", methods=["GET"])
+def account_status():
+    # Self-guarded (lives under the public /api/auth prefix).
+    uid = session.get("uid")
+    if not uid:
+        return jsonify({"error": "authentication required"}), 401
+    with get_db() as db:
+        row = db.execute(
+            "SELECT email_verified, totp_enabled FROM users WHERE id = ?", (uid,)
+        ).fetchone()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    return jsonify({
+        "email_verified": bool(row.get("email_verified")),
+        "totp_enabled": bool(row.get("totp_enabled")),
+    })
+
+
+@bp.route("/totp/setup", methods=["POST"])
+@limiter.limit("10 per minute")
+def totp_setup():
+    uid = session.get("uid")
+    if not uid:
+        return jsonify({"error": "authentication required"}), 401
+    with get_db() as db:
+        row = db.execute("SELECT email, totp_enabled FROM users WHERE id = ?", (uid,)).fetchone()
+        if not row:
+            return jsonify({"error": "not found"}), 404
+        if row.get("totp_enabled"):
+            # Don't silently wipe a working secret — disable first.
+            return jsonify({"error": "Two-factor is already enabled"}), 400
+        secret = generate_secret()
+        # Store the pending secret; 2FA stays disabled until a code is confirmed.
+        db.execute(
+            "UPDATE users SET totp_secret = ?, totp_enabled = FALSE WHERE id = ?",
+            (secret, uid),
+        )
+        db.commit()
+    return jsonify({"secret": secret, "otpauth_uri": provisioning_uri(secret, row["email"])})
+
+
+@bp.route("/totp/enable", methods=["POST"])
+@limiter.limit("10 per minute")
+def totp_enable():
+    uid = session.get("uid")
+    if not uid:
+        return jsonify({"error": "authentication required"}), 401
+    data = request.get_json() or {}
+    code = (data.get("code") or "").strip()
+    with get_db() as db:
+        row = db.execute(
+            "SELECT totp_secret, totp_enabled FROM users WHERE id = ?", (uid,)
+        ).fetchone()
+        if not row or not row.get("totp_secret"):
+            return jsonify({"error": "Start setup first"}), 400
+        if row.get("totp_enabled"):
+            return jsonify({"error": "Two-factor is already enabled"}), 400
+        if not totp_verify(row["totp_secret"], code):
+            return jsonify({"error": "That code didn't match. Try again."}), 400
+        # One-time backup codes: store hashes, return the plaintext set once.
+        plain_codes = [_gen_backup_code() for _ in range(10)]
+        hashes = [generate_password_hash(c.replace("-", "")) for c in plain_codes]
+        db.execute(
+            "UPDATE users SET totp_enabled = TRUE, totp_backup_codes = ? WHERE id = ?",
+            (json.dumps(hashes), uid),
+        )
+        db.commit()
+    return jsonify({"enabled": True, "backup_codes": plain_codes})
+
+
+@bp.route("/totp/disable", methods=["POST"])
+@limiter.limit("10 per minute")
+def totp_disable():
+    uid = session.get("uid")
+    if not uid:
+        return jsonify({"error": "authentication required"}), 401
+    data = request.get_json() or {}
+    code = (data.get("code") or "").strip()
+    with get_db() as db:
+        row = db.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    if not row or not row.get("totp_enabled"):
+        return jsonify({"error": "Two-factor isn't enabled"}), 400
+    # Require a valid current TOTP (or backup) code to turn 2FA off.
+    if not _check_totp_or_backup(row, code):
+        return jsonify({"error": "Invalid authentication code"}), 401
+    with get_db() as db:
+        db.execute(
+            "UPDATE users SET totp_enabled = FALSE, totp_secret = NULL, totp_backup_codes = NULL WHERE id = ?",
+            (uid,),
+        )
+        db.commit()
+    return jsonify({"enabled": False})
+
+
+@bp.route("/totp/login-verify", methods=["POST"])
+@limiter.limit("5 per minute")
+def totp_login_verify():
+    uid = session.get("pending_2fa_uid")
+    if not uid:
+        return jsonify({"error": "No pending login. Please sign in again."}), 400
+    data = request.get_json() or {}
+    code = (data.get("code") or "").strip()
+    with get_db() as db:
+        row = db.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    if not row or not row.get("totp_enabled"):
+        session.pop("pending_2fa_uid", None)
+        return jsonify({"error": "No pending login. Please sign in again."}), 400
+    if not _check_totp_or_backup(row, code):
+        return jsonify({"error": "Invalid authentication code"}), 401
+    session.permanent = True
+    session["uid"] = row["id"]
+    session.pop("pending_2fa_uid", None)
+    log_event(row["id"], f"{row['first_name']} {row['last_name']}", "login", f"Signed in with 2FA as {row['email']}")
+    return jsonify(_auth_user_payload(row))

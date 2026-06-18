@@ -299,6 +299,83 @@ function ForgotPasswordModal({ onClose, accentHex }: { onClose: () => void; acce
   )
 }
 
+// ===== Two-factor challenge (shown after a correct password when 2FA is on) =====
+function TotpChallengeModal({ email, accentHex, onClose }: { email: string; accentHex: string; onClose: () => void }) {
+  const [code, setCode] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/totp/login-verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: code.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || 'Invalid code. Try again.')
+      } else {
+        localStorage.setItem('user', JSON.stringify(data))
+        localStorage.setItem('lastEmail', email)
+        window.location.href = '.'
+      }
+    } catch {
+      setError('Connection failed. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Two-factor authentication"
+        className="w-full max-w-[360px] rounded-xl p-8 mx-4 border bg-[#0a0a0c]"
+        style={{ borderColor: 'rgba(255,255,255,0.12)', boxShadow: `0 0 80px -20px ${accentHex}25, 0 28px 72px -14px rgba(0,0,0,0.85)` }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-xl font-semibold">Two-factor code</h2>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors" aria-label="Close">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <p className="text-sm text-zinc-400">Enter the 6-digit code from your authenticator app. Lost your device? Enter a backup code instead.</p>
+          <input
+            id="totp-code"
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            value={code}
+            onChange={e => setCode(e.target.value)}
+            className="lpa-input tracking-[4px] text-center"
+            placeholder="123456"
+            autoFocus
+            required
+          />
+          {error && (
+            <div role="alert" className="text-sm text-red-400 flex items-center gap-2 bg-red-950/40 border border-red-900/60 rounded-lg px-4 py-2">⚠ {error}</div>
+          )}
+          <button type="submit" disabled={loading} className="lpa-submit">{loading ? 'Verifying…' : 'Verify →'}</button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ===== Sign in =====
 export function LoginPage() {
   const [email, setEmail] = useState(() => localStorage.getItem('lastEmail') || '')
@@ -309,6 +386,7 @@ export function LoginPage() {
   const [showFeaturePreview, setShowFeaturePreview] = useState(false)
   const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [showLoginTour, setShowLoginTour] = useState(false)
+  const [totpRequired, setTotpRequired] = useState(false)
 
   const isReturningUser = !!localStorage.getItem('lastEmail')
   const accentHex = getThemeAccentHex(localStorage.getItem('theme') || 'green')
@@ -326,6 +404,9 @@ export function LoginPage() {
       const data = await res.json()
       if (!res.ok) {
         setError(data.error || 'Access denied. Check credentials.')
+      } else if (data.totp_required) {
+        // Password OK, but the account has 2FA on — prompt for the code.
+        setTotpRequired(true)
       } else {
         localStorage.setItem('user', JSON.stringify(data))
         localStorage.setItem('lastEmail', email)
@@ -407,6 +488,9 @@ export function LoginPage() {
       )}
       {showForgotPassword && (
         <ForgotPasswordModal onClose={() => setShowForgotPassword(false)} accentHex={accentHex} />
+      )}
+      {totpRequired && (
+        <TotpChallengeModal email={email} accentHex={accentHex} onClose={() => setTotpRequired(false)} />
       )}
       {showLoginTour && (
         <Tour onClose={() => setShowLoginTour(false)} onComplete={() => setShowLoginTour(false)} accentHex={accentHex} />

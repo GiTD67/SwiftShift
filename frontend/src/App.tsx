@@ -5,6 +5,7 @@ import './index.css'
 import confetti from 'canvas-confetti'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
+import { QRCodeSVG } from 'qrcode.react'
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, addMonths, isSameMonth, isToday } from 'date-fns'
 import { useTimesheet } from './hooks/useTimesheet'
 import { useFormDraft, DraftRestoredNote } from './hooks/useFormDraft'
@@ -1825,6 +1826,119 @@ function ResetPasswordPage() {
   )
 }
 
+// ===== Security settings: email verification + opt-in TOTP 2FA =====
+function SecuritySettings({ userEmail }: { userEmail: string }) {
+  const [status, setStatus] = useState<{ email_verified: boolean; totp_enabled: boolean } | null>(null)
+  const [setup, setSetup] = useState<{ secret: string; otpauth_uri: string } | null>(null)
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [backupCodes, setBackupCodes] = useState<string[] | null>(null)
+  const [showDisable, setShowDisable] = useState(false)
+  const [disableCode, setDisableCode] = useState('')
+
+  const refresh = () => fetch(`${API_BASE}/api/auth/account-status`).then(r => r.json()).then(d => { if (!d.error) setStatus(d) }).catch(() => {})
+  useEffect(() => { refresh() }, [])
+
+  const startSetup = async () => {
+    setBusy(true)
+    try {
+      const r = await fetch(`${API_BASE}/api/auth/totp/setup`, { method: 'POST' })
+      const d = await r.json()
+      if (!r.ok) { toast.error(d.error || 'Could not start setup'); return }
+      setSetup(d); setBackupCodes(null); setCode('')
+    } catch { toast.error('Could not start setup') } finally { setBusy(false) }
+  }
+  const confirmEnable = async () => {
+    setBusy(true)
+    try {
+      const r = await fetch(`${API_BASE}/api/auth/totp/enable`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: code.trim() }) })
+      const d = await r.json()
+      if (!r.ok) { toast.error(d.error || 'Could not enable'); return }
+      setBackupCodes(d.backup_codes || []); setSetup(null); setCode(''); toast.success('Two-factor authentication enabled'); refresh()
+    } catch { toast.error('Could not enable') } finally { setBusy(false) }
+  }
+  const disable = async () => {
+    setBusy(true)
+    try {
+      const r = await fetch(`${API_BASE}/api/auth/totp/disable`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: disableCode.trim() }) })
+      const d = await r.json()
+      if (!r.ok) { toast.error(d.error || 'Could not disable'); return }
+      toast.success('Two-factor disabled'); setShowDisable(false); setDisableCode(''); refresh()
+    } catch { toast.error('Could not disable') } finally { setBusy(false) }
+  }
+  const resendVerification = async () => {
+    setBusy(true)
+    try {
+      const r = await fetch(`${API_BASE}/api/auth/resend-verification`, { method: 'POST' })
+      const d = await r.json()
+      if (!r.ok) { toast.error(d.error || 'Could not send'); return }
+      toast.success('Verification email sent')
+    } catch { toast.error('Could not send') } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="glass rounded-3xl p-6">
+        <h2 className="text-lg font-semibold mb-1 text-white">Email verification</h2>
+        <p className="text-xs text-zinc-500 mb-4">Confirm {userEmail} so we know it's really you.</p>
+        {status?.email_verified ? (
+          <div className="inline-flex items-center gap-2 text-sm text-emerald-400"><span className="w-2 h-2 rounded-full bg-emerald-400" /> Verified</div>
+        ) : (
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="inline-flex items-center gap-2 text-sm text-amber-400"><span className="w-2 h-2 rounded-full bg-amber-400" /> Not verified</div>
+            <button disabled={busy} onClick={resendVerification} className="px-4 py-2 rounded-xl text-sm font-medium glass hover:bg-white/10 text-zinc-200 disabled:opacity-50">Resend verification email</button>
+          </div>
+        )}
+      </div>
+
+      <div className="glass rounded-3xl p-6">
+        <h2 className="text-lg font-semibold mb-1 text-white">Two-factor authentication</h2>
+        <p className="text-xs text-zinc-500 mb-4">Add a 6-digit code from an authenticator app (Google Authenticator, Authy, 1Password) on top of your password.</p>
+        {status?.totp_enabled ? (
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 text-sm text-emerald-400"><span className="w-2 h-2 rounded-full bg-emerald-400" /> Two-factor is on</div>
+            {!showDisable ? (
+              <div><button onClick={() => setShowDisable(true)} className="px-4 py-2 rounded-xl text-sm font-medium glass hover:bg-white/10 text-zinc-200">Turn off</button></div>
+            ) : (
+              <div className="bg-white/5 rounded-2xl p-4 space-y-3 max-w-sm">
+                <p className="text-sm text-zinc-300">Enter a current code (or a backup code) to turn off 2FA.</p>
+                <input value={disableCode} onChange={e => setDisableCode(e.target.value)} className="glass-input w-full rounded-xl px-4 py-2.5 text-sm border border-white/10 focus:border-white/40 outline-none" placeholder="123456" inputMode="numeric" autoComplete="one-time-code" />
+                <div className="flex gap-2">
+                  <button disabled={busy} onClick={disable} className="px-4 py-2 rounded-xl text-sm font-medium bg-red-500/80 hover:bg-red-500 text-white disabled:opacity-50">Turn off 2FA</button>
+                  <button onClick={() => { setShowDisable(false); setDisableCode('') }} className="px-4 py-2 rounded-xl text-sm font-medium glass hover:bg-white/10 text-zinc-300">Cancel</button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : backupCodes ? (
+          <div className="bg-white/5 rounded-2xl p-4 space-y-3 max-w-sm">
+            <p className="text-sm text-emerald-400 font-medium">2FA is on. Save your backup codes.</p>
+            <p className="text-xs text-zinc-500">Each code works once if you lose your authenticator. Store them somewhere safe — you won't see them again.</p>
+            <div className="grid grid-cols-2 gap-2 font-mono text-sm text-zinc-200">
+              {backupCodes.map(c => <div key={c} className="bg-black/40 rounded-lg px-3 py-1.5 text-center tracking-wider">{c}</div>)}
+            </div>
+            <button onClick={() => setBackupCodes(null)} className="px-4 py-2 rounded-xl text-sm font-medium glass hover:bg-white/10 text-zinc-200">I've saved these</button>
+          </div>
+        ) : setup ? (
+          <div className="bg-white/5 rounded-2xl p-4 space-y-4 max-w-sm">
+            <p className="text-sm text-zinc-300">1. Scan this with your authenticator app:</p>
+            <div className="bg-white rounded-xl p-3 w-fit"><QRCodeSVG value={setup.otpauth_uri} size={168} /></div>
+            <p className="text-xs text-zinc-500">Can't scan? Enter this key manually:<br /><span className="font-mono text-zinc-300 break-all">{setup.secret}</span></p>
+            <p className="text-sm text-zinc-300">2. Enter the 6-digit code it shows:</p>
+            <input value={code} onChange={e => setCode(e.target.value)} className="glass-input w-full rounded-xl px-4 py-2.5 text-sm border border-white/10 focus:border-white/40 outline-none" placeholder="123456" inputMode="numeric" autoComplete="one-time-code" />
+            <div className="flex gap-2">
+              <button disabled={busy} onClick={confirmEnable} className="px-4 py-2 rounded-xl text-sm font-medium text-black disabled:opacity-50" style={{ backgroundColor: 'var(--accent-color)' }}>Verify &amp; enable</button>
+              <button onClick={() => { setSetup(null); setCode('') }} className="px-4 py-2 rounded-xl text-sm font-medium glass hover:bg-white/10 text-zinc-300">Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <button disabled={busy || status === null} onClick={startSetup} className="px-4 py-2 rounded-xl text-sm font-medium text-black disabled:opacity-50" style={{ backgroundColor: 'var(--accent-color)' }}>Enable two-factor</button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ===== Verify Email Page =====
 function VerifyEmailPage() {
   const token = new URLSearchParams(window.location.search).get('token') || ''
@@ -2006,7 +2120,7 @@ export default function App() {
   const appearanceOpenRef = useRef(false)
 
   // Profile tabs state
-  const [profileTab, setProfileTab] = useState<'info' | 'schedule' | 'deposit' | 'availability' | 'notifications'>('info')
+  const [profileTab, setProfileTab] = useState<'info' | 'schedule' | 'deposit' | 'availability' | 'notifications' | 'security'>('info')
   const [profilePicUrl, setProfilePicUrl] = useState<string>(() => localStorage.getItem('swiftshift-profile-pic') || '')
   const [profilePicZoom, setProfilePicZoom] = useState<number>(() => parseFloat(localStorage.getItem('swiftshift-profile-pic-zoom') || '1'))
   const [profilePicX, setProfilePicX] = useState<number>(() => parseFloat(localStorage.getItem('swiftshift-profile-pic-x') || '50'))
@@ -4048,6 +4162,20 @@ export default function App() {
 
       <div className="ta-content">
         <main className="ta-main">
+          {user && user.email_verified === false && (
+            <div className="max-w-[1200px] mx-auto mb-4 px-4 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-sm text-amber-300 flex items-center gap-2.5">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 6h20v12H2z"/><path d="M2 6l10 7 10-7"/></svg>
+              <span>Please verify your email to secure your account.{' '}
+                <button className="underline font-medium hover:text-amber-200" onClick={async () => {
+                  try {
+                    const r = await fetch(`${API_BASE}/api/auth/resend-verification`, { method: 'POST' })
+                    const d = await r.json()
+                    if (!r.ok) toast.error(d.error || 'Could not send'); else toast.success('Verification email sent')
+                  } catch { toast.error('Could not send') }
+                }}>Resend link</button>
+              </span>
+            </div>
+          )}
           {activeView === 'clock' && (
             <>
               {/* Company holiday banner */}
@@ -7238,11 +7366,11 @@ export default function App() {
 
               {/* Tab nav */}
               <div className="flex gap-2 flex-wrap">
-                {(['info', 'schedule', 'deposit', 'availability', 'notifications'] as const).map(tab => (
+                {(['info', 'schedule', 'deposit', 'availability', 'notifications', 'security'] as const).map(tab => (
                   <button key={tab} onClick={() => setProfileTab(tab)}
                     className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${profileTab === tab ? 'text-black' : 'glass hover:bg-white/10 text-zinc-300'}`}
                     style={profileTab === tab ? { backgroundColor: 'var(--accent-color)' } : undefined}>
-                    {tab === 'info' ? 'Info' : tab === 'schedule' ? 'Work Schedule' : tab === 'deposit' ? 'Direct Deposit' : tab === 'availability' ? 'Availability' : 'Notifications'}
+                    {tab === 'info' ? 'Info' : tab === 'schedule' ? 'Work Schedule' : tab === 'deposit' ? 'Direct Deposit' : tab === 'availability' ? 'Availability' : tab === 'notifications' ? 'Notifications' : 'Security'}
                   </button>
                 ))}
               </div>
@@ -7576,6 +7704,9 @@ export default function App() {
                     Save Preferences
                   </button>
                 </div>
+              )}
+              {profileTab === 'security' && (
+                <SecuritySettings userEmail={user.email} />
               )}
             </div>
           )}
