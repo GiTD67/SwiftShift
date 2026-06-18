@@ -26,6 +26,8 @@ FOUNDER_EMAIL = "trevordixon97@gmail.com"
 # (a cheap DoS vector); the 8-char floor is the existing minimum.
 MIN_PASSWORD_LEN = 8
 MAX_PASSWORD_LEN = 128
+# Lock the 2FA code step for 15 min after this many consecutive bad codes.
+MAX_2FA_ATTEMPTS = 5
 
 
 def _password_pwned(password):
@@ -122,12 +124,14 @@ def _check_totp_or_backup(row, code):
         if check_password_hash(h, normalized):
             remaining = hashes[:i] + hashes[i + 1:]
             with get_db() as db:
-                db.execute(
-                    "UPDATE users SET totp_backup_codes = ? WHERE id = ?",
-                    (json.dumps(remaining), row["id"]),
+                cur = db.execute(
+                    # Guard on the unchanged list so two concurrent requests
+                    # can't both consume the same code — exactly one UPDATE wins.
+                    "UPDATE users SET totp_backup_codes = ? WHERE id = ? AND totp_backup_codes = ?",
+                    (json.dumps(remaining), row["id"], raw),
                 )
                 db.commit()
-            return True
+            return getattr(cur, "rowcount", 0) == 1
     return False
 
 
@@ -168,6 +172,8 @@ def _ensure_users_table():
             "totp_secret TEXT",
             "totp_enabled BOOLEAN DEFAULT FALSE",
             "totp_backup_codes TEXT",
+            "totp_failed_attempts INTEGER DEFAULT 0",
+            "totp_locked_until INTEGER",
             "phone TEXT",
             "address_line1 TEXT",
             "address_line2 TEXT",
@@ -677,8 +683,31 @@ def totp_login_verify():
     if not row or not row.get("totp_enabled"):
         session.pop("pending_2fa_uid", None)
         return jsonify({"error": "No pending login. Please sign in again."}), 400
+    now = int(time.time())
+    locked_until = row.get("totp_locked_until") or 0
+    if locked_until > now:
+        mins = max(1, (locked_until - now + 59) // 60)
+        return jsonify({"error": f"Too many incorrect codes. Try again in {mins} minute(s)."}), 429
     if not _check_totp_or_backup(row, code):
+        # Count the failure; lock this account's 2FA step after MAX_2FA_ATTEMPTS.
+        attempts = (row.get("totp_failed_attempts") or 0) + 1
+        new_lock = now + 900 if attempts >= MAX_2FA_ATTEMPTS else None
+        with get_db() as db:
+            db.execute(
+                "UPDATE users SET totp_failed_attempts = ?, totp_locked_until = ? WHERE id = ?",
+                (0 if new_lock else attempts, new_lock, uid),
+            )
+            db.commit()
+        if new_lock:
+            return jsonify({"error": "Too many incorrect codes. Try again in 15 minutes."}), 429
         return jsonify({"error": "Invalid authentication code"}), 401
+    # Success — clear any failure counter and complete the login.
+    with get_db() as db:
+        db.execute(
+            "UPDATE users SET totp_failed_attempts = 0, totp_locked_until = NULL WHERE id = ?",
+            (uid,),
+        )
+        db.commit()
     session.permanent = True
     session["uid"] = row["id"]
     session.pop("pending_2fa_uid", None)

@@ -18,11 +18,15 @@ class _CursorWrapper:
     def __init__(self, cursor):
         self._cursor = cursor
         self.lastrowid = None
+        self.rowcount = None
 
     def execute(self, sql, params=None):
         # Convert ? to %s for psycopg2
         sql = sql.replace("?", "%s")
         self._cursor.execute(sql, params)
+        # Rows affected by this statement, captured before the lastrowid lookup
+        # below changes the cursor state. Enables atomic compare-and-update.
+        self.rowcount = self._cursor.rowcount
         # Try to capture lastrowid for INSERT statements
         if sql.strip().upper().startswith("INSERT") and "RETURNING" not in sql.upper():
             # Use currval if we can determine the sequence
