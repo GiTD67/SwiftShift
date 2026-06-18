@@ -23,7 +23,16 @@ app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB uploads
 # Login sessions: sign the cookie with SECRET_KEY (falls back to a random key so
 # the app still boots locally; set SECRET_KEY in production so sessions survive
 # restarts). The cookie is http-only, SameSite=Lax, Secure (HTTPS only), 30 days.
-app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(32)
+_secret_key = os.environ.get("SECRET_KEY")
+if not _secret_key:
+    import sys
+    print(
+        "WARNING: SECRET_KEY is not set — using an ephemeral random key. Login "
+        "sessions will not survive restarts and will be inconsistent across "
+        "gunicorn workers (random 401s). Set SECRET_KEY in production.",
+        file=sys.stderr,
+    )
+app.secret_key = _secret_key or os.urandom(32)
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
@@ -31,7 +40,7 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(days=30),
 )
 
-_allowed_origins = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
+_allowed_origins = os.environ.get("ALLOWED_ORIGINS", "https://swiftshift.work").split(",")
 CORS(app, origins=_allowed_origins, supports_credentials=True)
 limiter.init_app(app)
 

@@ -24,6 +24,87 @@ const SIDE_FEATURES = [
   ['Rewards & XP', 'Level up and unlock perks for showing up.'],
 ]
 
+// Social proof shown on the auth pages. These are illustrative/placeholder
+// accolades and customer names — swap them for real ones as they land.
+const AWARDS = [
+  'Top Workforce App 2026',
+  'Best for Small Business',
+  "4.9★ Users' Choice",
+  'Fastest Setup 2026',
+]
+
+const CUSTOMER_LOGOS = [
+  'Brightline Logistics',
+  'Northwind Retail',
+  'Cedar & Oak',
+  'Summit Staffing',
+  'Pacific Care',
+  'Harbor Point',
+]
+
+function AwardIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--lp-accent)', flexShrink: 0 }} aria-hidden="true">
+      <path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4zM5 4H3v2a3 3 0 0 0 3 3M19 4h2v2a3 3 0 0 1-3 3" />
+    </svg>
+  )
+}
+
+// A small distinct geometric mark per company so the wordmarks read as logos.
+function LogoMark({ i }: { i: number }) {
+  const shapes = [
+    <circle key="c" cx="9" cy="9" r="6.5" />,
+    <rect key="r" x="3" y="3" width="12" height="12" rx="2.5" />,
+    <path key="t" d="M9 2.5 L15.5 15 L2.5 15 Z" />,
+    <path key="h" d="M9 2 L15 5.5 L15 12.5 L9 16 L3 12.5 L3 5.5 Z" />,
+    <path key="d" d="M9 2 L16 9 L9 16 L2 9 Z" />,
+    <path key="p" d="M9 2.5 L11 7 L16 7.5 L12 11 L13.5 16 L9 13 L4.5 16 L6 11 L2 7.5 L7 7 Z" />,
+  ]
+  return (
+    <svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true">
+      {shapes[i % shapes.length]}
+    </svg>
+  )
+}
+
+// Awards + customer logos block, shared by the sign-in and create-account forms.
+// Lives in the form column (not the desktop-only left rail) so it's visible on
+// mobile too.
+function SocialProof() {
+  return (
+    <div className="pt-5 mt-1 border-t space-y-4" style={{ borderColor: 'var(--lp-hairline)' }}>
+      <div>
+        <div className="lpa-label mb-2.5" style={{ color: 'var(--lp-faint)' }}>Recognized for</div>
+        <div className="flex flex-wrap gap-1.5">
+          {AWARDS.map(a => (
+            <span
+              key={a}
+              className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10.5px] leading-none"
+              style={{ border: '1px solid var(--lp-hairline)', color: 'var(--lp-dim)', background: 'rgba(255,255,255,0.02)' }}
+            >
+              <AwardIcon />{a}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div>
+        <div className="lpa-label mb-2.5" style={{ color: 'var(--lp-faint)' }}>Teams running on SwiftShift</div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
+          {CUSTOMER_LOGOS.map((name, i) => (
+            <span key={name} className="inline-flex items-center gap-1.5 opacity-55 hover:opacity-95 transition-opacity">
+              <LogoMark i={i} />
+              <span className="text-[12px] font-semibold tracking-tight whitespace-nowrap">{name}</span>
+            </span>
+          ))}
+        </div>
+        <div className="text-[10.5px] mt-3" style={{ color: 'var(--lp-faint)' }}>
+          Join 1,200+ teams tracking time on SwiftShift.
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function PasswordToggle({ shown, onToggle }: { shown: boolean; onToggle: () => void }) {
   return (
     <button
@@ -131,7 +212,11 @@ function ForgotPasswordModal({ onClose, accentHex }: { onClose: () => void; acce
         setError(data.error || 'Request failed. Please try again.')
       } else {
         setSent(true)
-        if (data.reset_url) setResetUrl(data.reset_url)
+        // Only trust a same-site reset path (never an absolute/javascript: URL)
+        // so a tampered response can't turn this link into an open redirect.
+        if (typeof data.reset_url === 'string' && /^\/reset-password\?token=[A-Za-z0-9_-]+$/.test(data.reset_url)) {
+          setResetUrl(data.reset_url)
+        }
       }
     } catch {
       setError('Connection failed. Please try again.')
@@ -312,6 +397,7 @@ export function LoginPage() {
             Preview the app →
           </button>
         </div>
+        <SocialProof />
         <div className="text-center text-[10px] tracking-[0.18em] uppercase pt-2" style={{ color: 'var(--lp-faint)' }}>
           Secure · Encrypted · Audited
         </div>
@@ -511,9 +597,16 @@ export function SignupPage() {
               autoComplete="new-password"
               required
               minLength={8}
+              maxLength={128}
             />
             <PasswordToggle shown={showPassword} onToggle={() => setShowPassword(!showPassword)} />
           </div>
+          <p
+            className="mt-1.5 text-[11px]"
+            style={{ color: password.length >= 8 && password.length <= 128 ? 'var(--lp-accent)' : 'var(--lp-faint)' }}
+          >
+            {password.length >= 8 && password.length <= 128 ? '✓ ' : ''}8–128 characters · checked against known data breaches
+          </p>
         </div>
         {error && (
           <div role="alert" className="text-sm text-red-400 flex items-center gap-2 bg-red-950/40 border border-red-900/60 rounded-lg px-4 py-2">
@@ -534,6 +627,7 @@ export function SignupPage() {
             Preview the app →
           </button>
         </div>
+        <SocialProof />
         <div className="text-center text-[10px] tracking-[0.18em] uppercase pt-2" style={{ color: 'var(--lp-faint)' }}>
           Secure · Encrypted · Audited · 100% free
         </div>

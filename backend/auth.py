@@ -1,4 +1,5 @@
 """Auth routes: signup, signin, Google OAuth, forgot/reset password."""
+import hashlib
 import time
 import uuid
 
@@ -15,6 +16,55 @@ bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 # The founder's account is always a manager, whether it already exists at boot
 # (see _ensure_users_table) or gets created later via signup/Google.
 FOUNDER_EMAIL = "trevordixon97@gmail.com"
+
+# Upper bound guards against very long inputs being fed to the password hasher
+# (a cheap DoS vector); the 8-char floor is the existing minimum.
+MIN_PASSWORD_LEN = 8
+MAX_PASSWORD_LEN = 128
+
+
+def _password_pwned(password):
+    """Return True if the password appears in the HaveIBeenPwned breach corpus.
+
+    Uses the k-anonymity range API: only the first 5 hex chars of the SHA-1 are
+    sent over the wire, never the password or its full hash. Fails OPEN (returns
+    False) on any timeout/network/parse error so a third-party outage can never
+    block a signup or password reset.
+    """
+    try:
+        digest = hashlib.sha1(password.encode("utf-8")).hexdigest().upper()
+        prefix, suffix = digest[:5], digest[5:]
+        resp = http_requests.get(
+            f"https://api.pwnedpasswords.com/range/{prefix}",
+            headers={"Add-Padding": "true"},
+            timeout=2.5,
+        )
+        if not resp.ok:
+            return False
+        for line in resp.text.splitlines():
+            line_suffix, _, _count = line.partition(":")
+            if line_suffix.strip().upper() == suffix:
+                return True
+        return False
+    except Exception:
+        return False
+
+
+def _password_problem(password, email=None):
+    """Validate a password; return a user-facing error string, or None if OK.
+
+    Shared by signup and reset-password so neither path can set a weaker
+    password than the other.
+    """
+    if not password or len(password) < MIN_PASSWORD_LEN:
+        return f"Password must be at least {MIN_PASSWORD_LEN} characters"
+    if len(password) > MAX_PASSWORD_LEN:
+        return f"Password must be at most {MAX_PASSWORD_LEN} characters"
+    if email and password.strip().lower() == email.strip().lower():
+        return "Password can't be the same as your email"
+    if _password_pwned(password):
+        return "That password has appeared in a known data breach. Please choose a different one."
+    return None
 
 
 def _ensure_users_table():
@@ -188,9 +238,10 @@ def signup():
     password = data.get("password")
     if not first_name or not last_name or not email or not password:
         return jsonify({"error": "first_name, last_name, email, password required"}), 400
-    if len(password) < 8:
-        # Matches the reset-password rule so signup can't create weaker passwords.
-        return jsonify({"error": "Password must be at least 8 characters"}), 400
+    # Shared rules: length bounds + breach check (see _password_problem).
+    problem = _password_problem(password, email)
+    if problem:
+        return jsonify({"error": problem}), 400
     pw_hash = generate_password_hash(password)
     is_founder = email.strip().lower() == FOUNDER_EMAIL
     with get_db() as db:
@@ -218,7 +269,14 @@ def signin():
     if not email or not password:
         return jsonify({"error": "email, password required"}), 400
     with get_db() as db:
-        row = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        # Case-insensitive match so "Alice@x.com" and "alice@x.com" are the same
+        # account (forgot-password already normalizes this way). If legacy
+        # duplicate-cased rows exist, prefer the exact-case row, then lowest id,
+        # so the result is deterministic rather than optimizer-dependent.
+        row = db.execute(
+            "SELECT * FROM users WHERE LOWER(email) = LOWER(?) ORDER BY (email = ?) DESC, id ASC LIMIT 1",
+            (email, email),
+        ).fetchone()
     if not row or not check_password_hash(row["password_hash"], password):
         return jsonify({"error": "invalid credentials"}), 401
     session.permanent = True
@@ -269,7 +327,10 @@ def google_auth():
         return jsonify({"error": "Email not provided by Google"}), 400
 
     with get_db() as db:
-        row = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        row = db.execute(
+            "SELECT * FROM users WHERE LOWER(email) = LOWER(?) ORDER BY (email = ?) DESC, id ASC LIMIT 1",
+            (email, email),
+        ).fetchone()
         if not row:
             row = db.execute(
                 "INSERT INTO users (first_name, last_name, email, password_hash, is_fulltime, is_manager)"
@@ -344,8 +405,9 @@ def reset_password():
 
     if not token or not new_password:
         return jsonify({"error": "token and password required"}), 400
-    if len(new_password) < 8:
-        return jsonify({"error": "Password must be at least 8 characters"}), 400
+    problem = _password_problem(new_password)
+    if problem:
+        return jsonify({"error": problem}), 400
 
     with get_db() as db:
         row = db.execute(
