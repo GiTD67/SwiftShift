@@ -2,7 +2,7 @@ from datetime import datetime
 
 from flask import Blueprint, jsonify, request
 
-from db import get_db
+from db import get_db, safe_bootstrap
 from permissions import current_uid, manager_required
 
 bp = Blueprint("employees", __name__)
@@ -28,7 +28,7 @@ def _ensure_schema():
         db.commit()
 
 
-_ensure_schema()
+safe_bootstrap(_ensure_schema)
 
 
 def _viewer_company_id(db, uid):

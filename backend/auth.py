@@ -10,7 +10,7 @@ from flask import Blueprint, jsonify, request, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from audit import log_event
-from db import get_db
+from db import get_db, safe_bootstrap
 from limiter import limiter
 from mailer import APP_BASE_URL, send_reset_email, send_verification_email
 from totp import generate_secret, provisioning_uri
@@ -203,7 +203,7 @@ def _ensure_users_table():
             pass
 
 
-_ensure_users_table()
+safe_bootstrap(_ensure_users_table)
 
 
 def _ensure_jobs_table():
@@ -223,7 +223,7 @@ def _ensure_jobs_table():
         )
 
 
-_ensure_jobs_table()
+safe_bootstrap(_ensure_jobs_table)
 
 
 def _ensure_employees_table():
@@ -239,7 +239,7 @@ def _ensure_employees_table():
         )
 
 
-_ensure_employees_table()
+safe_bootstrap(_ensure_employees_table)
 
 
 def _ensure_time_entries_table():
@@ -261,7 +261,7 @@ def _ensure_time_entries_table():
         )
 
 
-_ensure_time_entries_table()
+safe_bootstrap(_ensure_time_entries_table)
 
 
 def _ensure_clock_sessions_table():
@@ -281,7 +281,7 @@ def _ensure_clock_sessions_table():
         )
 
 
-_ensure_clock_sessions_table()
+safe_bootstrap(_ensure_clock_sessions_table)
 
 
 def _ensure_password_reset_tokens_table():
@@ -299,7 +299,7 @@ def _ensure_password_reset_tokens_table():
         )
 
 
-_ensure_password_reset_tokens_table()
+safe_bootstrap(_ensure_password_reset_tokens_table)
 
 
 def _ensure_email_verification_tokens_table():
@@ -317,7 +317,7 @@ def _ensure_email_verification_tokens_table():
         )
 
 
-_ensure_email_verification_tokens_table()
+safe_bootstrap(_ensure_email_verification_tokens_table)
 
 
 def _issue_verification_email(user_id, email):

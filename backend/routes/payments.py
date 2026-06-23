@@ -26,7 +26,7 @@ import requests
 from flask import Blueprint, current_app, jsonify, request
 
 from audit import log_event
-from db import get_db
+from db import get_db, safe_bootstrap
 from permissions import current_uid, is_manager, manager_required
 from routes.reports import (
     _OT_PREMIUM,
@@ -149,7 +149,7 @@ def _ensure_tables():
         db.commit()
 
 
-_ensure_tables()
+safe_bootstrap(_ensure_tables)
 
 
 # --- Stripe REST helper (no SDK) -------------------------------------------

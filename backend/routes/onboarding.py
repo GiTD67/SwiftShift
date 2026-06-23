@@ -11,7 +11,7 @@ import secrets
 from flask import Blueprint, jsonify, request
 
 import auth  # noqa: F401  # ensures the users table exists before the ALTERs below
-from db import get_db
+from db import get_db, safe_bootstrap
 from permissions import current_uid, manager_required
 
 bp = Blueprint("onboarding", __name__)
@@ -68,7 +68,7 @@ def _ensure_tables():
             db.execute(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col_def}")
 
 
-_ensure_tables()
+safe_bootstrap(_ensure_tables)
 
 
 # No I/L/O/0/1 - avoids ambiguous characters in hand-typed codes.

@@ -84,3 +84,25 @@ class _ConnWrapper:
 def get_db():
     conn = psycopg2.connect(DATABASE_URL)
     return _ConnWrapper(conn)
+
+
+def safe_bootstrap(ensure_fn):
+    """Run an import-time CREATE-TABLE-IF-NOT-EXISTS bootstrap without ever
+    letting a database outage crash startup.
+
+    The _ensure_*_table() helpers run at module import. A hard DB connect there
+    means an unreachable database takes down the ENTIRE web service, including
+    the static frontend, which needs no database at all. Wrapping the call lets
+    the app still boot and serve the frontend; the bootstrap re-runs and
+    succeeds on the next start once DATABASE_URL points at a reachable database
+    (Render restarts the service when its env vars change).
+    """
+    try:
+        ensure_fn()
+    except Exception as exc:  # bootstrap must never be fatal at import time
+        import sys
+        name = getattr(ensure_fn, "__name__", repr(ensure_fn))
+        sys.stderr.write(
+            f"WARNING: skipping DB bootstrap {name} "
+            f"(database unavailable at startup): {exc}\n"
+        )

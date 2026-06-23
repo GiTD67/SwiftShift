@@ -2,7 +2,7 @@ from datetime import datetime
 
 from flask import Blueprint, jsonify, request
 
-from db import get_db
+from db import get_db, safe_bootstrap
 from permissions import current_uid, manager_required
 
 bp = Blueprint("jobs", __name__, url_prefix="/api/jobs")
@@ -30,7 +30,7 @@ def _ensure_columns():
         db.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS company_id INTEGER")
 
 
-_ensure_columns()
+safe_bootstrap(_ensure_columns)
 
 
 def _viewer_company_id(db, uid):
