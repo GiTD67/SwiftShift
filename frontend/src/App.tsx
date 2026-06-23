@@ -175,7 +175,7 @@ function OctopusChart({ node, expanded, setExpanded, search, expandedAll }: {
           </div>
           <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-white/10">
             {n.children?.length > 0 && (
-              <button onClick={toggle(n.id)} className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 flex items-center gap-1">
+              <button onClick={toggle(n.id)} className="text-[9px] p-2 min-w-[32px] min-h-[32px] rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center gap-1">
                 {exp ? '▼' : '▶'} {n.children.length}
               </button>
             )}
@@ -250,7 +250,7 @@ function OctopusChart({ node, expanded, setExpanded, search, expandedAll }: {
       {/* Click Modal */}
       {selected && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center" onClick={() => setSelected(null)} style={{ background: 'var(--scrim)', WebkitBackdropFilter: 'blur(4px)', backdropFilter: 'blur(4px)' }}>
-          <div role="dialog" aria-modal="true" aria-label="Team member details" className="glass--thick rounded-2xl p-6 w-80" onClick={(e) => e.stopPropagation()} style={{ boxShadow: '0 0 80px -20px rgba(var(--accent-color-rgb), 0.21), 0 28px 72px -14px rgba(0,0,0,0.85)' }}>
+          <div role="dialog" aria-modal="true" aria-label="Team member details" className="glass--thick rounded-2xl p-6 mx-4 w-full max-w-xs sm:w-80" onClick={(e) => e.stopPropagation()} style={{ boxShadow: '0 0 80px -20px rgba(var(--accent-color-rgb), 0.21), 0 28px 72px -14px rgba(0,0,0,0.85)' }}>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center text-xl font-bold text-white/85 flex-shrink-0">{orgInitials(selected.name)}</div>
               <div>
@@ -1315,7 +1315,7 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
       {/* Achievements */}
       <div className="glass rounded-2xl p-4">
         <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--accent-color)' }}>Achievements</div>
-        <div className="grid grid-cols-5 sm:grid-cols-5 gap-2">
+        <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
           {ACHIEVEMENTS.map(ach => {
             const unlocked = gState.unlockedAchievements.includes(ach.id)
             return (
@@ -3629,7 +3629,7 @@ export default function App() {
             </button>
             {/* Hover dropdown */}
             <div
-              className="absolute right-0 top-full mt-1 w-72 bg-zinc-900 border border-white/10 rounded-2xl hidden group-hover:block group-focus-within:block z-50 overflow-hidden"
+              className="absolute right-0 top-full mt-1 w-72 bg-zinc-900 border border-white/10 rounded-2xl hidden sm:group-hover:block sm:group-focus-within:block z-50 overflow-hidden"
               style={{ boxShadow: '0 0 40px -10px rgba(var(--accent-color-rgb), 0.2), 0 8px 24px rgba(0,0,0,0.8)' }}
             >
               <div className="px-4 py-2.5 text-xs text-zinc-500 uppercase tracking-wider border-b border-white/10">
@@ -4445,7 +4445,7 @@ export default function App() {
               </div>
 
               {/* Right sidebar: Real Time Rewards (top) + This pay period */}
-              <aside className="xl:w-80 shrink-0 flex flex-col sm:flex-row xl:flex-col gap-4">
+              <aside className="xl:w-80 shrink-0 flex flex-col xl:flex-col gap-4">
                 {/* Real Time Rewards module - at top (styled to match the Rewards-tab ticker) */}
                 <div className="glass rounded-3xl p-6 flex-1 flex flex-col relative overflow-hidden">
                   <div
@@ -4722,7 +4722,7 @@ export default function App() {
                 </div>
 
                 {/* Stats row */}
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {[
                     ['Total Holidays', String(holidays.length)],
                     ['Upcoming', String(upcoming.length)],
@@ -4916,35 +4916,35 @@ export default function App() {
                       <tr key={u.id} className="border-b border-white/10">
                         <td className="py-1">
                           <input
-                            className="bg-black/40 border border-white/10 rounded px-2 py-0.5 w-20"
+                            className="bg-black/40 border border-white/10 rounded px-2 py-0.5 w-20 text-base"
                             value={u.first_name}
                             onChange={(e) => setUsers(users.map(x => x.id === u.id ? { ...x, first_name: e.target.value } : x))}
                           />
                         </td>
                         <td className="py-1">
                           <input
-                            className="bg-black/40 border border-white/10 rounded px-2 py-0.5 w-20"
+                            className="bg-black/40 border border-white/10 rounded px-2 py-0.5 w-20 text-base"
                             value={u.last_name}
                             onChange={(e) => setUsers(users.map(x => x.id === u.id ? { ...x, last_name: e.target.value } : x))}
                           />
                         </td>
                         <td className="py-1">
                           <input
-                            className="bg-black/40 border border-white/10 rounded px-2 py-0.5 w-32"
+                            className="bg-black/40 border border-white/10 rounded px-2 py-0.5 w-32 text-base"
                             value={u.email}
                             onChange={(e) => setUsers(users.map(x => x.id === u.id ? { ...x, email: e.target.value } : x))}
                           />
                         </td>
                         <td className="py-1">
                           <input
-                            className="bg-black/40 border border-white/10 rounded px-2 py-0.5 w-24"
+                            className="bg-black/40 border border-white/10 rounded px-2 py-0.5 w-24 text-base"
                             value={u.job_role || ''}
                             onChange={(e) => setUsers(users.map(x => x.id === u.id ? { ...x, job_role: e.target.value } : x))}
                           />
                         </td>
                         <td className="py-1">
                           <select
-                            className="bg-black/40 border border-white/10 rounded px-2 py-0.5 w-28"
+                            className="bg-black/40 border border-white/10 rounded px-2 py-0.5 w-28 text-base"
                             value={u.manager_name || ''}
                             onChange={(e) => setUsers(users.map(x => x.id === u.id ? { ...x, manager_name: e.target.value } : x))}
                           >
@@ -4958,7 +4958,7 @@ export default function App() {
                         </td>
                         <td className="py-1">
                           <select
-                            className="bg-black/40 border border-white/10 rounded px-2 py-0.5 w-16"
+                            className="bg-black/40 border border-white/10 rounded px-2 py-0.5 w-16 text-base"
                             value={u.is_fulltime ? '1' : '0'}
                             onChange={(e) => setUsers(users.map(x => x.id === u.id ? { ...x, is_fulltime: e.target.value === '1' ? 1 : 0 } : x))}
                           >
@@ -4971,7 +4971,7 @@ export default function App() {
                             type="number"
                             step="0.01"
                             min="0"
-                            className="bg-black/40 border border-white/10 rounded px-2 py-0.5 w-16"
+                            className="bg-black/40 border border-white/10 rounded px-2 py-0.5 w-16 text-base"
                             value={u.pay ?? ''}
                             onChange={(e) => setUsers(users.map(x => x.id === u.id ? { ...x, pay: e.target.value ? parseFloat(e.target.value) : null } : x))}
                           />
@@ -4981,7 +4981,7 @@ export default function App() {
                             type="number"
                             step="0.01"
                             min="0"
-                            className="bg-black/40 border border-white/10 rounded px-2 py-0.5 w-20"
+                            className="bg-black/40 border border-white/10 rounded px-2 py-0.5 w-20 text-base"
                             value={u.salary ?? ''}
                             onChange={(e) => setUsers(users.map(x => x.id === u.id ? { ...x, salary: e.target.value ? parseFloat(e.target.value) : null } : x))}
                           />
@@ -5470,9 +5470,9 @@ export default function App() {
                 <div className="flex items-center gap-2">
                   {scheduleViewMode === 'month' && (
                     <div className="flex items-center gap-1">
-                      <button onClick={() => setMonthCursor(c => addMonths(c, -1))} aria-label="Previous month" className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs transition-colors">←</button>
-                      <button onClick={() => setMonthCursor(new Date())} className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs transition-colors">Today</button>
-                      <button onClick={() => setMonthCursor(c => addMonths(c, 1))} aria-label="Next month" className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs transition-colors">→</button>
+                      <button onClick={() => setMonthCursor(c => addMonths(c, -1))} aria-label="Previous month" className="px-3 py-2 min-h-[40px] min-w-[40px] rounded-lg bg-white/10 hover:bg-white/20 text-xs transition-colors flex items-center justify-center">←</button>
+                      <button onClick={() => setMonthCursor(new Date())} className="px-3 py-2 min-h-[40px] rounded-lg bg-white/10 hover:bg-white/20 text-xs transition-colors flex items-center justify-center">Today</button>
+                      <button onClick={() => setMonthCursor(c => addMonths(c, 1))} aria-label="Next month" className="px-3 py-2 min-h-[40px] min-w-[40px] rounded-lg bg-white/10 hover:bg-white/20 text-xs transition-colors flex items-center justify-center">→</button>
                     </div>
                   )}
                   <div className="flex rounded-xl overflow-hidden border border-white/10">
@@ -5509,6 +5509,8 @@ export default function App() {
                 const dayKeys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const
                 return (
                   <div className="glass rounded-3xl p-4 sm:p-6">
+                    <div className="overflow-x-auto">
+                    <div className="min-w-[420px]">
                     <div className="grid grid-cols-7 gap-1.5 mb-1.5">
                       {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
                         <div key={day} className="text-xs font-semibold text-zinc-400 uppercase text-center py-1">{day}</div>
@@ -5542,6 +5544,8 @@ export default function App() {
                           </div>
                         )
                       })}
+                    </div>
+                    </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-4 mt-3 text-[11px] text-zinc-500">
                       <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--accent-color)' }} /> Working day (your availability)</span>
@@ -6519,7 +6523,7 @@ export default function App() {
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-amber-400">{action}</span>
                           {action === 'Auth needed' && (
-                            <button className="px-2 py-0.5 rounded-lg text-xs font-medium bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 transition-colors">Authorize</button>
+                            <button className="px-3 py-2 min-h-[36px] rounded-lg text-xs font-medium bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 transition-colors">Authorize</button>
                           )}
                         </div>
                       </div>
@@ -7044,7 +7048,7 @@ export default function App() {
           )})()}
           {activeView === 'groktax' && (
             <div className="max-w-5xl mx-auto">
-              <div className="glass rounded-3xl flex flex-col h-[calc(100dvh-140px)] overflow-hidden">
+              <div className="glass rounded-3xl flex flex-col h-[calc(100svh-140px)] overflow-hidden">
                 {/* Header */}
                 <div className="px-6 py-5 border-b border-white/10 flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center">
@@ -7158,7 +7162,7 @@ export default function App() {
             </div>
           )}
           {activeView === 'grokky' && (
-            <div className="max-w-3xl mx-auto h-[calc(100dvh-140px)] flex flex-col">
+            <div className="max-w-3xl mx-auto h-[calc(100svh-140px)] flex flex-col">
               <div className="glass rounded-3xl flex flex-col h-full overflow-hidden">
                 {/* HEADER - simplified */}
                 <div className="px-6 py-5 border-b border-white/10 flex items-center gap-3">
@@ -7245,7 +7249,7 @@ export default function App() {
                     <button
                       onClick={() => handleSendChat()}
                       disabled={chatLoading || (!chatMessage.trim() && !attachedFile)}
-                      className="px-5 rounded-xl text-sm font-medium disabled:opacity-40" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
+                      className="px-5 py-2.5 min-h-[44px] rounded-xl text-sm font-medium disabled:opacity-40" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
                     >
                       Send
                     </button>
