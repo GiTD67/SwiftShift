@@ -56,7 +56,7 @@ def clock_in():
     with get_db() as db:
         # Idempotent: a double-tap, second device, or replayed offline punch
         # must not open a second concurrent session (each would later be
-        # closed for its full duration — double-counted paid time). Only
+        # closed for its full duration - double-counted paid time). Only
         # recent sessions are reused: a forgotten open session from yesterday
         # should stay open so the missed-clockout flag surfaces it for
         # correction, not silently absorb today's shift.

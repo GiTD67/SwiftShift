@@ -35,7 +35,7 @@ def _viewer_company_id(db, uid):
     return row["company_id"] if row else None
 
 
-# GET /api/open-shifts — upcoming open/claimed shifts (everyone), with claim state
+# GET /api/open-shifts - upcoming open/claimed shifts (everyone), with claim state
 @bp.route("/api/open-shifts", methods=["GET"])
 def list_open_shifts():
     today = date.today().isoformat()
@@ -70,7 +70,7 @@ def list_open_shifts():
     return jsonify([dict(r) for r in rows])
 
 
-# POST /api/open-shifts — manager posts an open shift
+# POST /api/open-shifts - manager posts an open shift
 @bp.route("/api/open-shifts", methods=["POST"])
 def create_open_shift():
     err = manager_required()
@@ -98,7 +98,7 @@ def create_open_shift():
     return jsonify(dict(row)), 201
 
 
-# POST /api/open-shifts/:id/claim — first successful claim wins
+# POST /api/open-shifts/:id/claim - first successful claim wins
 @bp.route("/api/open-shifts/<int:shift_id>/claim", methods=["POST"])
 def claim_open_shift(shift_id):
     uid = current_uid()
@@ -146,7 +146,7 @@ def claim_open_shift(shift_id):
     return jsonify(dict(row))
 
 
-# DELETE /api/open-shifts/:id — manager cancels a posted shift
+# DELETE /api/open-shifts/:id - manager cancels a posted shift
 @bp.route("/api/open-shifts/<int:shift_id>", methods=["DELETE"])
 def cancel_open_shift(shift_id):
     err = manager_required()

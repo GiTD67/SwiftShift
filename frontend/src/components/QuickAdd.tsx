@@ -79,7 +79,7 @@ export function QuickAdd({ onAdd, disabled }: QuickAddProps) {
     }
 
     // Equal start/end is a zero-length entry. (A later end-of-day time is a
-    // valid overnight shift — calculateDuration rolls it past midnight — so we
+    // valid overnight shift - calculateDuration rolls it past midnight - so we
     // only reject the genuinely empty case here.)
     if (form.startTime === form.endTime) {
       toast.error('Start and end times must differ')
@@ -92,7 +92,7 @@ export function QuickAdd({ onAdd, disabled }: QuickAddProps) {
     })
     confetti({ particleCount: 60, spread: 55, origin: { y: 0.65 }, ticks: 50 })
 
-    // Entry saved — the draft is no longer needed
+    // Entry saved - the draft is no longer needed
     clearDraft()
 
     // Reset form but keep date/project/task

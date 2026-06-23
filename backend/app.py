@@ -16,7 +16,7 @@ frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 
 app = Flask(__name__, static_folder=None)
 # One reverse-proxy hop (Render) sets X-Forwarded-For; without this the rate
-# limiter would key every client on the proxy's IP — a single shared bucket.
+# limiter would key every client on the proxy's IP - a single shared bucket.
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB uploads
 
@@ -27,7 +27,7 @@ _secret_key = os.environ.get("SECRET_KEY")
 if not _secret_key:
     import sys
     print(
-        "WARNING: SECRET_KEY is not set — using an ephemeral random key. Login "
+        "WARNING: SECRET_KEY is not set - using an ephemeral random key. Login "
         "sessions will not survive restarts and will be inconsistent across "
         "gunicorn workers (random 401s). Set SECRET_KEY in production.",
         file=sys.stderr,

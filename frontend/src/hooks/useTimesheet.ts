@@ -21,7 +21,7 @@ export function useTimesheet() {
     try {
       return JSON.parse(saved)
     } catch {
-      // Corrupted persisted state — discard it rather than crashing on mount.
+      // Corrupted persisted state - discard it rather than crashing on mount.
       localStorage.removeItem(TIMESHEET_STORAGE_KEY)
       return fallback
     }

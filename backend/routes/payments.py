@@ -4,13 +4,13 @@ Company funding source = a saved us_bank_account PaymentMethod collected through
 a Stripe-hosted Checkout Session (mode=setup). Each employee = an Express
 connected account onboarded via hosted Account Links. A payroll run = one ACH
 debit PaymentIntent on the platform account; when it settles, one Transfer per
-employee. Everything is plain REST against api.stripe.com using ``requests`` —
+employee. Everything is plain REST against api.stripe.com using ``requests`` -
 no Stripe SDK, no new dependencies.
 
 Honesty constraint: when STRIPE_SECRET_KEY is unset, /api/payments/status
 returns {"configured": false}, every other endpoint here returns 503 (except
 the pure-math preview), and the webhook returns 400. Nothing ever fakes
-success. This moves GROSS wages only — no tax withholding or remittance.
+success. This moves GROSS wages only - no tax withholding or remittance.
 
 No raw bank numbers are ever stored: Stripe IDs, bank_name, last4 and statuses
 only.
@@ -50,7 +50,7 @@ def _ensure_tables():
     # Idempotent DDL run on every worker boot (same pattern as auth.py:19-81):
     # a failed statement aborts the whole Postgres transaction, so every
     # statement must be IF NOT EXISTS. Deliberately independent of any Stripe
-    # configuration — the module must import cleanly with no env vars set.
+    # configuration - the module must import cleanly with no env vars set.
     with get_db() as db:
         db.execute(
             """
@@ -381,7 +381,7 @@ def _run_with_items(db, run_id):
     return out
 
 
-# --- GET /api/payments/status — any logged-in user --------------------------
+# --- GET /api/payments/status - any logged-in user --------------------------
 
 @bp.route("/api/payments/status", methods=["GET"])
 def payments_status():
@@ -409,7 +409,7 @@ def payments_status():
 
 # --- Company funding source (manager) ----------------------------------------
 
-# POST /api/payments/company/funding-session — Stripe-hosted Checkout (mode=setup)
+# POST /api/payments/company/funding-session - Stripe-hosted Checkout (mode=setup)
 @bp.route("/api/payments/company/funding-session", methods=["POST"])
 def company_funding_session():
     err = manager_required()
@@ -460,7 +460,7 @@ def _store_verified_funding_pm(pm):
     with get_db() as db:
         settings_id = _settings_id_for_customer(db, customer_id)
         if settings_id is None:
-            return  # not one of our funding customers — nothing to attach to
+            return  # not one of our funding customers - nothing to attach to
         _set_payment_settings(
             db,
             settings_id,
@@ -635,7 +635,7 @@ def payout_account_get():
     })
 
 
-# POST /api/payments/me/payout-account/login-link — Express Dashboard access
+# POST /api/payments/me/payout-account/login-link - Express Dashboard access
 @bp.route("/api/payments/me/payout-account/login-link", methods=["POST"])
 def payout_account_login_link():
     nc = _require_configured()
@@ -653,7 +653,7 @@ def payout_account_login_link():
     return jsonify({"url": link["url"]})
 
 
-# GET /api/payments/me/payouts — my payroll-run items, newest first
+# GET /api/payments/me/payouts - my payroll-run items, newest first
 @bp.route("/api/payments/me/payouts", methods=["GET"])
 def my_payouts():
     nc = _require_configured()
@@ -710,7 +710,7 @@ def _parse_period(data):
 
 def _compute_items(db, start, end, company_id):
     """Per-user gross for the period, reusing reports.py hour/overtime math
-    (single source of truth — do not fork). Scoped to the given company's
+    (single source of truth - do not fork). Scoped to the given company's
     employees; company_id None (legacy pre-company callers) keeps the
     original global behavior, mirroring users.py."""
     daily = _daily_hours(db, start, end)
@@ -765,7 +765,7 @@ def _compute_items(db, start, end, company_id):
     return items
 
 
-# POST /api/payments/runs/preview — pure computation, persists nothing.
+# POST /api/payments/runs/preview - pure computation, persists nothing.
 # Deliberately works even when Stripe is unconfigured: it's just math.
 @bp.route("/api/payments/runs/preview", methods=["POST"])
 def preview_run():
@@ -789,7 +789,7 @@ def preview_run():
     })
 
 
-# POST /api/payments/runs — create a run and confirm the funding ACH debit
+# POST /api/payments/runs - create a run and confirm the funding ACH debit
 @bp.route("/api/payments/runs", methods=["POST"])
 def create_run():
     err = manager_required()
@@ -916,7 +916,7 @@ def create_run():
     return jsonify({"run": run}), 201
 
 
-# GET /api/payments/runs — newest first with item counts
+# GET /api/payments/runs - newest first with item counts
 @bp.route("/api/payments/runs", methods=["GET"])
 def list_runs():
     err = manager_required()
@@ -952,7 +952,7 @@ def list_runs():
     return jsonify({"runs": runs})
 
 
-# GET /api/payments/runs/<id> — run detail with per-employee items
+# GET /api/payments/runs/<id> - run detail with per-employee items
 @bp.route("/api/payments/runs/<int:run_id>", methods=["GET"])
 def run_detail(run_id):
     err = manager_required()
@@ -969,7 +969,7 @@ def run_detail(run_id):
     return jsonify({"run": _serialize_run(run), "items": items})
 
 
-# POST /api/payments/runs/<id>/cancel — only while the ACH debit hasn't started
+# POST /api/payments/runs/<id>/cancel - only while the ACH debit hasn't started
 @bp.route("/api/payments/runs/<int:run_id>/cancel", methods=["POST"])
 def cancel_run(run_id):
     err = manager_required()
@@ -990,7 +990,7 @@ def cancel_run(run_id):
         try:
             _stripe("POST", f"/v1/payment_intents/{run['stripe_payment_intent_id']}/cancel")
         except StripeError as exc:
-            # An ACH debit already processing can't be canceled — be honest.
+            # An ACH debit already processing can't be canceled - be honest.
             return jsonify({"error": exc.message}), 409
     with get_db() as db:
         db.execute(
@@ -1003,7 +1003,7 @@ def cancel_run(run_id):
     return jsonify({"run": payload})
 
 
-# POST /api/payments/runs/<id>/sync — missed-webhook recovery
+# POST /api/payments/runs/<id>/sync - missed-webhook recovery
 @bp.route("/api/payments/runs/<int:run_id>/sync", methods=["POST"])
 def sync_run(run_id):
     err = manager_required()
@@ -1054,7 +1054,7 @@ def _find_run_for_pi(pi):
 def _execute_transfers(run_id):
     """Send one Transfer per pending item, then settle the run's final status.
     Previously-failed items (except synthetic zero_amount rows) are retried
-    too, so POST /runs/<id>/sync can recover a transient Stripe failure — the
+    too, so POST /runs/<id>/sync can recover a transient Stripe failure - the
     per-item Idempotency-Key makes re-execution exactly-once at Stripe (a
     send-then-timeout retry returns the original transfer instead of paying
     twice)."""
@@ -1157,7 +1157,7 @@ def _handle_payment_failed(run, pi):
 
 
 def _apply_payment_intent_state(run, pi):
-    """Map a PaymentIntent's status onto the run — same machine as the webhook."""
+    """Map a PaymentIntent's status onto the run - same machine as the webhook."""
     status = pi.get("status")
     if status == "succeeded":
         _handle_run_funded(run)
@@ -1321,13 +1321,13 @@ def _handle_event(event_type, event):
     # anything else: ignore
 
 
-# POST /api/stripe/webhook — public (listed in app.py _PUBLIC_API_PATHS);
+# POST /api/stripe/webhook - public (listed in app.py _PUBLIC_API_PATHS);
 # authenticity comes from the signature, never from a session.
 @bp.route("/api/stripe/webhook", methods=["POST"])
 def stripe_webhook():
     if not _configured():
         return jsonify({"error": "payments not configured"}), 400
-    raw_body = request.get_data()  # raw bytes, unmodified — required for HMAC
+    raw_body = request.get_data()  # raw bytes, unmodified - required for HMAC
     if not _verify_webhook_signature(raw_body, request.headers.get("Stripe-Signature", "")):
         return jsonify({"error": "invalid signature"}), 400
     try:

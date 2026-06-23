@@ -41,7 +41,7 @@ def _viewer_company_id(db, uid):
 # GET /api/shift-swaps?user_id=X&status=open
 @bp.route("/api/shift-swaps", methods=["GET"])
 def list_swaps():
-    # A `user_id` query param means "scope to me" — but the identity always comes
+    # A `user_id` query param means "scope to me" - but the identity always comes
     # from the session, never the client-supplied value, so you can't read another
     # user's swaps by changing the id. Omitting it lists all (for the manager hub).
     scope_to_me = request.args.get("user_id") is not None
@@ -56,7 +56,7 @@ def list_swaps():
             params.extend([uid, uid])
         else:
             # Company-scope the global list: a non-legacy viewer only sees swaps
-            # involving users of their own company (requester or target — same
+            # involving users of their own company (requester or target - same
             # membership rule as export.py). Legacy viewers (company_id NULL)
             # keep the global list.
             viewer_company = _viewer_company_id(db, uid)
@@ -156,7 +156,7 @@ def update_swap(swap_id):
         if not row:
             return jsonify({"error": "not found"}), 404
         # A non-legacy manager can only act on swaps involving their own
-        # company (requester or target — same membership rule as list_swaps
+        # company (requester or target - same membership rule as list_swaps
         # and export.py); cross-company swaps look like 404. Legacy callers
         # (company_id NULL) keep the original global behavior.
         caller_company = _viewer_company_id(db, current_uid())

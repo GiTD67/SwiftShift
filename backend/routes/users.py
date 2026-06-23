@@ -76,7 +76,7 @@ def create_user():
     if not password:
         return jsonify({"error": "password required"}), 400
     if not isinstance(password, str) or len(password) < 8:
-        # Same rule as /api/auth/signup — the admin path must not mint weaker accounts.
+        # Same rule as /api/auth/signup - the admin path must not mint weaker accounts.
         return jsonify({"error": "password must be at least 8 characters"}), 400
     pw_hash = generate_password_hash(password)
     with get_db() as db:
@@ -115,7 +115,7 @@ def get_user(target_id):
             ).fetchone()
         else:
             # Legacy (NULL-company) viewers can look up themselves and other
-            # NULL-company accounts only — never company-scoped users.
+            # NULL-company accounts only - never company-scoped users.
             row = db.execute(
                 f"SELECT {_USER_COLS} FROM users WHERE id = ? AND company_id IS NULL",
                 (target_id,),
@@ -141,7 +141,7 @@ def update_user(target_id):
     if not fields:
         return jsonify({"error": "no updatable fields provided"}), 400
 
-    # Pay, role, and admin status are manager-only — even on your own record.
+    # Pay, role, and admin status are manager-only - even on your own record.
     if not caller_is_manager and any(f in fields for f in _MANAGER_ONLY_FIELDS):
         return jsonify({"error": "manager access required to change pay, role, or admin status"}), 403
 

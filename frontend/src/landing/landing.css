@@ -53,6 +53,28 @@
 .lp-word { color: var(--lp-dim); }
 .lp-word--em { color: var(--lp-fg); }
 
+/* hero headline words - each is its own inline box so GSAP can transform it.
+   .lp-sad deflates to gray on scroll; .lp-brand (SwiftShift) brightens + grows. */
+.lp-hw { display: inline-block; color: var(--lp-fg); will-change: transform; }
+.lp-sad { transform-origin: 50% 0%; }
+.lp-brand {
+  color: var(--lp-fg);
+  font-weight: 650;
+  transform-origin: 50% 100%;
+}
+
+/* interactive hero dot field (canvas) - softly faded at the edges */
+.lp-gravity-dots {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  -webkit-mask-image: radial-gradient(125% 105% at 72% 28%, #000 52%, transparent 100%);
+  mask-image: radial-gradient(125% 105% at 72% 28%, #000 52%, transparent 100%);
+}
+
 /* ---------- nav ---------- */
 .lp-nav {
   position: fixed;
@@ -64,6 +86,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 18px clamp(20px, 4vw, 48px);
+  /* clear the iPhone notch / Dynamic Island (needs viewport-fit=cover) */
+  padding-top: calc(18px + env(safe-area-inset-top, 0px));
   transition: background-color 0.35s ease, backdrop-filter 0.35s ease;
 }
 .lp-nav.is-scrolled {
@@ -82,13 +106,19 @@
   font-size: 0.875rem;
   font-weight: 600;
   padding: 11px 22px;
+  min-height: 44px;
   border-radius: 4px;
   white-space: nowrap;
   transition: transform 0.25s var(--ease-out, ease), box-shadow 0.25s ease;
 }
 @media (max-width: 640px) {
-  .lp-nav { padding: 13px 16px; }
-  .lp-btn { padding: 9px 14px; font-size: 0.8rem; }
+  .lp-nav { padding: 13px 16px; padding-top: calc(13px + env(safe-area-inset-top, 0px)); }
+  .lp-btn { padding: 11px 14px; font-size: 0.8rem; }
+  /* keep the dot texture visible on phone screens (centered, not right-biased) */
+  .lp-dots {
+    -webkit-mask-image: radial-gradient(ellipse 120% 80% at 75% 50%, #000 42%, transparent 100%);
+    mask-image: radial-gradient(ellipse 120% 80% at 75% 50%, #000 42%, transparent 100%);
+  }
 }
 .lp-btn:hover {
   transform: translateY(-1px);
@@ -127,7 +157,7 @@
 .lp-step .lp-step-name { font-weight: 600; font-size: 0.95rem; }
 .lp-step .lp-step-desc { color: var(--lp-dim); font-size: 0.9rem; margin-top: 2px; }
 
-/* the orb — lime ring state */
+/* the orb - lime ring state */
 .lp-orb-ring {
   width: 100%;
   height: 100%;
@@ -138,7 +168,7 @@
     0 0 90px rgba(215, 254, 81, 0.18),
     inset 0 0 36px rgba(215, 254, 81, 0.12);
 }
-/* the orb — molten "sun" state */
+/* the orb - molten "sun" state */
 .lp-orb-sun {
   position: relative;
   width: 100%;
@@ -246,6 +276,57 @@
   box-shadow:
     0 60px 120px -40px rgba(0, 0, 0, 0.9),
     0 0 80px -30px rgba(215, 254, 81, 0.12);
+}
+
+/* ---------- features (each lights up + grows on scroll) ---------- */
+.lp-feature-list { list-style: none; margin: 0; padding: 0; }
+.lp-feature {
+  display: flex;
+  align-items: baseline;
+  gap: clamp(14px, 3vw, 36px);
+  padding: clamp(10px, 1.7vh, 20px) 0;
+  border-top: 1px solid var(--lp-hairline);
+}
+.lp-feature:last-child { border-bottom: 1px solid var(--lp-hairline); }
+.lp-feature-idx {
+  flex: none;
+  width: 2.4em;
+  font-size: 0.8rem;
+  letter-spacing: 0.18em;
+  font-variant-numeric: tabular-nums;
+  color: var(--lp-faint);
+  transform: translateY(-0.18em);
+}
+.lp-feature-text {
+  display: inline-block;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: clamp(1.2rem, 4.4vw, 3rem);
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  transform-origin: left center;
+  color: rgba(244, 244, 245, 0.2);
+  will-change: transform;
+}
+
+/* ---------- the heavyweight mark that drains gray + turns sad ---------- */
+.lp-workday { width: clamp(72px, 11vw, 116px); flex: none; }
+.lp-wd-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.lp-wd-orb { fill: #0a6ed1; }
+.lp-wd-sheen { fill: rgba(255, 255, 255, 0.28); }
+.lp-wd-mark { fill: none; stroke: #ffffff; stroke-width: 5; stroke-linecap: round; opacity: 0.55; }
+.lp-wd-eye { fill: #14181f; opacity: 0; }
+.lp-wd-mouth { fill: none; stroke: #14181f; stroke-width: 4; stroke-linecap: round; opacity: 0; }
+.lp-wd-tear { fill: #8fc2ef; opacity: 0; }
+
+/* Without GSAP pins (reduced motion), let the pinned sections lay out as
+   normal stacked blocks instead of collapsing to a fixed viewport height. */
+@media (prefers-reduced-motion: reduce) {
+  .lp-scale, .lp-pay, .lp-fin { height: auto; min-height: 72vh; }
+  .lp-pay-frame { position: relative; inset: auto; }
+  .lp-letterbox { min-height: 56vh; }
 }
 
 /* ============================================================

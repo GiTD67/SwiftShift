@@ -71,7 +71,7 @@ def get_org_settings(db, company_id=None):
     return dict(row)
 
 
-# GET /api/org-settings — any signed-in user can read their company's settings
+# GET /api/org-settings - any signed-in user can read their company's settings
 @bp.route("/api/org-settings", methods=["GET"])
 def get_settings():
     with get_db() as db:
@@ -79,7 +79,7 @@ def get_settings():
     return jsonify(settings)
 
 
-# PUT /api/org-settings — manager-only
+# PUT /api/org-settings - manager-only
 @bp.route("/api/org-settings", methods=["PUT"])
 def update_settings():
     err = manager_required()
@@ -135,7 +135,7 @@ def _parse_ts(value):
     return ts
 
 
-# GET /api/org-settings/flags — manager-only: clock sessions open longer than
+# GET /api/org-settings/flags - manager-only: clock sessions open longer than
 # missed_clockout_hours, plus days where someone worked over ot_alert_daily_hours.
 @bp.route("/api/org-settings/flags", methods=["GET"])
 def get_flags():

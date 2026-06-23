@@ -2,7 +2,7 @@
    Ambient background motion (Claude-style subtle drift)
    ------------------------------------------------------------
    A pair of soft, accent-tinted glows that drift very slowly behind
-   the app — like the gentle motion on Anthropic's site.
+   the app - like the gentle motion on Anthropic's site.
 
    - Scoped to the DEFAULT background only, so it never fights the
      other "Appearance" background styles (grid/dots/stars/aurora/…).

@@ -111,7 +111,7 @@ export default function EmployeeOnboarding({
     }
   }
 
-  // saveAvailability=false is the availability step's "Skip" — finish without saving.
+  // saveAvailability=false is the availability step's "Skip" - finish without saving.
   async function finish(saveAvailability: boolean) {
     setFinishing(true)
     try {
@@ -154,7 +154,7 @@ export default function EmployeeOnboarding({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      {/* body scroll is disabled globally — the card owns its scrolling */}
+      {/* body scroll is disabled globally - the card owns its scrolling */}
       <div className="glass w-full max-w-xl rounded-3xl border border-white/10 max-h-[90vh] flex flex-col">
         <div className="overflow-y-auto p-8">
           {phase === 'link' ? (
@@ -186,11 +186,11 @@ export default function EmployeeOnboarding({
                       color: 'var(--accent-color)',
                     }}
                   >
-                    ✓ Joining <span className="font-semibold">{lookup.company_name}</span> as {lookup.name}{lookup.job_role ? ` — ${lookup.job_role}` : ''}
+                    ✓ Joining <span className="font-semibold">{lookup.company_name}</span> as {lookup.name}{lookup.job_role ? ` - ${lookup.job_role}` : ''}
                   </div>
                 ) : (
                   <div className="text-sm text-red-400 bg-red-950/40 border border-red-900/60 rounded-xl px-4 py-2">
-                    ⚠ Invalid or expired invite code — double-check it with your manager.
+                    ⚠ Invalid or expired invite code - double-check it with your manager.
                   </div>
                 )
               )}
@@ -247,9 +247,9 @@ export default function EmployeeOnboarding({
                     </div>
                   </div>
                   <div className="bg-white/5 rounded-2xl px-5 py-4 space-y-2 text-sm">
-                    <div className="flex justify-between gap-3"><span className="text-zinc-400">Company</span><span className="font-medium text-right">{companyName || '—'}</span></div>
-                    <div className="flex justify-between gap-3"><span className="text-zinc-400">Role</span><span className="font-medium text-right">{jobRole || '—'}</span></div>
-                    <div className="flex justify-between gap-3"><span className="text-zinc-400">Hourly rate</span><span className="font-medium text-right">{hourlyRate != null ? `$${Number(hourlyRate).toFixed(2)}/hr` : '—'}</span></div>
+                    <div className="flex justify-between gap-3"><span className="text-zinc-400">Company</span><span className="font-medium text-right">{companyName || '-'}</span></div>
+                    <div className="flex justify-between gap-3"><span className="text-zinc-400">Role</span><span className="font-medium text-right">{jobRole || '-'}</span></div>
+                    <div className="flex justify-between gap-3"><span className="text-zinc-400">Hourly rate</span><span className="font-medium text-right">{hourlyRate != null ? `$${Number(hourlyRate).toFixed(2)}/hr` : '-'}</span></div>
                   </div>
                   <div className="flex items-center justify-between pt-1">
                     <button onClick={onSkip} className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">Skip for now</button>
@@ -300,7 +300,7 @@ export default function EmployeeOnboarding({
                   <div>
                     <div className="text-xs tracking-[2px] mb-1.5 uppercase" style={{ color: 'var(--accent-color)' }}>Availability · Step 3 of 3</div>
                     <h2 className="text-2xl font-semibold tracking-tight mb-1">When can you work?</h2>
-                    <p className="text-zinc-400 text-sm">Optional — helps your manager build schedules. You can change it any time in your profile.</p>
+                    <p className="text-zinc-400 text-sm">Optional - helps your manager build schedules. You can change it any time in your profile.</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {DAYS.map(day => (

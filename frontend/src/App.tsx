@@ -200,7 +200,7 @@ function OctopusChart({ node, expanded, setExpanded, search, expandedAll }: {
         <NodeCard n={n} />
         {hasKids && (
           <div className="relative flex flex-col items-center mt-3">
-            {/* vertical line from parent — glows with the accent */}
+            {/* vertical line from parent - glows with the accent */}
             <div className="w-px h-4" style={{ background: 'linear-gradient(to bottom, transparent, rgba(var(--accent-color-rgb),0.55))' }} />
             {/* horizontal connector bar */}
             <div className="h-px" style={{ width: (n.children.length - 1) * 190 + 80, background: 'rgba(var(--accent-color-rgb),0.35)', boxShadow: '0 0 6px rgba(var(--accent-color-rgb),0.3)' }} />
@@ -220,8 +220,10 @@ function OctopusChart({ node, expanded, setExpanded, search, expandedAll }: {
   }
 
   return (
-    <div className="py-4">
-      <TreeNode n={node} />
+    <div className="py-4 overflow-x-auto">
+      <div className="w-max mx-auto">
+        <TreeNode n={node} />
+      </div>
 
       {/* Hover Tooltip */}
       {hovered && hoverPos && (
@@ -307,7 +309,7 @@ function usePayPeriodRange(periodOffset: number) {
     const currentPeriodIndex = Math.max(0, Math.floor(daysSinceAnchor / 14))
     const targetPeriodIndex = currentPeriodIndex + periodOffset
     // Step in whole calendar days (DST-safe) so periodStart always lands on the
-    // anchor's weekday (Sunday) — the day-grid header relies on this.
+    // anchor's weekday (Sunday) - the day-grid header relies on this.
     const periodStart = new Date(anchor)
     periodStart.setDate(anchor.getDate() + targetPeriodIndex * 14)
     periodStart.setHours(0, 0, 0, 0)
@@ -720,7 +722,7 @@ function TimesheetView({ user, gamification, holidays }: { user: any; gamificati
         setClockSessionsByDate(byDate)
         setCompletedSessions(rows.filter(r => r.clock_in && r.clock_out))
 
-        // Populate entries from API — only fill blanks, preserve manual edits
+        // Populate entries from API - only fill blanks, preserve manual edits
         setEntries(prev => {
           const next = { ...prev }
           dayDates.forEach((d, i) => {
@@ -922,10 +924,10 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
             return exists ? prev.map(s => s.period_start === row.period_start ? row : s) : [row, ...prev]
           })
         } else {
-          toast.error('Submitted locally, but saving to the server failed. Pay history may not update — please resubmit.')
+          toast.error('Submitted locally, but saving to the server failed. Pay history may not update - please resubmit.')
         }
       }).catch(() => {
-        toast.error('Submitted locally, but saving to the server failed. Pay history may not update — please resubmit.')
+        toast.error('Submitted locally, but saving to the server failed. Pay history may not update - please resubmit.')
       })
     }
   }
@@ -963,7 +965,7 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
       .finally(() => setCorrSubmitting(false))
   }
 
-  // History grid renderer — shows hours + clock in/out times
+  // History grid renderer - shows hours + clock in/out times
   const HistoryGrid = ({ period, pDates, pId }: { period: string; pDates: Date[]; pId: string }) => {
     const pHours = pDates.map((_, i) =>
       parseHours(historyEntries[pId]?.[entryKey(pId, i)] || '') || parseHours(entries[entryKey(pId, i)] || '')
@@ -1220,7 +1222,7 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
             </div>
           </div>
         </div>
-        {/* Day grid — Liquid Heat Calendar (Mon–Sun × 2 weeks, no horizontal scroll) */}
+        {/* Day grid - Liquid Heat Calendar (Mon–Sun × 2 weeks, no horizontal scroll) */}
         <div className="p-4 sm:p-5">
           <div className="grid grid-cols-7 gap-1.5 sm:gap-2 mb-2 text-[10px] sm:text-xs uppercase tracking-wider text-zinc-500">
             {dayNames.map((n, i) => <div key={i} className="text-center">{n}</div>)}
@@ -1247,7 +1249,7 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
                     ...(isHighlighted ? { animation: 'flashCell 0.6s ease-in-out' } : {}),
                   }}
                 >
-                  {/* Heat fill — encodes hours: rises with the day, amber past 8h */}
+                  {/* Heat fill - encodes hours: rises with the day, amber past 8h */}
                   {h > 0 && (
                     <div
                       className="absolute inset-x-0 bottom-0 pointer-events-none transition-[height] duration-500"
@@ -1268,7 +1270,7 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
                       {d.toLocaleDateString([], { month: 'short', day: 'numeric' })}
                     </div>
                     {holiday && (
-                      <div className="w-full truncate text-center text-[8px] sm:text-[9px] leading-tight text-sky-300 mb-1" title={`${holiday.name} — company holiday`}>
+                      <div className="w-full truncate text-center text-[8px] sm:text-[9px] leading-tight text-sky-300 mb-1" title={`${holiday.name} - company holiday`}>
                         {holiday.name}
                       </div>
                     )}
@@ -1351,7 +1353,7 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
           className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors text-left">
           <div>
             <div className="text-sm font-medium" style={{ color: 'var(--accent-color)' }}>Time Punch Corrections</div>
-            <div className="text-xs text-zinc-500">Wrong clock-in or clock-out time? Request a fix — your manager approves it.</div>
+            <div className="text-xs text-zinc-500">Wrong clock-in or clock-out time? Request a fix - your manager approves it.</div>
           </div>
           <span className="text-zinc-400 text-lg">{showCorrections ? '▲' : '▼'}</span>
         </button>
@@ -1586,7 +1588,7 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
         <p className="text-[11px] text-zinc-500 mt-3">Once submitted, this period is locked until approval or rejection.</p>
       </div>
 
-      {/* Holiday heads-up confirm — shown before certification when the period contains a company holiday */}
+      {/* Holiday heads-up confirm - shown before certification when the period contains a company holiday */}
       {showHolidayConfirm && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowHolidayConfirm(false)}>
           <div role="dialog" aria-modal="true" aria-label="Holiday in this pay period" className="glass rounded-2xl p-6 w-full max-w-md mx-4 border border-white/20" onClick={e => e.stopPropagation()} style={{ boxShadow: '0 0 80px -20px rgba(var(--accent-color-rgb), 0.25), 0 28px 72px -14px rgba(0,0,0,0.85)' }}>
@@ -1757,7 +1759,7 @@ function ResetPasswordPage() {
             <div className="mb-5">
               <div className="text-xs tracking-[2px] mb-1.5 uppercase" style={{ color: accentHex }}>Set New Password</div>
               <h2 className="text-2xl font-semibold tracking-tight">Choose a new password</h2>
-              <p className="text-sm text-zinc-500 mt-1.5">We emailed you this link — it expires one hour after it was sent.</p>
+              <p className="text-sm text-zinc-500 mt-1.5">We emailed you this link - it expires one hour after it was sent.</p>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -1913,7 +1915,7 @@ function SecuritySettings({ userEmail }: { userEmail: string }) {
         ) : backupCodes ? (
           <div className="bg-white/5 rounded-2xl p-4 space-y-3 max-w-sm">
             <p className="text-sm text-emerald-400 font-medium">2FA is on. Save your backup codes.</p>
-            <p className="text-xs text-zinc-500">Each code works once if you lose your authenticator. Store them somewhere safe — you won't see them again.</p>
+            <p className="text-xs text-zinc-500">Each code works once if you lose your authenticator. Store them somewhere safe - you won't see them again.</p>
             <div className="grid grid-cols-2 gap-2 font-mono text-sm text-zinc-200">
               {backupCodes.map(c => <div key={c} className="bg-black/40 rounded-lg px-3 py-1.5 text-center tracking-wider">{c}</div>)}
             </div>
@@ -2019,7 +2021,7 @@ export default function App() {
   } catch {
     localStorage.removeItem('user')
   }
-  // Manager/admin role — drives which manager-only UI is shown. Refreshed at each
+  // Manager/admin role - drives which manager-only UI is shown. Refreshed at each
   // login (the signin response includes is_manager). The backend is the real gate.
   const isManager = !!(user && user.is_manager)
 
@@ -2111,6 +2113,18 @@ export default function App() {
   const appearanceTriggerRef = useRef<HTMLElement | null>(null)
   const appearancePanelRef = useRef<HTMLDivElement | null>(null)
   const userMenuBtnRef = useRef<HTMLButtonElement | null>(null)
+  const userMenuWrapRef = useRef<HTMLDivElement | null>(null)
+  // Touch devices have no hover, so the account menu also opens on tap and
+  // closes on an outside tap. Desktop hover behavior is left untouched.
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  useEffect(() => {
+    if (!userMenuOpen) return
+    const onDown = (e: PointerEvent) => {
+      if (!userMenuWrapRef.current?.contains(e.target as Node)) setUserMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
+  }, [userMenuOpen])
   // ⌘K command palette
   const [cmdkOpen, setCmdkOpen] = useState(false)
   const [cmdkQuery, setCmdkQuery] = useState('')
@@ -2231,7 +2245,7 @@ export default function App() {
   const [editingHoliday, setEditingHoliday] = useState<number | null>(null)
   const [holidayForm, setHolidayForm] = useState({ name: '', date: '', recurring: false, description: '' })
 
-  // Draft auto-save for the entry forms — in-progress values survive accidental
+  // Draft auto-save for the entry forms - in-progress values survive accidental
   // closes and reloads (restored on reopen, cleared on successful submit).
   // Edit flows (existing PTO request / holiday) are excluded on purpose.
   const ptoDraft = useFormDraft('pto-request', ptoRequestForm, setPtoRequestForm, showPtoForm && editingPtoId === null)
@@ -2240,7 +2254,7 @@ export default function App() {
   const announcementDraft = useFormDraft('announcement', announcementForm, setAnnouncementForm, showAnnouncementForm)
   const holidayDraft = useFormDraft('holiday', holidayForm, setHolidayForm, showHolidayForm && !editingHoliday)
 
-  // New hire onboarding modal state (creates company invites — no temp passwords)
+  // New hire onboarding modal state (creates company invites - no temp passwords)
   const [showAddHireModal, setShowAddHireModal] = useState(false)
   const [addHireForm, setAddHireForm] = useState({ first_name: '', last_name: '', email: '', job_role: '', hourly_rate: '' })
   const [addHireLoading, setAddHireLoading] = useState(false)
@@ -2249,7 +2263,7 @@ export default function App() {
   const [importLoading, setImportLoading] = useState(false)
   const [importResult, setImportResult] = useState<{ success: number; errors: string[] } | null>(null)
 
-  // Payments (Stripe) status — single source of truth for whether real payments
+  // Payments (Stripe) status - single source of truth for whether real payments
   // are configured; threaded into PayrollRunsPanel + PayoutSetupCard so neither
   // ever shows payment UI without the backend confirming it's real.
   const [paymentsStatus, setPaymentsStatus] = useState<any | null>(null)
@@ -2554,7 +2568,7 @@ export default function App() {
       .finally(() => setAuditLoading(false))
   }, [activeView])
 
-  // Load my editable profile (contact info + W-4 withholding) once signed in —
+  // Load my editable profile (contact info + W-4 withholding) once signed in -
   // filing status also drives the paystub estimate on the Payroll/Taxes tabs.
   useEffect(() => {
     if (!user?.id) return
@@ -2584,7 +2598,7 @@ export default function App() {
     const counts = past.reduce<Record<string, number>>((acc, e) => { acc[e.category] = (acc[e.category] || 0) + 1; return acc }, {})
     const summary = Object.entries(counts).map(([cat, n]) => `${n} ${labels[cat as NotifCategory] || cat}${n !== 1 ? 's' : ''}`).join(' · ')
     toast.info('📬 Your daily summary', {
-      description: `${summary} — ${past.slice(0, 3).map(e => e.title).join(' · ')}${past.length > 3 ? ` +${past.length - 3} more` : ''}`,
+      description: `${summary} - ${past.slice(0, 3).map(e => e.title).join(' · ')}${past.length > 3 ? ` +${past.length - 3} more` : ''}`,
       duration: 12000,
     })
   }, [user?.id])
@@ -2617,7 +2631,7 @@ export default function App() {
   }, [])
 
   // First-run detection: ask the backend which onboarding wizard (if any) this
-  // account still needs — the single source of truth (not the signin response).
+  // account still needs - the single source of truth (not the signin response).
   useEffect(() => {
     if (!user?.id) return
     fetch(`${API_BASE}/api/onboarding/status`)
@@ -2647,16 +2661,16 @@ export default function App() {
     const qs = params.toString()
     window.history.replaceState({}, '', `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`)
     if (funding === 'success') {
-      toast.success('Company bank connected', { description: 'Verification may take a moment — micro-deposits can take 1–2 days.' })
+      toast.success('Company bank connected', { description: 'Verification may take a moment - micro-deposits can take 1–2 days.' })
       refreshPaymentsStatus()
     } else if (funding === 'cancel') {
-      toast.info('Bank connection canceled — nothing was saved')
+      toast.info('Bank connection canceled - nothing was saved')
     }
     if (payouts === 'return') {
       toast.success('Payout setup submitted', { description: 'Stripe is confirming your details.' })
       refreshPaymentsStatus()
     } else if (payouts === 'refresh') {
-      // Stripe account links are single-use and expire — mint a fresh one and continue.
+      // Stripe account links are single-use and expire - mint a fresh one and continue.
       toast.info('Resuming payout setup…')
       fetch(`${API_BASE}/api/payments/me/payout-account/onboard`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
         .then(r => r.json().then(d => ({ ok: r.ok, d })))
@@ -2768,7 +2782,7 @@ export default function App() {
   // Tracks which reminder thresholds have already fired this clock session (reset on clock-in)
   const breakReminderFiredRef = useRef<Set<string>>(new Set())
 
-  // Daily streak counter (gamified punctuality) — prefer DB values, fall back to localStorage
+  // Daily streak counter (gamified punctuality) - prefer DB values, fall back to localStorage
   const [streak, setStreak] = useState<number>(() => {
     if (user?.streak_count != null) return Number(user.streak_count)
     const saved = localStorage.getItem('streak')
@@ -2839,7 +2853,7 @@ export default function App() {
       .catch(() => {})
   }, [user?.id])
 
-  // Replay punches queued while offline — on app load and whenever connectivity returns
+  // Replay punches queued while offline - on app load and whenever connectivity returns
   useEffect(() => {
     if (!user?.id) return
     let cancelled = false
@@ -2851,7 +2865,7 @@ export default function App() {
           if (sid) setActiveSessionId(sid)
           if (!hasQueuedPunches()) setOfflinePunchPending(false)
           if (synced > 0) {
-            toast.success('Back online — offline punches synced', {
+            toast.success('Back online - offline punches synced', {
               description: `${synced} punch${synced === 1 ? '' : 'es'} saved with the original time.`,
             })
           }
@@ -2894,7 +2908,7 @@ export default function App() {
   const todayTotalMs = todayWorkedMs + sessionWorkedMs
   const isOvertimeOverdrive = todayTotalMs >= 8 * 3600000
 
-  // Daily-goal + overdrive milestone confetti — fired from an effect (NOT during
+  // Daily-goal + overdrive milestone confetti - fired from an effect (NOT during
   // render, which was a setState-in-render bug), gated to the clock view and to
   // prefers-reduced-motion.
   useEffect(() => {
@@ -3051,7 +3065,7 @@ export default function App() {
     }
   }, [Math.floor(now.getTime() / 60000)])
 
-  // Pay period — keyed on the calendar day, not the 1-second `now` tick:
+  // Pay period - keyed on the calendar day, not the 1-second `now` tick:
   // the period only changes at a day boundary, and recomputing the two
   // toLocaleDateString calls every second is needless work.
   const { period, periodLabel } = useMemo(() => {
@@ -3101,12 +3115,12 @@ export default function App() {
         const queueOffline = () => {
           queuePunch({ action: 'clock_in', timestamp: punchTs })
           setOfflinePunchPending(true)
-          toast.info('Saved offline — will sync when you reconnect', {
+          toast.info('Saved offline - will sync when you reconnect', {
             description: 'Your clock-in is queued with its original time.',
           })
         }
         if (!navigator.onLine || hasQueuedPunches()) {
-          // Offline, or earlier punches are still queued — keep FIFO order so
+          // Offline, or earlier punches are still queued - keep FIFO order so
           // a queued clock-out can't be replayed after this clock-in and
           // close the wrong session. If we're actually online, flush now.
           queueOffline()
@@ -3305,12 +3319,12 @@ export default function App() {
         const queueOffline = () => {
           queuePunch({ action: 'clock_out', timestamp: punchTs, sessionId: sid, breakMinutes: unpaidBreakMin })
           setOfflinePunchPending(true)
-          toast.info('Saved offline — will sync when you reconnect', {
+          toast.info('Saved offline - will sync when you reconnect', {
             description: 'Your clock-out is queued with its original time.',
           })
         }
         if (!navigator.onLine || (!sid && hasQueuedPunches())) {
-          // Offline, or the matching clock-in is itself still queued — keep order
+          // Offline, or the matching clock-in is itself still queued - keep order
           queueOffline()
           if (navigator.onLine) window.dispatchEvent(new Event('online'))
         } else if (sid) {
@@ -3331,7 +3345,7 @@ export default function App() {
             .catch(() => toast.error("Couldn't record your PTO accrual for this session"))
         } else {
           // Online but no known session id (e.g. clock-out right after a
-          // refresh, before the active-session fetch resolves) — queue the
+          // refresh, before the active-session fetch resolves) - queue the
           // punch instead of silently dropping it, then flush right away:
           // the replay path resolves the open session server-side.
           queuePunch({ action: 'clock_out', timestamp: punchTs, sessionId: sid, breakMinutes: unpaidBreakMin })
@@ -3369,7 +3383,7 @@ export default function App() {
   }
 
   const handleSuggestion = (suggestion: string) => {
-    // Pass the text directly — setChatMessage + deferred send reads a stale
+    // Pass the text directly - setChatMessage + deferred send reads a stale
     // closure where chatMessage is still the pre-click value, so the chip
     // would silently do nothing.
     handleSendChat(suggestion)
@@ -3462,7 +3476,7 @@ export default function App() {
     setOnboardingIntent(null)
     setOnboardingStatus((s: any) => ({ ...(s || {}), needs: null, onboarding_complete: true }))
   }
-  // Session-memory dismissal only — no persistence, so the prompt returns next login.
+  // Session-memory dismissal only - no persistence, so the prompt returns next login.
   // Also drop the create-company intent: an employee who misclicked
   // "Create a company" and skipped out would otherwise be locked into the
   // manager wizard on every future login, with no way back to the invite-code
@@ -3489,7 +3503,7 @@ export default function App() {
       const data = await res.json().catch(() => null)
       if (!res.ok) { toast.error(data?.error || 'Failed to create invite.'); return }
       setInviteListRefresh(n => n + 1)
-      toast.success(`Invite created for ${first_name.trim()}!`, { description: `Code ${data.code} — copy the code or signup link from the invite list.` })
+      toast.success(`Invite created for ${first_name.trim()}!`, { description: `Code ${data.code} - copy the code or signup link from the invite list.` })
       setShowAddHireModal(false)
       setAddHireForm({ first_name: '', last_name: '', email: '', job_role: '', hourly_rate: '' })
     } catch {
@@ -3584,7 +3598,7 @@ export default function App() {
             <span className="hidden md:inline">Search</span>
             <kbd className="hidden md:inline md:ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 border border-white/10 leading-none">⌘K</kbd>
           </button>
-          {/* Upgrade CTA — prominent, left of achievements */}
+          {/* Upgrade CTA - prominent, left of achievements */}
           <button
             onClick={() => navTo('pricing')}
             className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-full transition-all hover:scale-105 active:scale-95"
@@ -3652,8 +3666,8 @@ export default function App() {
             <span className="text-white/40 ta-streak-label">day streak</span>
           </div>
           {/* User menu dropdown */}
-          <div className="relative group">
-            <button ref={userMenuBtnRef} type="button" aria-haspopup="true" className="text-sm text-zinc-400 cursor-pointer flex items-center gap-2 bg-transparent border-0 p-0">
+          <div ref={userMenuWrapRef} className="relative group">
+            <button ref={userMenuBtnRef} type="button" aria-haspopup="true" aria-expanded={userMenuOpen} onClick={() => setUserMenuOpen(o => !o)} className="text-sm text-zinc-400 cursor-pointer flex items-center gap-2 bg-transparent border-0 p-0">
               {profilePicUrl
                 ? <span
                     className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 inline-flex"
@@ -3668,8 +3682,8 @@ export default function App() {
               }
               <span className="hidden sm:inline">Hi, {user.first_name}</span> <span className="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded-full ml-1" style={{ backgroundColor: 'var(--accent-color)', color: '#000', fontWeight: 700 }}>Lv.{appCurrentLevel.level}</span> ▾
             </button>
-            <div className="absolute right-0 top-full w-56 bg-zinc-900 border border-white/10 rounded-xl shadow-lg hidden group-hover:block group-focus-within:block z-50 pt-1">
-              {/* Mobile-only rows — shown as navbar pills on ≥sm */}
+            <div onClick={() => setUserMenuOpen(false)} style={userMenuOpen ? { display: 'block' } : undefined} className="absolute right-0 top-full w-56 bg-zinc-900 border border-white/10 rounded-xl shadow-lg hidden group-hover:block group-focus-within:block z-50 pt-1">
+              {/* Mobile-only rows - shown as navbar pills on ≥sm */}
               <div className="sm:hidden border-b border-white/10">
                 <div className="px-4 py-2 text-sm text-zinc-300 rounded-t-xl">
                   🔥 {streak} day streak
@@ -3715,7 +3729,7 @@ export default function App() {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6 }}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
               </button>
               {/* Appearance controls (theme, custom color, background, avatar frame)
-                  now live in the Appearance slide-over — opened via the button above */}
+                  now live in the Appearance slide-over - opened via the button above */}
               <button
                 onClick={() => navTo('pricing')}
                 className="w-full text-left px-4 py-2 text-sm hover:bg-white/5 text-zinc-400 border-t border-white/10"
@@ -4095,7 +4109,7 @@ export default function App() {
           { g: 'Go to', label: 'Org Chart', run: () => navTo('orgchart') },
           { g: 'Go to', label: 'Files', run: () => navTo('taxes') },
           { g: 'Go to', label: 'AI Tax Filing', run: () => navTo('groktax') },
-          { g: 'Go to', label: 'Swifty — AI Assistant', run: () => navTo('grokky') },
+          { g: 'Go to', label: 'Swifty - AI Assistant', run: () => navTo('grokky') },
           { g: 'Go to', label: 'InstaApply', run: () => navTo('applications') },
           { g: 'Go to', label: 'Profile', run: () => navTo('profile') },
           { g: 'Go to', label: 'Pricing', run: () => navTo('pricing') },
@@ -4116,7 +4130,7 @@ export default function App() {
           { g: 'Action', label: 'Log out', run: () => handleLogout() },
         ]
         // Manager destinations render nothing for non-managers (blank screen),
-        // so hide them from the palette — same gating as the sidebar.
+        // so hide them from the palette - same gating as the sidebar.
         const visibleCmds = isManager ? cmds : cmds.filter(c => c.g !== 'Manager')
         const q = cmdkQuery.trim().toLowerCase()
         const filtered = q ? visibleCmds.filter(c => c.label.toLowerCase().includes(q) || c.g.toLowerCase().includes(q)) : visibleCmds
@@ -4185,14 +4199,14 @@ export default function App() {
                 return (
                   <div className="max-w-[1200px] mx-auto mb-4 px-4 py-3 rounded-2xl bg-sky-500/10 border border-sky-500/30 text-sm text-sky-300 flex items-center gap-2.5">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                    <span>Today is <span className="font-semibold text-white">{todayHoliday.name}</span> — company holiday</span>
+                    <span>Today is <span className="font-semibold text-white">{todayHoliday.name}</span> - company holiday</span>
                   </div>
                 )
               })()}
               <div className="flex flex-col xl:flex-row gap-6 items-stretch max-w-[1200px] mx-auto">
               {/* Left: Dashboard */}
               <div className="flex-1 flex flex-col">
-                {/* Dashboard card — hero surface */}
+                {/* Dashboard card - hero surface */}
                 <div className="glass glass--hero rounded-3xl p-5 sm:p-8 flex-1 flex flex-col">
                   <div className="flex flex-col sm:flex-row items-start gap-6 sm:gap-10">
                     {/* Left: Greeting, Time, Status, Buttons */}
@@ -4218,7 +4232,7 @@ export default function App() {
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.58 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/>
                           </svg>
-                          Saved offline — will sync when you reconnect
+                          Saved offline - will sync when you reconnect
                         </div>
                       )}
 
@@ -4289,7 +4303,7 @@ export default function App() {
 
                         return (
                           <div className="relative w-[200px] h-[200px] sm:w-[260px] sm:h-[260px] flex items-center justify-center">
-                            {/* Energy core — luminous accent glow when clocked in */}
+                            {/* Energy core - luminous accent glow when clocked in */}
                             {isClockedIn && <div className="energy-core-glow" aria-hidden="true" />}
                             <svg viewBox="0 0 260 260" className="absolute w-full h-full" overflow="visible" style={isOverdrive ? { filter: 'drop-shadow(0 0 12px #FFAA00) drop-shadow(0 0 24px #FFD700)' } : undefined}>
                               {/* Background ring */}
@@ -4323,19 +4337,19 @@ export default function App() {
                                   }}
                                 />
                               )}
-                              {/* Overdrive: electric bolt flashes around the ring — zigzag lightning at 4 cardinal positions */}
+                              {/* Overdrive: electric bolt flashes around the ring - zigzag lightning at 4 cardinal positions */}
                               {isOverdrive && (
                                 <>
-                                  {/* top — zigzag pointing up */}
+                                  {/* top - zigzag pointing up */}
                                   <polyline points="127,26 131,16 126,12 130,22" fill="none" stroke="#FFD700" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
                                     style={{ animation: 'overdrive-bolt 3.2s 0.0s infinite', willChange: 'opacity' }} />
-                                  {/* right — zigzag pointing right */}
+                                  {/* right - zigzag pointing right */}
                                   <polyline points="234,127 244,131 240,126 248,130" fill="none" stroke="#FFD700" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
                                     style={{ animation: 'overdrive-bolt 3.2s 0.8s infinite', willChange: 'opacity' }} />
-                                  {/* bottom — zigzag pointing down */}
+                                  {/* bottom - zigzag pointing down */}
                                   <polyline points="133,234 129,244 134,248 130,238" fill="none" stroke="#FFD700" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
                                     style={{ animation: 'overdrive-bolt 3.2s 1.6s infinite', willChange: 'opacity' }} />
-                                  {/* left — zigzag pointing left */}
+                                  {/* left - zigzag pointing left */}
                                   <polyline points="26,133 16,129 20,134 12,130" fill="none" stroke="#FFD700" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
                                     style={{ animation: 'overdrive-bolt 3.2s 2.4s infinite', willChange: 'opacity' }} />
                                   {/* upper-right */}
@@ -4872,7 +4886,7 @@ export default function App() {
                       )).then(results => {
                         const failed = results.filter(r => r.status === 'rejected').length
                         if (failed === 0) toast.success('Team changes saved')
-                        else toast.error(`Couldn't save changes for ${failed} of ${results.length} people — try again`)
+                        else toast.error(`Couldn't save changes for ${failed} of ${results.length} people - try again`)
                       })
                     }}
                     className="px-4 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
@@ -5029,12 +5043,12 @@ export default function App() {
                   <span className="text-xs font-semibold text-zinc-400 uppercase">Flags</span>
                   {orgFlags.missed_clockouts.map(f => (
                     <span key={`mc-${f.session_id}`} className="px-2.5 py-1 rounded-full text-xs font-medium bg-red-500/20 text-red-400">
-                      Missed clock-out: {f.employee_name || `User #${f.employee_id}`} — open {f.open_hours}h
+                      Missed clock-out: {f.employee_name || `User #${f.employee_id}`} - open {f.open_hours}h
                     </span>
                   ))}
                   {orgFlags.ot_alerts.map(f => (
                     <span key={`ot-${f.employee_id}-${f.date}`} className="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400">
-                      OT: {f.employee_name || `User #${f.employee_id}`} — {f.hours}h on {f.date}
+                      OT: {f.employee_name || `User #${f.employee_id}`} - {f.hours}h on {f.date}
                     </span>
                   ))}
                 </div>
@@ -5220,7 +5234,7 @@ export default function App() {
                   </div>
                   <div className="space-y-3">
                     {pendingCorrections.map(c => {
-                      const fmtPunch = (iso: string | null) => iso ? new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
+                      const fmtPunch = (iso: string | null) => iso ? new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'
                       return (
                         <div key={c.id} className="flex flex-wrap items-center gap-3 bg-white/5 rounded-xl px-4 py-3">
                           <div className="flex-1 min-w-0">
@@ -5240,7 +5254,7 @@ export default function App() {
                                       .then(r => { if (!r.ok) throw new Error(); return r.json() })
                                       .then(() => {
                                         setPendingCorrections(prev => prev.map(x => x.id === c.id ? { ...x, status: 'approved' } : x))
-                                        notify('manager', 'success', 'Correction approved — session times updated')
+                                        notify('manager', 'success', 'Correction approved - session times updated')
                                       }).catch(() => toast.error('Failed to approve')).finally(() => setCorrectionActionLoading(null))
                                   }}
                                   className="px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 transition-colors disabled:opacity-50"
@@ -5282,7 +5296,7 @@ export default function App() {
                   <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                     <div>
                       <h2 className="text-lg font-semibold text-white">Manager: Workflow Settings</h2>
-                      <p className="text-xs text-zinc-400 mt-0.5">Auto-approvals and team flags — applies org-wide</p>
+                      <p className="text-xs text-zinc-400 mt-0.5">Auto-approvals and team flags - applies org-wide</p>
                     </div>
                     <button
                       onClick={() => {
@@ -5344,7 +5358,7 @@ export default function App() {
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                   <div>
                     <h2 className="text-lg font-semibold text-white">Open Shifts</h2>
-                    <p className="text-xs text-zinc-400 mt-0.5">Up-for-grabs shifts — first to claim gets it</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">Up-for-grabs shifts - first to claim gets it</p>
                   </div>
                   {isManager && (
                     <button onClick={() => setShowOpenShiftForm(v => !v)} className="px-4 py-2 rounded-xl text-sm font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}>
@@ -5413,11 +5427,11 @@ export default function App() {
                                   .then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Failed to claim'); return d })
                                   .then(row => {
                                     setOpenShifts(prev => prev.map(x => x.id === row.id ? { ...x, ...row } : x))
-                                    toast.success("Shift claimed — it's yours!")
+                                    toast.success("Shift claimed - it's yours!")
                                   })
                                   .catch((e: any) => {
                                     toast.error(e.message || 'Failed to claim')
-                                    // Someone may have beaten us to it — refresh the board
+                                    // Someone may have beaten us to it - refresh the board
                                     fetch(`${API_BASE}/api/open-shifts`).then(r => r.json()).then(r => setOpenShifts(Array.isArray(r) ? r : [])).catch(() => {})
                                   })
                                   .finally(() => setClaimingShiftId(null))
@@ -5576,10 +5590,10 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Personal Paystub (estimate only — SwiftShift pays gross wages and withholds nothing) */}
+              {/* Personal Paystub (estimate only - SwiftShift pays gross wages and withholds nothing) */}
               <div className="glass rounded-3xl p-6">
-                <h2 className="text-lg font-semibold mb-1 text-white">Estimated paycheck — {periodLabel}</h2>
-                <p className="text-xs text-zinc-500 mb-4">Taxes are estimates — not withheld by SwiftShift.</p>
+                <h2 className="text-lg font-semibold mb-1 text-white">Estimated paycheck - {periodLabel}</h2>
+                <p className="text-xs text-zinc-500 mb-4">Taxes are estimates - not withheld by SwiftShift.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   {/* Earnings */}
                   <div className="space-y-3">
@@ -5639,7 +5653,7 @@ export default function App() {
                 <div className="mt-4 text-xs text-zinc-500">* Tax estimates are approximate. Actual withholding may differ based on filing status and elections.</div>
               </div>
 
-              {/* Tax Withholding Calculator — 2026 brackets */}
+              {/* Tax Withholding Calculator - 2026 brackets */}
               <div className="glass rounded-3xl p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-white">Tax Withholding Summary</h2>
@@ -5884,7 +5898,7 @@ export default function App() {
                     <div className="sm:col-span-2 flex items-center gap-2">
                       <input type="checkbox" id="pto-partial-day" checked={ptoRequestForm.is_partial_day}
                         onChange={e => setPtoRequestForm(f => ({ ...f, is_partial_day: e.target.checked }))} className="accent-current" />
-                      <label htmlFor="pto-partial-day" className="text-xs text-zinc-400">Partial day — request a few hours instead of full days</label>
+                      <label htmlFor="pto-partial-day" className="text-xs text-zinc-400">Partial day - request a few hours instead of full days</label>
                     </div>
                     <div>
                       <div className="text-xs text-zinc-400 mb-1">Type</div>
@@ -6294,7 +6308,7 @@ export default function App() {
                 </div>
                 <div className="glass rounded-3xl p-6">
                   <h2 className="text-lg font-semibold mb-1 text-white">Invites &amp; Onboarding</h2>
-                  <p className="text-xs text-zinc-400 mb-4">Mint invite codes for new hires — they enter the code (or open the link) at signup to join your company.</p>
+                  <p className="text-xs text-zinc-400 mb-4">Mint invite codes for new hires - they enter the code (or open the link) at signup to join your company.</p>
                   <InviteManagerPanel refreshKey={inviteListRefresh} />
                 </div>
               </div>
@@ -6305,7 +6319,7 @@ export default function App() {
                   <div role="dialog" aria-modal="true" aria-label="Add new hire" className="glass rounded-3xl p-6 w-full max-w-md space-y-4 max-h-[85dvh] !overflow-y-auto" onClick={e => e.stopPropagation()}>
                     <div>
                       <div className="text-lg font-bold" style={{ color: 'var(--accent-color)' }}>Add New Hire</div>
-                      <div className="text-xs text-zinc-400 mt-0.5">Creates an invite code — share the code or signup link and they join your company when they sign up.</div>
+                      <div className="text-xs text-zinc-400 mt-0.5">Creates an invite code - share the code or signup link and they join your company when they sign up.</div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -7534,13 +7548,13 @@ export default function App() {
                 const splitOk = Math.abs(splitTotal - 100) <= 0.01
                 return (
                 <div className="space-y-6">
-                {/* Real payouts (Stripe Express) — the legacy form below is reference only */}
+                {/* Real payouts (Stripe Express) - the legacy form below is reference only */}
                 <PayoutSetupCard status={paymentsStatus} />
                 <div className="glass rounded-3xl p-6 space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <h2 className="text-lg font-semibold text-white">Direct Deposit</h2>
-                      <p className="text-xs text-zinc-500 mt-0.5">Reference only — not used for SwiftShift payments</p>
+                      <p className="text-xs text-zinc-500 mt-0.5">Reference only - not used for SwiftShift payments</p>
                     </div>
                     {(depositEdit?.length || 0) < 3 && (
                       <button onClick={() => setDepositEdit((s: any) => [...(s || []), { bank_name: '', account_type: 'checking', routing_number: '', account_number: '', split_percent: 0 }])}
@@ -7587,7 +7601,7 @@ export default function App() {
                     </div>
                   ))}
                   <div className={`text-xs ${splitOk ? 'text-zinc-500' : 'text-red-400'}`}>
-                    Split total: {Math.round(splitTotal * 100) / 100}%{splitOk ? '' : ' — percentages must total 100%'}
+                    Split total: {Math.round(splitTotal * 100) / 100}%{splitOk ? '' : ' - percentages must total 100%'}
                   </div>
                   {directDeposit?.accounts?.some((a: any) => a.bank_name) && (
                     <div className="text-xs text-zinc-500">Currently on file: <span className="text-zinc-300">{directDeposit.accounts.filter((a: any) => a.bank_name).map((a: any) => `${a.bank_name} (${a.account_type}, ${a.split_percent}%)`).join(' · ')}</span></div>
@@ -7920,7 +7934,7 @@ export default function App() {
               swap_auto_approve: { label: 'Shift swap auto-approved', category: 'admin' },
               org_settings_update: { label: 'Updated workflow settings', category: 'admin' },
             }
-            // created_at comes from Postgres NOW()::text ("YYYY-MM-DD HH:MM:SS.ssssss+00") — normalize to ISO for Date()
+            // created_at comes from Postgres NOW()::text ("YYYY-MM-DD HH:MM:SS.ssssss+00") - normalize to ISO for Date()
             const parseTs = (ts: string) => new Date(String(ts || '').replace(' ', 'T').replace(/\+00$/, 'Z'))
             const entries = auditEvents.map(e => {
               const meta = actionMeta[e.action] || { label: e.action, category: 'admin' as const }
@@ -7977,7 +7991,7 @@ export default function App() {
                     { label: 'Events (30 days)', value: last30d.toLocaleString() },
                     { label: 'Unique Actors', value: String(uniqueActors) },
                     { label: 'Admin Actions', value: String(adminActions) },
-                    { label: 'Latest Event', value: latest && !isNaN(latest.getTime()) ? latest.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—' },
+                    { label: 'Latest Event', value: latest && !isNaN(latest.getTime()) ? latest.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '-' },
                   ].map(({ label, value }) => (
                     <div key={label} className="glass rounded-2xl p-4 text-center">
                       <div className="text-2xl font-bold" style={{ color: 'var(--accent-color)' }}>{value}</div>
@@ -8002,6 +8016,7 @@ export default function App() {
 
                 {/* Log entries */}
                 <div className="glass rounded-3xl overflow-hidden">
+                 <div className="overflow-x-auto"><div className="min-w-[480px]">
                   <div className="px-5 py-3 border-b border-white/10 grid grid-cols-[140px_1fr_1fr_80px] gap-3 text-[10px] uppercase tracking-wider text-zinc-500">
                     <div>Timestamp</div><div>Actor</div><div>Action</div><div>Category</div>
                   </div>
@@ -8028,6 +8043,7 @@ export default function App() {
                       </div>
                     ))}
                   </div>
+                 </div></div>
                 </div>
 
                 {/* Retention notice */}
@@ -8392,9 +8408,9 @@ export default function App() {
                 {[
                   { type: 'xp', icon: '⬆', title: 'Level Up!', desc: `You reached Lv.${appCurrentLevel.level} ${appCurrentLevel.name}`, time: '2h ago', unread: true },
                   { type: 'timesheet', icon: '📋', title: 'Timesheet Due', desc: 'Your current pay period timesheet is due in 3 days', time: '5h ago', unread: true },
-                  { type: 'streak', icon: '🔥', title: 'Streak Alert', desc: 'You\'re on a 7-day check-in streak — keep it up!', time: '1d ago', unread: true },
-                  { type: 'leaderboard', icon: '🏆', title: 'Leaderboard Move', desc: 'Alex Rivera overtook your XP ranking — time to earn more!', time: '1d ago', unread: false },
-                  { type: 'hours', icon: '⏱', title: 'Approaching Overtime', desc: 'You\'ve logged 38h this week — 2h until overtime kicks in', time: '2d ago', unread: false },
+                  { type: 'streak', icon: '🔥', title: 'Streak Alert', desc: 'You\'re on a 7-day check-in streak - keep it up!', time: '1d ago', unread: true },
+                  { type: 'leaderboard', icon: '🏆', title: 'Leaderboard Move', desc: 'Alex Rivera overtook your XP ranking - time to earn more!', time: '1d ago', unread: false },
+                  { type: 'hours', icon: '⏱', title: 'Approaching Overtime', desc: 'You\'ve logged 38h this week - 2h until overtime kicks in', time: '2d ago', unread: false },
                   { type: 'achievement', icon: '◆', title: 'Achievement Unlocked', desc: 'You earned the "Perfect Period" badge', time: '3d ago', unread: false },
                   { type: 'payroll', icon: '💵', title: 'Payslip Ready', desc: 'Your payslip for the period ending Apr 19 is available', time: '5d ago', unread: false },
                 ].map((alert, i) => (
@@ -8423,7 +8439,7 @@ export default function App() {
           )}
         </main>
 
-        {/* First-run onboarding wizards — rendered before the tour, which waits
+        {/* First-run onboarding wizards - rendered before the tour, which waits
             (gated on !onboardingActive) until onboarding finishes or is skipped */}
         {onboardingActive && onboardingMode === 'manager_setup' && (
           <ManagerOnboarding
@@ -8447,7 +8463,7 @@ export default function App() {
           />
         )}
 
-        {/* Guided tour modal — also waits for the onboarding status fetch to
+        {/* Guided tour modal - also waits for the onboarding status fetch to
             resolve so a fresh signup's tour isn't yanked mid-display when the
             wizard turns out to be needed */}
         {showTour && !onboardingActive && onboardingStatus !== null && (

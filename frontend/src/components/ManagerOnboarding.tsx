@@ -16,11 +16,11 @@ export const inviteUrl = (code: string) => {
 function copyText(text: string, label: string) {
   navigator.clipboard.writeText(text).then(
     () => toast.success(`${label} copied to clipboard`),
-    () => toast.error('Could not copy — select and copy it manually.'),
+    () => toast.error('Could not copy - select and copy it manually.'),
   )
 }
 
-// Curated common zones — the backend accepts any string ≤64 chars.
+// Curated common zones - the backend accepts any string ≤64 chars.
 const TIMEZONES: Array<[string, string]> = [
   ['America/New_York', 'Eastern (New York)'],
   ['America/Chicago', 'Central (Chicago)'],
@@ -97,7 +97,7 @@ export function InviteManagerPanel({ refreshKey = 0 }: { refreshKey?: number }) 
       if (!res.ok) { toast.error(data?.error || 'Failed to create invite.'); return }
       setInvites(prev => [data, ...prev])
       setForm({ name: '', email: '', job_role: '', hourly_rate: '' })
-      toast.success(`Invite created — code ${data.code}`)
+      toast.success(`Invite created - code ${data.code}`)
     } catch {
       toast.error('Network error.')
     } finally {
@@ -121,7 +121,7 @@ export function InviteManagerPanel({ refreshKey = 0 }: { refreshKey?: number }) 
     })
     setBulkErrors(malformed)
     if (parsed.length === 0) {
-      if (malformed.length === 0) toast.error('Nothing to add — paste one "Name, email, rate" per line.')
+      if (malformed.length === 0) toast.error('Nothing to add - paste one "Name, email, rate" per line.')
       return
     }
     setBulkBusy(true)
@@ -229,7 +229,7 @@ export function InviteManagerPanel({ refreshKey = 0 }: { refreshKey?: number }) 
       <div className="space-y-2">
         {!loaded && <div className="text-sm text-zinc-500">Loading invites…</div>}
         {loaded && invites.length === 0 && (
-          <div className="text-sm text-zinc-500">No invites yet — add your first employee above.</div>
+          <div className="text-sm text-zinc-500">No invites yet - add your first employee above.</div>
         )}
         {invites.map(inv => (
           <div key={inv.id} className="bg-white/5 rounded-xl px-4 py-3">
@@ -309,7 +309,7 @@ export default function ManagerOnboarding({
         }),
       })
       const data = await res.json().catch(() => null)
-      if (res.status === 409) { setStep(2); return } // already in a company — keep going
+      if (res.status === 409) { setStep(2); return } // already in a company - keep going
       if (!res.ok) { setError(data?.error || 'Could not save company.'); return }
       setCompanyState(editing ? data : data.company)
       setStep(2)
@@ -341,7 +341,7 @@ export default function ManagerOnboarding({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      {/* body scroll is disabled globally — the card owns its scrolling */}
+      {/* body scroll is disabled globally - the card owns its scrolling */}
       <div className="glass w-full max-w-xl rounded-3xl border border-white/10 max-h-[90vh] flex flex-col">
         <div className="overflow-y-auto p-8">
           {/* Step indicator */}
@@ -360,7 +360,7 @@ export default function ManagerOnboarding({
               <div>
                 <div className="text-xs tracking-[2px] mb-1.5 uppercase" style={{ color: 'var(--accent-color)' }}>Company Setup · Step 1 of 3</div>
                 <h2 className="text-2xl font-semibold tracking-tight mb-1">
-                  Welcome{user?.first_name ? `, ${user.first_name}` : ''} — set up your company
+                  Welcome{user?.first_name ? `, ${user.first_name}` : ''} - set up your company
                 </h2>
                 <p className="text-zinc-400 text-sm">A few basics so payroll and schedules work the way your team does.</p>
               </div>
@@ -412,7 +412,7 @@ export default function ManagerOnboarding({
               <div>
                 <div className="text-xs tracking-[2px] mb-1.5 uppercase" style={{ color: 'var(--accent-color)' }}>Company Setup · Step 2 of 3</div>
                 <h2 className="text-2xl font-semibold tracking-tight mb-1">Add your employees</h2>
-                <p className="text-zinc-400 text-sm">Each invite gets a code — share the code or the signup link and they join your company instantly. No emails are sent.</p>
+                <p className="text-zinc-400 text-sm">Each invite gets a code - share the code or the signup link and they join your company instantly. No emails are sent.</p>
               </div>
               <InviteManagerPanel />
               <div className="flex items-center justify-between pt-1">

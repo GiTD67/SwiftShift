@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-// Draft auto-save for entry forms — while a form is open, in-progress values
+// Draft auto-save for entry forms - while a form is open, in-progress values
 // are persisted to localStorage (debounced, keyed by user id + form name),
 // restored the next time the form opens, and forgotten on successful submit
 // or via the "Discard draft" control.
@@ -23,7 +23,7 @@ export function useFormDraft<T extends object>(
   active: boolean,
 ) {
   const [draftRestored, setDraftRestored] = useState(false)
-  // Skip the next debounced save — set whenever we change the form ourselves
+  // Skip the next debounced save - set whenever we change the form ourselves
   // (restore, discard, post-submit reset) so only real user edits make drafts.
   const skipNextSave = useRef(false)
   // Form value of a scheduled-but-not-yet-written save, flushed if the form
@@ -47,7 +47,7 @@ export function useFormDraft<T extends object>(
         setDraftRestored(true)
       }
     } catch {
-      // Corrupted draft — discard it rather than crashing.
+      // Corrupted draft - discard it rather than crashing.
       try { localStorage.removeItem(draftKey(name)) } catch {}
     }
   }, [active])
@@ -67,7 +67,7 @@ export function useFormDraft<T extends object>(
     if (pendingSave.current !== null) { write(pendingSave.current); pendingSave.current = null }
   }, [active])
 
-  // Forget the draft — call on successful submit. The form change that usually
+  // Forget the draft - call on successful submit. The form change that usually
   // follows (the post-submit reset) is not re-saved as a new draft.
   const clearDraft = () => {
     window.clearTimeout(timer.current)
@@ -77,7 +77,7 @@ export function useFormDraft<T extends object>(
     try { localStorage.removeItem(draftKey(name)) } catch {}
   }
 
-  // Discard control — drop the draft and reset the form to its defaults.
+  // Discard control - drop the draft and reset the form to its defaults.
   const discardDraft = (reset: T) => {
     clearDraft()
     setForm(reset)

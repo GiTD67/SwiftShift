@@ -63,7 +63,7 @@
   --accent-spill: 0 0 24px rgba(var(--accent-color-rgb), 0.18);
   --focus-ring: 0 0 0 2px var(--accent-color), 0 0 0 5px rgba(var(--accent-color-rgb), 0.30);
 
-  /* Semantic status colors — theme-independent (success/warn/danger/info) */
+  /* Semantic status colors - theme-independent (success/warn/danger/info) */
   --ok: #34d399;
   --warn: #f59e0b;
   --danger: #f87171;
@@ -106,10 +106,10 @@ button, [role="button"] {
 /* No crystal overlay - plain black */
 
 /* ============================================
-   iOS 26 LIQUID GLASS — Ultra-premium glassmorphism
+   iOS 26 LIQUID GLASS - Ultra-premium glassmorphism
    ============================================ */
 
-/* Real translucent glass — NOTE: border-radius intentionally comes from the
+/* Real translucent glass - NOTE: border-radius intentionally comes from the
    markup's rounded-* utility so the 121 call sites keep their varied corners;
    the specular ::before inherits whatever radius the element resolves to. */
 .glass {
@@ -130,7 +130,7 @@ button, [role="button"] {
     background var(--dur-2) var(--ease-standard);
 }
 
-/* Living specular — a slow sheen sweep so no surface is ever inert (the #1
+/* Living specular - a slow sheen sweep so no surface is ever inert (the #1
    tell of fake glass is a static highlight). CSS-only, GPU-cheap, clips to radius. */
 .glass::before {
   content: '';
@@ -181,7 +181,7 @@ button, [role="button"] {
 }
 
 /* ============================================
-   GLASS TIERS — one material vocabulary
+   GLASS TIERS - one material vocabulary
    ============================================ */
 
 /* Thin: chrome (navbar/sidebar/sticky) */
@@ -217,7 +217,7 @@ button, [role="button"] {
   box-shadow: var(--shadow-4), inset 0 1px 0 var(--glass-spec-t), inset 0 -1px 0 var(--glass-spec-b);
 }
 
-/* Tile: nested rows INSIDE glass — deliberately NO blur (avoids nested-glass mud + perf) */
+/* Tile: nested rows INSIDE glass - deliberately NO blur (avoids nested-glass mud + perf) */
 .glass-tile {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.07);
@@ -240,7 +240,7 @@ button, [role="button"] {
 }
 .glass--interactive:active { transform: translateY(0) scale(0.997); }
 
-/* Active/selected — the only place accent touches the material */
+/* Active/selected - the only place accent touches the material */
 .glass--active { border-color: rgba(var(--accent-color-rgb), 0.45); box-shadow: var(--shadow-2), var(--accent-spill); }
 
 /* ============================================
@@ -313,7 +313,7 @@ button, [role="button"] {
 }
 
 /* ============================================
-   ACCENT TEXT — glow is opt-in via .is-hero only
+   ACCENT TEXT - glow is opt-in via .is-hero only
    ============================================ */
 
 .neon-green {
@@ -322,7 +322,7 @@ button, [role="button"] {
 }
 
 /* Glow reserved for deliberate single heroes (clock, earnings, page H1).
-   Data figures stay crisp — glowing text on glass hurts edge contrast. */
+   Data figures stay crisp - glowing text on glass hurts edge contrast. */
 .neon-green.is-hero {
   text-shadow: 0 0 18px rgba(var(--accent-color-rgb), 0.35);
 }
@@ -341,7 +341,7 @@ button, [role="button"] {
    ============================================ */
 
 /* Global keyboard focus indicator. The app had 50+ `focus:outline-none` inputs/
-   buttons with no replacement — a WCAG 2.4.7 failure. :focus-visible shows the ring
+   buttons with no replacement - a WCAG 2.4.7 failure. :focus-visible shows the ring
    only for keyboard/AT users, never on mouse click, so it doesn't disturb pointer use.
    !important is intentional: it must beat Tailwind's `.focus:outline-none:focus`. */
 a:focus-visible,
@@ -447,7 +447,7 @@ textarea:focus-visible,
 }
 
 /* ============================================
-   THEME SWITCHER — accent color overrides
+   THEME SWITCHER - accent color overrides
    ============================================ */
 
 [data-theme="green"] .glass-btn-green,
@@ -614,7 +614,7 @@ textarea:focus-visible,
 [data-theme] .hover\:bg-emerald-500\/40:hover { background-color: rgba(var(--accent-color-rgb), 0.40); }
 
 /* ============================================
-   OVERTIME OVERDRIVE MODE — Gold Electric Theme
+   OVERTIME OVERDRIVE MODE - Gold Electric Theme
    Activates after 8 hours via data-overdrive="true"
    ============================================ */
 
@@ -659,7 +659,7 @@ textarea:focus-visible,
   80%       { border-color: rgba(255, 200, 0, 0.45); }
 }
 
-/* Overdrive pulse is scoped to the HERO surface only — it used to run a glow pulse
+/* Overdrive pulse is scoped to the HERO surface only - it used to run a glow pulse
    AND a border flicker on all 121 glass panels at once (a vestibular/perf hazard).
    The gold tint still applies app-wide via the --accent-color token override, and the
    global prefers-reduced-motion rule neutralizes this pulse. */
@@ -766,7 +766,7 @@ textarea:focus-visible,
 }
 
 /* ============================================
-   PRINT STYLES — Paystub printing
+   PRINT STYLES - Paystub printing
    ============================================ */
 @media print {
   /* Hide everything except paystub content */
@@ -843,7 +843,7 @@ textarea:focus-visible,
 }
 
 /* ============================================
-   TOAST / NOTIFICATION — LIQUID GLASS
+   TOAST / NOTIFICATION - LIQUID GLASS
    Same material vocabulary as .glass: translucent
    dark panel, backdrop blur, white/10 ring,
    rounded-2xl, soft accent glow.

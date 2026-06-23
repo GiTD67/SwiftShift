@@ -1,5 +1,5 @@
 /* ============================================
-   TA LAYOUT — Sidebar + Content
+   TA LAYOUT - Sidebar + Content
    ============================================ */
 
 .ta-app {
@@ -9,7 +9,7 @@
      permanently clipped behind it; vh above is the fallback. */
   height: 100dvh;
   overflow: hidden;
-  /* Near-black depth gradient + accent-tinted aurora — this is the canonical
+  /* Near-black depth gradient + accent-tinted aurora - this is the canonical
      base the default background uses and what every .glass panel refracts.
      Pattern modes (grid/dots/stars…) layer their ::before overlays on top;
      gradient/aurora/gravity-grid modes set their own background below. */
@@ -582,7 +582,7 @@
 .ta-cmdk-foot { padding: 8px 14px; border-top: 1px solid var(--glass-ring); font-size: 0.7rem; color: var(--fg-3); display: flex; gap: 12px; flex-shrink: 0; }
 .ta-cmdk-foot kbd { background: rgba(255, 255, 255, 0.08); border-radius: 4px; padding: 1px 5px; font-family: var(--font-mono); }
 
-/* Pre-auth (login/signup/reset) background — near-black canvas + accent aurora,
+/* Pre-auth (login/signup/reset) background - near-black canvas + accent aurora,
    matching .ta-app so glass cards float over real depth on the first impression. */
 .auth-bg {
   background:
@@ -592,7 +592,7 @@
 }
 
 /* ============================================
-   TIME CLOCK — unified pill buttons + energy core
+   TIME CLOCK - unified pill buttons + energy core
    ============================================ */
 .clock-pill {
   display: inline-flex;
@@ -640,7 +640,7 @@
   border-color: rgba(239, 68, 68, 0.60);
 }
 
-/* Energy core — luminous accent pulse behind the Target Ring (reduced-motion safe) */
+/* Energy core - luminous accent pulse behind the Target Ring (reduced-motion safe) */
 .energy-core-glow {
   position: absolute;
   inset: 20%;

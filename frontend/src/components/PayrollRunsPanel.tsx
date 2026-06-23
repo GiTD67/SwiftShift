@@ -69,7 +69,7 @@ export const fmtUsd = (cents: number) =>
 
 const RUN_CHIPS: Record<string, { label: string; cls: string }> = {
   funding: { label: 'ACH processing', cls: 'bg-amber-500/20 text-amber-400' },
-  funded: { label: 'Funded — sending transfers', cls: 'bg-amber-500/20 text-amber-400' },
+  funded: { label: 'Funded - sending transfers', cls: 'bg-amber-500/20 text-amber-400' },
   paid: { label: 'Paid', cls: 'bg-emerald-500/20 text-emerald-400' },
   partially_paid: { label: 'Partially paid', cls: 'bg-red-500/20 text-red-400' },
   failed: { label: 'Failed', cls: 'bg-red-500/20 text-red-400' },
@@ -82,14 +82,14 @@ function RunStatusChip({ status }: { status: string }) {
 }
 
 const ITEM_STATUS: Record<string, { label: string; cls: string }> = {
-  sent: { label: 'Sent — typically arrives in 1–2 business days', cls: 'text-emerald-400' },
+  sent: { label: 'Sent - typically arrives in 1–2 business days', cls: 'text-emerald-400' },
   pending: { label: 'Processing', cls: 'text-amber-400' },
-  skipped_no_payout_account: { label: 'Skipped — no payout account', cls: 'text-zinc-400' },
+  skipped_no_payout_account: { label: 'Skipped - no payout account', cls: 'text-zinc-400' },
   failed: { label: 'Failed', cls: 'text-red-400' },
 }
 
 // Shared honesty card: shown by both payments components when Stripe isn't
-// configured. No action buttons — nothing pretends to work.
+// configured. No action buttons - nothing pretends to work.
 export function PaymentsNotConfiguredCard() {
   return (
     <div className="glass rounded-3xl p-6 flex items-start gap-4">
@@ -276,7 +276,7 @@ export default function PayrollRunsPanel({ status, defaultPeriodStart, defaultPe
           </div>
         ) : (
           <div className="text-sm text-zinc-400">
-            Connect the bank account payroll is funded from. You'll verify it on a secure Stripe-hosted page — SwiftShift never sees or stores the account number.
+            Connect the bank account payroll is funded from. You'll verify it on a secure Stripe-hosted page - SwiftShift never sees or stores the account number.
             <div className="mt-3">
               <button onClick={connectBank} disabled={connectLoading}
                 className="px-4 py-2 rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
@@ -331,7 +331,7 @@ export default function PayrollRunsPanel({ status, defaultPeriodStart, defaultPe
                       <tr key={item.user_id} className="border-b border-white/5 hover:bg-white/5">
                         <td className="py-2.5 pr-4 font-medium">{item.name}</td>
                         <td className="py-2.5 pr-4">{item.hours.toFixed(1)}h</td>
-                        <td className="py-2.5 pr-4">{item.overtime_hours > 0 ? `${item.overtime_hours.toFixed(1)}h` : '—'}</td>
+                        <td className="py-2.5 pr-4">{item.overtime_hours > 0 ? `${item.overtime_hours.toFixed(1)}h` : '-'}</td>
                         <td className="py-2.5 pr-4">${item.hourly_rate}/hr</td>
                         <td className="py-2.5 pr-4 font-semibold" style={{ color: 'var(--accent-color)' }}>{fmtUsd(item.gross_cents)}</td>
                         <td className="py-2.5">
@@ -341,8 +341,8 @@ export default function PayrollRunsPanel({ status, defaultPeriodStart, defaultPe
                             <span className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-zinc-500/20 text-zinc-400">Nothing to pay</span>
                           ) : (
                             <span className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-amber-500/20 text-amber-400"
-                              title="No payout account — ask them to set up payouts in Profile">
-                              No payout account — ask them to set up payouts in Profile
+                              title="No payout account - ask them to set up payouts in Profile">
+                              No payout account - ask them to set up payouts in Profile
                             </span>
                           )}
                         </td>
@@ -441,7 +441,7 @@ export default function PayrollRunsPanel({ status, defaultPeriodStart, defaultPe
               <div className="mb-3 text-xs text-red-400">{selectedRun.failure_message}</div>
             )}
             {selectedRun.status === 'funding' && (
-              <div className="mb-3 text-xs text-zinc-500">ACH debit of the company bank is processing — employees are paid once it settles (typically 4 business days).</div>
+              <div className="mb-3 text-xs text-zinc-500">ACH debit of the company bank is processing - employees are paid once it settles (typically 4 business days).</div>
             )}
             <div className="overflow-x-auto">
               <table className="w-full text-sm" style={{ minWidth: '560px' }}>

@@ -5,7 +5,7 @@ import sys
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
-    raise SystemExit("DATABASE_URL not set — add it in your Railway/Render environment variables.")
+    raise SystemExit("DATABASE_URL not set - add it in your Railway/Render environment variables.")
 
 try:
     conn = psycopg2.connect(DATABASE_URL)

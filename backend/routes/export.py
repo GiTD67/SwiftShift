@@ -72,7 +72,7 @@ def _attachment(body, filename, mimetype):
     )
 
 
-# GET /api/export/me — everything the logged-in user owns, as one JSON bundle
+# GET /api/export/me - everything the logged-in user owns, as one JSON bundle
 @bp.route("/api/export/me", methods=["GET"])
 def export_me():
     uid = current_uid()
@@ -96,7 +96,7 @@ def export_me():
     return _attachment(json.dumps(bundle, indent=2, default=str), filename, "application/json")
 
 
-# GET /api/export/me.csv — the logged-in user's time data (clock sessions + manual entries)
+# GET /api/export/me.csv - the logged-in user's time data (clock sessions + manual entries)
 @bp.route("/api/export/me.csv", methods=["GET"])
 def export_me_csv():
     uid = current_uid()
@@ -122,7 +122,7 @@ def export_me_csv():
     return _attachment(buf.getvalue(), filename, "text/csv")
 
 
-# GET /api/export/company — manager-only zip of per-table CSVs for all users
+# GET /api/export/company - manager-only zip of per-table CSVs for all users
 @bp.route("/api/export/company", methods=["GET"])
 def export_company():
     err = manager_required()

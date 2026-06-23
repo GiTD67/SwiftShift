@@ -71,7 +71,7 @@ def _ensure_tables():
 _ensure_tables()
 
 
-# No I/L/O/0/1 — avoids ambiguous characters in hand-typed codes.
+# No I/L/O/0/1 - avoids ambiguous characters in hand-typed codes.
 _CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
 

@@ -4,7 +4,7 @@ TAX_YEAR = 2026
 
 STANDARD_DEDUCTION_SINGLE = 15000
 
-# (bracket_size, rate) — None means "rest of income"
+# (bracket_size, rate) - None means "rest of income"
 ORDINARY_TAX_BRACKETS_SINGLE = [
     (11925, 0.10),
     (48475 - 11925, 0.12),

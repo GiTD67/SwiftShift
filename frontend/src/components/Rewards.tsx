@@ -214,7 +214,7 @@ export function Rewards({ totalHours, isClockedIn, theme = 'green', user, onFocu
     return () => clearTimeout(timer)
   }, [highlightRate])
 
-  // Subtle welcome burst on tab focus — single + reduced-motion-aware. Big
+  // Subtle welcome burst on tab focus - single + reduced-motion-aware. Big
   // celebrations are reserved for real milestones, not for opening a tab.
   useEffect(() => {
     if (onFocus && !hasFiredConfetti) {
@@ -233,7 +233,7 @@ export function Rewards({ totalHours, isClockedIn, theme = 'green', user, onFocu
     <div ref={containerRef} className="max-w-[1200px] mx-auto space-y-4">
 
       {/* ═══════════════════════════════════════════
-          TOP MODULE — Live Earnings Machine
+          TOP MODULE - Live Earnings Machine
           ═══════════════════════════════════════════ */}
       <div className="glass rounded-3xl p-6">
         {/* Header */}
@@ -362,7 +362,7 @@ export function Rewards({ totalHours, isClockedIn, theme = 'green', user, onFocu
           </div>
         </div>
 
-        {/* ── HOURLY RATE + PTO VAULT — side by side below the 3 modules ── */}
+        {/* ── HOURLY RATE + PTO VAULT - side by side below the 3 modules ── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
 
           {/* HOURLY RATE */}

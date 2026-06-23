@@ -7,7 +7,7 @@ import { Tour } from '../components/Tour'
 // Sign-in and create-account pages in the scrollytelling landing aesthetic:
 // pure black, hairline borders, white CTA. All auth behavior (endpoints,
 // localStorage persistence, invite lookup/accept, forgot-password) is
-// unchanged from the previous pages — only the presentation moved.
+// unchanged from the previous pages - only the presentation moved.
 
 const AUTH_TESTIMONIALS = [
   { quote: 'SwiftShift cut our payroll processing time in half. The real-time earnings view alone boosted team morale.', name: 'Jamie M.', role: 'HR Director', location: 'Austin TX', initials: 'JM' },
@@ -25,7 +25,7 @@ const SIDE_FEATURES = [
 ]
 
 // Social proof shown on the auth pages. These are illustrative/placeholder
-// accolades and customer names — swap them for real ones as they land.
+// accolades and customer names - swap them for real ones as they land.
 const AWARDS = [
   'Top Workforce App 2026',
   'Best for Small Business',
@@ -177,12 +177,13 @@ function AuthShell({ children, formTitle }: { children: React.ReactNode; formTit
             </div>
           </div>
         </div>
-        {/* Right: the form */}
-        <div className="flex-1 flex items-center justify-center p-5 pt-24 lg:pt-5">
+        {/* Right: the form. items-start on mobile so a tall signup form scrolls
+            from the top instead of centering its head off-screen. */}
+        <div className="flex-1 flex items-start lg:items-center justify-center p-5 pt-24 pb-16 lg:pt-5 lg:pb-5">
           <div className="w-full max-w-[400px]">{children}</div>
         </div>
       </div>
-      <div className="absolute bottom-5 right-6 text-[10px] z-10" style={{ color: 'var(--lp-faint)' }}>
+      <div className="fixed right-6 text-[10px] z-10" style={{ color: 'var(--lp-faint)', bottom: 'calc(1.25rem + env(safe-area-inset-bottom, 0px))' }}>
         © 2026 SwiftShift. All rights reserved.
       </div>
     </div>
@@ -405,7 +406,7 @@ export function LoginPage() {
       if (!res.ok) {
         setError(data.error || 'Access denied. Check credentials.')
       } else if (data.totp_required) {
-        // Password OK, but the account has 2FA on — prompt for the code.
+        // Password OK, but the account has 2FA on - prompt for the code.
         setTotpRequired(true)
       } else {
         localStorage.setItem('user', JSON.stringify(data))
@@ -515,7 +516,7 @@ export function SignupPage() {
   const [inviteInfo, setInviteInfo] = useState<any | null>(null)
   const accentHex = getThemeAccentHex(localStorage.getItem('theme') || 'green')
 
-  // Debounced invite lookup (public endpoint) — previews the company before signup.
+  // Debounced invite lookup (public endpoint) - previews the company before signup.
   useEffect(() => {
     const code = inviteCode.trim()
     if (code.length < 6) { setInviteInfo(null); return }
@@ -595,7 +596,7 @@ export function SignupPage() {
         </p>
       </div>
       <form onSubmit={handleSubmit} className="space-y-5 lpa-rise" style={{ animationDelay: '0.12s' }}>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label htmlFor="signup-first-name" className="lpa-label">First name</label>
             <input
@@ -624,9 +625,9 @@ export function SignupPage() {
             />
           </div>
         </div>
-        {/* Invite code (optional) — links the new account to its company */}
+        {/* Invite code (optional): links the new account to its company */}
         <div>
-          <label htmlFor="signup-invite-code" className="lpa-label">Invite code <span style={{ color: 'var(--lp-faint)' }}>— optional</span></label>
+          <label htmlFor="signup-invite-code" className="lpa-label">Invite code <span style={{ color: 'var(--lp-faint)' }}>(optional)</span></label>
           <input
             id="signup-invite-code"
             type="text"
@@ -646,11 +647,11 @@ export function SignupPage() {
                   color: 'var(--lp-accent)',
                 }}
               >
-                ✓ Joining <span className="font-semibold">{inviteInfo.company_name}</span> as {inviteInfo.name}{inviteInfo.job_role ? ` — ${inviteInfo.job_role}` : ''}
+                ✓ Joining <span className="font-semibold">{inviteInfo.company_name}</span> as {inviteInfo.name}{inviteInfo.job_role ? ` (${inviteInfo.job_role})` : ''}
               </div>
             ) : (
               <div className="mt-2 text-sm text-red-400 bg-red-950/40 border border-red-900/60 rounded-lg px-4 py-2">
-                ⚠ Invalid or expired invite code — double-check it or leave this blank.
+                ⚠ Invalid or expired invite code; double-check it or leave this blank.
               </div>
             )
           )}

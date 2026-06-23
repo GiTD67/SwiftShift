@@ -318,7 +318,7 @@ export function GravityGridBackground() {
     document.addEventListener('mousedown', onPointerDown)
     document.addEventListener('mouseup', onPointerUp)
 
-    // Pre-allocated uniform buffers — reused every frame to avoid GC churn.
+    // Pre-allocated uniform buffers - reused every frame to avoid GC churn.
     const rData = new Float32Array(MAX_R * 3)
     const sData = new Float32Array(MAX_S * 4)
     const ages = new Float32Array(MAX_S)

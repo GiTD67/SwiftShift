@@ -44,7 +44,7 @@ def _parse_iso(value):
         return None
 
 
-# POST /api/corrections — employee requests a fix to one of their own completed sessions
+# POST /api/corrections - employee requests a fix to one of their own completed sessions
 @bp.route("/api/corrections", methods=["POST"])
 def create_correction():
     data = request.get_json() or {}
@@ -85,7 +85,7 @@ def create_correction():
     return jsonify(dict(row)), 201
 
 
-# GET /api/corrections/mine — the caller's own correction requests
+# GET /api/corrections/mine - the caller's own correction requests
 @bp.route("/api/corrections/mine", methods=["GET"])
 def my_corrections():
     uid = current_uid()
@@ -98,7 +98,7 @@ def my_corrections():
     return jsonify([dict(r) for r in rows])
 
 
-# GET /api/corrections/pending — manager review queue (includes current session times)
+# GET /api/corrections/pending - manager review queue (includes current session times)
 @bp.route("/api/corrections/pending", methods=["GET"])
 def pending_corrections():
     err = manager_required()
@@ -134,7 +134,7 @@ def pending_corrections():
     return jsonify([dict(r) for r in rows])
 
 
-# POST /api/corrections/:id/approve — manager approves and the session row is updated
+# POST /api/corrections/:id/approve - manager approves and the session row is updated
 @bp.route("/api/corrections/<int:req_id>/approve", methods=["POST"])
 def approve_correction(req_id):
     err = manager_required()

@@ -126,7 +126,7 @@ def _check_totp_or_backup(row, code):
             with get_db() as db:
                 cur = db.execute(
                     # Guard on the unchanged list so two concurrent requests
-                    # can't both consume the same code — exactly one UPDATE wins.
+                    # can't both consume the same code - exactly one UPDATE wins.
                     "UPDATE users SET totp_backup_codes = ? WHERE id = ? AND totp_backup_codes = ?",
                     (json.dumps(remaining), row["id"], raw),
                 )
@@ -451,7 +451,7 @@ def google_auth():
             ).fetchone()
 
     if row.get("totp_enabled"):
-        # Same 2FA gate as password signin — Google proving the email must not
+        # Same 2FA gate as password signin - Google proving the email must not
         # let a 2FA-protected account skip the second factor.
         session["pending_2fa_uid"] = row["id"]
         session.pop("uid", None)
@@ -605,7 +605,7 @@ def totp_setup():
         if not row:
             return jsonify({"error": "not found"}), 404
         if row.get("totp_enabled"):
-            # Don't silently wipe a working secret — disable first.
+            # Don't silently wipe a working secret - disable first.
             return jsonify({"error": "Two-factor is already enabled"}), 400
         secret = generate_secret()
         # Store the pending secret; 2FA stays disabled until a code is confirmed.
@@ -701,7 +701,7 @@ def totp_login_verify():
         if new_lock:
             return jsonify({"error": "Too many incorrect codes. Try again in 15 minutes."}), 429
         return jsonify({"error": "Invalid authentication code"}), 401
-    # Success — clear any failure counter and complete the login.
+    # Success - clear any failure counter and complete the login.
     with get_db() as db:
         db.execute(
             "UPDATE users SET totp_failed_attempts = 0, totp_locked_until = NULL WHERE id = ?",

@@ -4,7 +4,7 @@ Calls the REST endpoint directly so there's no new Python dependency (reuses
 ``requests``, already required). Configured entirely by environment:
 
   RESEND_API_KEY  required to actually send. If unset, send_email() is a no-op
-                  that logs and returns False — so signup / password reset never
+                  that logs and returns False - so signup / password reset never
                   crash just because email isn't configured yet.
   RESEND_FROM     From header, e.g. "SwiftShift <noreply@swiftshift.work>".
                   The domain must be verified in Resend.
@@ -34,7 +34,7 @@ def send_email(to, subject, html, text=None):
     False, so the auth flows that call it degrade gracefully instead of failing.
     """
     if not RESEND_API_KEY:
-        logger.warning("RESEND_API_KEY not set — skipping email to %s (%s)", to, subject)
+        logger.warning("RESEND_API_KEY not set - skipping email to %s (%s)", to, subject)
         return False
     try:
         payload = {"from": RESEND_FROM, "to": [to], "subject": subject, "html": html}

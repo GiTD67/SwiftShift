@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { Fragment, useEffect, useRef } from 'react'
 
 // ---------------------------------------------------------------------------
-// WordReveal — renders text split into per-word spans so GSAP can brighten
+// WordReveal - renders text split into per-word spans so GSAP can brighten
 // them sequentially on scroll. `**bold**` segments render pre-emphasized
 // (white) and the rest dim; containers tagged data-word-reveal get a scrubbed
 // dim→bright stagger wired up in LandingPage. Screen readers get the plain
@@ -38,7 +38,45 @@ export function WordReveal({
 }
 
 // ---------------------------------------------------------------------------
-// LiveMoney — a dollar figure that accrues in real time at an hourly rate,
+// HeroHeadline - like WordReveal, but supports two scroll-driven emphases:
+//   ~~text~~  -> "sad" words that deflate and turn gray as you scroll
+//   **text**  -> "brand" words (SwiftShift) that brighten, lift, and grow
+// Each word is an inline-block span carrying stable classes (.lp-hw, plus
+// .lp-sad / .lp-brand) so GSAP can transform it. Screen readers get the
+// plain sentence via aria-label; the spans are presentational.
+// ---------------------------------------------------------------------------
+export function HeroHeadline({ text, className }: { text: string; className?: string }) {
+  const plain = text.replace(/~~|\*\*/g, '')
+  const words: { text: string; sad: boolean; brand: boolean }[] = []
+  text.split(/(~~[^~]+~~|\*\*[^*]+\*\*)/).forEach(seg => {
+    if (!seg) return
+    const sad = seg.startsWith('~~')
+    const brand = seg.startsWith('**')
+    seg.replace(/~~|\*\*/g, '').split(/\s+/).filter(Boolean).forEach(w =>
+      words.push({ text: w, sad, brand }),
+    )
+  })
+  return (
+    <h1 className={className} aria-label={plain}>
+      {words.map((w, i) => (
+        // The space lives BETWEEN the inline-block spans (not inside them, where
+        // inline-block layout would trim it) so words are spaced and can wrap.
+        <Fragment key={i}>
+          <span
+            aria-hidden="true"
+            className={`lp-hw${w.sad ? ' lp-sad' : ''}${w.brand ? ' lp-brand' : ''}`}
+          >
+            {w.text}
+          </span>
+          {i < words.length - 1 ? ' ' : ''}
+        </Fragment>
+      ))}
+    </h1>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// LiveMoney - a dollar figure that accrues in real time at an hourly rate,
 // with a small third-decimal digit so the motion is visible every frame.
 // Mirrors the in-app live earnings odometer that the copy is selling.
 // ---------------------------------------------------------------------------
@@ -79,7 +117,7 @@ export function LiveMoney({
 }
 
 // ---------------------------------------------------------------------------
-// GalaxyCanvas — a lightweight spiral-galaxy particle field. Rotation is
+// GalaxyCanvas - a lightweight spiral-galaxy particle field. Rotation is
 // driven from outside (scroll progress) via rotationRef, plus a slow idle
 // drift so it never feels frozen.
 // ---------------------------------------------------------------------------
@@ -165,7 +203,7 @@ export function GalaxyCanvas({
 }
 
 // ---------------------------------------------------------------------------
-// HandwrittenNote — a Caveat-script annotation with a hand-drawn circled
+// HandwrittenNote - a Caveat-script annotation with a hand-drawn circled
 // arrow. The strokes use pathLength=1 so GSAP can write them on with a
 // simple dashoffset 1→0 scrub; the text reveals via a clip-path sweep.
 // Targets carry stable classes: .lp-hw-stroke (paths) and .lp-handwrite-clip.
@@ -198,7 +236,7 @@ export function HandwrittenNote({ text, className }: { text: string; className?:
 }
 
 // ---------------------------------------------------------------------------
-// CountUp — a numeral that counts from 0 when it enters the viewport.
+// CountUp - a numeral that counts from 0 when it enters the viewport.
 // LandingPage wires the trigger; this just renders the final value and a
 // data attribute with the target so GSAP can animate textContent.
 // ---------------------------------------------------------------------------
@@ -207,5 +245,154 @@ export function CountUp({ value, className }: { value: number; className?: strin
     <span className={className} data-countup={value}>
       {value.toLocaleString('en-US')}
     </span>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// GravityDots - the hero's dot field, made interactive. A grid of dots that
+// bends toward the pointer like a little gravity well (and brightens to the
+// accent near the cursor), then springs back. Pure 2D canvas, pointer-events
+// none so it never blocks the hero. Reduced motion renders one static grid.
+// ---------------------------------------------------------------------------
+export function GravityDots({ className }: { className?: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const reduce = typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    let w = 0, h = 0
+    type Dot = { bx: number; by: number; x: number; y: number; vx: number; vy: number }
+    let dots: Dot[] = []
+
+    const build = () => {
+      const rect = canvas.getBoundingClientRect()
+      w = rect.width; h = rect.height
+      canvas.width = Math.floor(w * dpr)
+      canvas.height = Math.floor(h * dpr)
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      // Spacing scales up a touch on small screens to keep the dot count sane.
+      const spacing = w < 640 ? 26 : 32
+      const cols = Math.ceil(w / spacing) + 2
+      const rows = Math.ceil(h / spacing) + 2
+      dots = []
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const bx = c * spacing, by = r * spacing
+          dots.push({ bx, by, x: bx, y: by, vx: 0, vy: 0 })
+        }
+      }
+    }
+    build()
+
+    const drawStatic = () => {
+      ctx.clearRect(0, 0, w, h)
+      ctx.fillStyle = 'rgba(255,255,255,0.14)'
+      for (const d of dots) {
+        ctx.beginPath()
+        ctx.arc(d.bx, d.by, 1, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+
+    const ro = new ResizeObserver(() => { build(); if (reduce) drawStatic() })
+    ro.observe(canvas)
+
+    if (reduce) {
+      drawStatic()
+      return () => ro.disconnect()
+    }
+
+    // Pointer position in canvas-local coords; far-away sentinel = inactive.
+    let mx = -1e5, my = -1e5
+    const RADIUS = 168
+    const setFromClient = (cx: number, cy: number) => {
+      const rect = canvas.getBoundingClientRect()
+      mx = cx - rect.left; my = cy - rect.top
+    }
+    const onMouse = (e: MouseEvent) => setFromClient(e.clientX, e.clientY)
+    const onTouch = (e: TouchEvent) => { const t = e.touches[0]; if (t) setFromClient(t.clientX, t.clientY) }
+    const onLeave = () => { mx = -1e5; my = -1e5 }
+    window.addEventListener('mousemove', onMouse, { passive: true })
+    window.addEventListener('touchmove', onTouch, { passive: true })
+    window.addEventListener('touchend', onLeave, { passive: true })
+    window.addEventListener('touchcancel', onLeave, { passive: true })
+    window.addEventListener('mouseout', onLeave, { passive: true })
+
+    let raf = 0
+    const render = () => {
+      ctx.clearRect(0, 0, w, h)
+      const r2 = RADIUS * RADIUS
+      for (const d of dots) {
+        const dx = mx - d.bx, dy = my - d.by
+        const dist2 = dx * dx + dy * dy
+        let near = 0
+        if (dist2 < r2) {
+          const dist = Math.sqrt(dist2) || 0.0001
+          near = 1 - dist / RADIUS                 // 0..1 falloff
+          const pull = near * near * 30             // dots drawn toward the cursor
+          const tx = d.bx + (dx / dist) * pull
+          const ty = d.by + (dy / dist) * pull
+          d.vx += (tx - d.x) * 0.16
+          d.vy += (ty - d.y) * 0.16
+        } else {
+          d.vx += (d.bx - d.x) * 0.11               // spring back home
+          d.vy += (d.by - d.y) * 0.11
+        }
+        d.vx *= 0.80; d.vy *= 0.80
+        d.x += d.vx; d.y += d.vy
+
+        const radius = 1 + near * 1.8
+        ctx.beginPath()
+        ctx.arc(d.x, d.y, radius, 0, Math.PI * 2)
+        ctx.fillStyle = near > 0
+          ? `rgba(215,254,81,${0.16 + near * 0.62})`
+          : 'rgba(255,255,255,0.14)'
+        ctx.fill()
+      }
+      raf = requestAnimationFrame(render)
+    }
+    raf = requestAnimationFrame(render)
+
+    return () => {
+      cancelAnimationFrame(raf)
+      ro.disconnect()
+      window.removeEventListener('mousemove', onMouse)
+      window.removeEventListener('touchmove', onTouch)
+      window.removeEventListener('touchend', onLeave)
+      window.removeEventListener('touchcancel', onLeave)
+      window.removeEventListener('mouseout', onLeave)
+    }
+  }, [])
+
+  return <canvas ref={canvasRef} className={className} aria-hidden="true" />
+}
+
+// ---------------------------------------------------------------------------
+// WorkdayMorph - an original enterprise-style logo mark (a glossy blue orb
+// with a corporate swirl) that, as you scroll into the comparison, drains to
+// gray and morphs into a sad face: the swirl fades, eyes and a frown appear,
+// a tear wells up. All targets carry stable classes wired up in LandingPage.
+// (Original art - it evokes heavyweight HR software, it is not a real mark.)
+// ---------------------------------------------------------------------------
+export function WorkdayMorph({ className }: { className?: string }) {
+  return (
+    <div className={className} data-workday aria-hidden="true">
+      <svg viewBox="0 0 120 120" className="lp-wd-svg">
+        <circle className="lp-wd-orb" cx="60" cy="60" r="46" />
+        <circle className="lp-wd-sheen" cx="46" cy="44" r="15" />
+        <path className="lp-wd-mark" d="M38 58 q11 -24 22 0 q11 24 22 0" />
+        <circle className="lp-wd-eye" cx="47" cy="55" r="4.6" />
+        <circle className="lp-wd-eye" cx="73" cy="55" r="4.6" />
+        <path className="lp-wd-mouth" d="M45 86 Q60 73 75 86" />
+        <path className="lp-wd-tear" d="M47 63 q-4.5 7.5 0 11 q4.5 -3.5 0 -11 z" />
+      </svg>
+    </div>
   )
 }

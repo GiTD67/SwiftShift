@@ -100,7 +100,7 @@ export function LootDrop({ isOpen, onClose, earnings, ptoHours, durationMin, the
       return
     }
 
-    // Confetti burst — theme color only, fires exactly once per modal open
+    // Confetti burst - theme color only, fires exactly once per modal open
     const burst = () => {
       if (hasFiredConfettiRef.current) return
       hasFiredConfettiRef.current = true
@@ -114,7 +114,7 @@ export function LootDrop({ isOpen, onClose, earnings, ptoHours, durationMin, the
       })
     }
 
-    // Single burst — fires only once
+    // Single burst - fires only once
     burst()
 
     // Settle stage after coins drop
@@ -122,7 +122,7 @@ export function LootDrop({ isOpen, onClose, earnings, ptoHours, durationMin, the
       setStage('settled')
     }, 1800)
 
-    // NO auto-close — user must dismiss manually
+    // NO auto-close - user must dismiss manually
 
     return () => {
       clearTimeout(settleTimer)
@@ -174,7 +174,7 @@ export function LootDrop({ isOpen, onClose, earnings, ptoHours, durationMin, the
             className="glass rounded-3xl px-6 pb-6 pt-5 text-center relative overflow-hidden border border-white/20"
             style={{ boxShadow: `0 0 80px -20px ${accentColor}35, 0 28px 72px -14px rgba(0,0,0,0.85)` }}
           >
-            {/* Close X — absolute top-right corner */}
+            {/* Close X - absolute top-right corner */}
             <button
               onClick={onClose}
               className="absolute top-1.5 right-1.5 w-8 h-8 flex items-center justify-center text-zinc-400 hover:text-white text-2xl leading-none z-10 rounded-lg hover:bg-white/10 transition-colors"

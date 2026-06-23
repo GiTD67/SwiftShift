@@ -279,7 +279,7 @@ def match_jobs():
 
     resume_text = extract_resume_text(user_id)
     if not resume_text.strip():
-        # No resume text available — return jobs as-is with 0 score
+        # No resume text available - return jobs as-is with 0 score
         return jsonify({"jobs": [{"job": j, "score": 0, "label": "No resume"} for j in jobs]})
 
     api_key = os.environ.get("XAI_API_KEY")

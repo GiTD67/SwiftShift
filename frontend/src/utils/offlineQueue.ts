@@ -1,4 +1,4 @@
-// Offline punch queue — clock in/out punches made while offline are stored in
+// Offline punch queue - clock in/out punches made while offline are stored in
 // localStorage and replayed in order (with their original timestamps as
 // client_ts) once connectivity returns.
 
@@ -21,7 +21,7 @@ export function getQueuedPunches(): QueuedPunch[] {
     const parsed = JSON.parse(raw)
     return Array.isArray(parsed) ? parsed : []
   } catch {
-    // Corrupted queue — discard it rather than crashing.
+    // Corrupted queue - discard it rather than crashing.
     localStorage.removeItem(QUEUE_KEY)
     return []
   }
@@ -68,13 +68,13 @@ export async function flushQueuedPunches(apiBase: string): Promise<{ synced: num
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ client_ts: punch.timestamp }),
         })
-        if (res.status >= 500) break // server hiccup — retry later
+        if (res.status >= 500) break // server hiccup - retry later
         if (res.ok) {
           const row = await res.json()
           if (row?.id) activeSessionId = row.id
           synced++
         }
-        // other 4xx: punch was rejected — drop it
+        // other 4xx: punch was rejected - drop it
       } else {
         // Resolve the session to close: the id captured at punch time, the one
         // a just-replayed clock_in created, or whatever session is still open.
@@ -97,13 +97,13 @@ export async function flushQueuedPunches(apiBase: string): Promise<{ synced: num
             activeSessionId = null
           }
         }
-        // No open session to close — drop the punch
+        // No open session to close - drop the punch
       }
       queue = queue.slice(1)
       saveQueue(queue)
     }
   } catch {
-    // Network error — still offline; whatever wasn't synced stays queued.
+    // Network error - still offline; whatever wasn't synced stays queued.
   } finally {
     flushing = false
   }

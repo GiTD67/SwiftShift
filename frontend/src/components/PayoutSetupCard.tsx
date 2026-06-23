@@ -26,9 +26,9 @@ interface PayoutItem {
 }
 
 const PAYOUT_STATUS: Record<string, { label: string; cls: string }> = {
-  sent: { label: 'Sent — typically arrives in 1–2 business days', cls: 'text-emerald-400' },
+  sent: { label: 'Sent - typically arrives in 1–2 business days', cls: 'text-emerald-400' },
   pending: { label: 'Processing', cls: 'text-amber-400' },
-  skipped_no_payout_account: { label: 'Skipped — no payout account', cls: 'text-red-400' },
+  skipped_no_payout_account: { label: 'Skipped - no payout account', cls: 'text-red-400' },
   failed: { label: 'Failed', cls: 'text-red-400' },
 }
 
@@ -121,7 +121,7 @@ export default function PayoutSetupCard({ status }: PayoutSetupCardProps) {
 
       {onboardingStatus === 'pending' && (
         <div>
-          <p className="text-sm text-zinc-400">Your payout setup with Stripe isn't finished yet — pick up where you left off.</p>
+          <p className="text-sm text-zinc-400">Your payout setup with Stripe isn't finished yet - pick up where you left off.</p>
           {disabledReason && <p className="text-xs text-amber-400 mt-1">Stripe needs more info: {disabledReason}</p>}
           <button onClick={startOnboarding} disabled={actionLoading}
             className="mt-3 px-4 py-2 rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
@@ -169,13 +169,13 @@ export default function PayoutSetupCard({ status }: PayoutSetupCardProps) {
               </thead>
               <tbody>
                 {payouts.map(p => {
-                  // An item still 'pending' on a failed/canceled run will never pay out —
+                  // An item still 'pending' on a failed/canceled run will never pay out -
                   // show the honest terminal state instead of 'Processing' forever.
                   const runDead = p.status === 'pending' && (p.run_status === 'failed' || p.run_status === 'canceled')
                   const st = runDead
                     ? (p.run_status === 'failed'
-                        ? { label: 'Not paid — payroll run failed', cls: 'text-red-400' }
-                        : { label: 'Not paid — payroll run canceled', cls: 'text-zinc-400' })
+                        ? { label: 'Not paid - payroll run failed', cls: 'text-red-400' }
+                        : { label: 'Not paid - payroll run canceled', cls: 'text-zinc-400' })
                     : PAYOUT_STATUS[p.status] || { label: p.status, cls: 'text-zinc-400' }
                   return (
                     <tr key={`${p.run_id}-${p.period_start}`} className="border-b border-white/5">
@@ -189,7 +189,7 @@ export default function PayoutSetupCard({ status }: PayoutSetupCardProps) {
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-zinc-500 mt-2">Gross wages only — no taxes are withheld by SwiftShift.</p>
+          <p className="text-xs text-zinc-500 mt-2">Gross wages only - no taxes are withheld by SwiftShift.</p>
         </div>
       )}
     </div>

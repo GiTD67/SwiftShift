@@ -159,7 +159,7 @@ function MiniSparkline({ values, color }: { values: number[]; color: string }) {
   )
 }
 
-// Gradient rank chip (replaces 🥇🥈🥉 emoji) — gold/silver/bronze for 1/2/3, else plain number
+// Gradient rank chip (replaces 🥇🥈🥉 emoji) - gold/silver/bronze for 1/2/3, else plain number
 function RankChip({ rank }: { rank: number }) {
   const styles: Record<number, { bg: string; fg: string; ring: string }> = {
     1: { bg: 'linear-gradient(135deg,#FFE08A,#F5B125)', fg: '#3a2a00', ring: 'rgba(245,177,37,0.5)' },
@@ -364,7 +364,7 @@ export function SalesKPI({ isAdmin = true, accentColor = '#22c55e', addXP }: Sal
     setShowAddPrize(false)
   }
 
-  const myRep = reps[0] ?? { id: 0, name: '—', closes: 0, comps: 0, revenue: 0, streak: 0, xp: 0 }
+  const myRep = reps[0] ?? { id: 0, name: '-', closes: 0, comps: 0, revenue: 0, streak: 0, xp: 0 }
   const sortedReps = [...reps].sort((a, b) => b.closes - a.closes)
   const totalCloses = reps.reduce((s, r) => s + r.closes, 0)
   const totalRevenue = reps.reduce((s, r) => s + r.revenue, 0)

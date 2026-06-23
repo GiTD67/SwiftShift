@@ -79,7 +79,7 @@ def get_balance():
     return jsonify(dict(row))
 
 
-# POST /api/pto/balance/accrue  — called on every clock-out
+# POST /api/pto/balance/accrue  - called on every clock-out
 @bp.route("/api/pto/balance/accrue", methods=["POST"])
 def accrue_pto():
     data = request.get_json() or {}
@@ -204,7 +204,7 @@ def create_request():
     return jsonify(dict(row)), 201
 
 
-# PUT /api/pto/requests/:id  — manager approve/deny, or owner edit while pending
+# PUT /api/pto/requests/:id  - manager approve/deny, or owner edit while pending
 @bp.route("/api/pto/requests/<int:req_id>", methods=["PUT"])
 def update_request(req_id):
     data = request.get_json() or {}
@@ -353,7 +353,7 @@ def _owner_edit(req_id, data):
     return jsonify(dict(row))
 
 
-# DELETE /api/pto/requests/:id  — owner cancels a still-pending request
+# DELETE /api/pto/requests/:id  - owner cancels a still-pending request
 @bp.route("/api/pto/requests/<int:req_id>", methods=["DELETE"])
 def cancel_request(req_id):
     uid = current_uid()

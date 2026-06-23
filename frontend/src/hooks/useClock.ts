@@ -15,7 +15,7 @@ export function useClock() {
     try {
       return JSON.parse(saved)
     } catch {
-      // Corrupted persisted state — discard it rather than crashing on mount.
+      // Corrupted persisted state - discard it rather than crashing on mount.
       localStorage.removeItem(CLOCK_STORAGE_KEY)
       return fallback
     }
