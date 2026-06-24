@@ -110,7 +110,7 @@ def update_settings():
 
         db.execute(
             "UPDATE org_settings SET auto_approve_swap_hours = ?, ot_alert_daily_hours = ?, missed_clockout_hours = ?, updated_at = ? WHERE id = ?",
-            (auto_hours, ot_hours, missed_hours, datetime.utcnow().isoformat(), current["id"]),
+            (auto_hours, ot_hours, missed_hours, datetime.now(timezone.utc).replace(tzinfo=None).isoformat(), current["id"]),
         )
         db.commit()
         row = db.execute(
@@ -142,7 +142,7 @@ def get_flags():
     err = manager_required()
     if err:
         return err
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     with get_db() as db:
         viewer_company = _viewer_company_id(db, current_uid())
         settings = get_org_settings(db, viewer_company)

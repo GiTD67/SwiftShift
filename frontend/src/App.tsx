@@ -2867,6 +2867,9 @@ export default function App() {
   const [wakeKey, setWakeKey] = useState(() => new Date().toISOString().slice(0, 10))
   const wakeKeyRef = useRef(wakeKey)
   useEffect(() => { wakeKeyRef.current = wakeKey }, [wakeKey])
+  // Bumped after offline punches finish syncing so the clock-state effect below
+  // re-derives the active session id and today/period totals from the now-synced DB.
+  const [syncKey, setSyncKey] = useState(0)
   useEffect(() => {
     const bump = () => {
       const today = new Date().toISOString().slice(0, 10)
@@ -2958,7 +2961,7 @@ export default function App() {
         setPeriodTotalMs(periodMs)
       })
       .catch(() => {})
-  }, [user?.id, wakeKey])
+  }, [user?.id, wakeKey, syncKey])
 
   // Replay punches queued while offline - on app load and whenever connectivity returns
   useEffect(() => {
@@ -2972,6 +2975,10 @@ export default function App() {
           if (sid) setActiveSessionId(sid)
           if (!hasQueuedPunches()) setOfflinePunchPending(false)
           if (synced > 0) {
+            // Re-run the clock-state effect so a session opened by a replayed
+            // offline clock-in (and today/period totals) shows up immediately
+            // instead of leaving activeSessionId null until the next wake.
+            setSyncKey(k => k + 1)
             toast.success('Back online - offline punches synced', {
               description: `${synced} punch${synced === 1 ? '' : 'es'} saved with the original time.`,
             })

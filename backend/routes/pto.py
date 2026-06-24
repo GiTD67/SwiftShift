@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request
 
@@ -218,7 +218,7 @@ def update_request(req_id):
     if status not in ("approved", "denied", "pending"):
         return jsonify({"error": "status must be approved, denied, or pending"}), 400
 
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     with get_db() as db:
         _ensure_tables(db)
         row = db.execute("SELECT * FROM pto_requests WHERE id = ?", (req_id,)).fetchone()

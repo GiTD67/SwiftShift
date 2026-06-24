@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request
 import os
 import json
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 from openai import OpenAI
 import chromadb
@@ -82,7 +82,7 @@ def reindex_user_chroma(user_id: str):
             # Chunk into ~1000 tokens each with overlap
             for i, chunk in enumerate(chunk_text(content)):
                 docs.append(chunk)
-                metadatas.append({"filename": f.name, "chunk": i, "uploaded_at": datetime.utcnow().isoformat()})
+                metadatas.append({"filename": f.name, "chunk": i, "uploaded_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat()})
                 ids.append(f"{f.name}::{i}")
     if docs:
         coll.add(documents=docs, metadatas=metadatas, ids=ids)

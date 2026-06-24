@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request
 
@@ -86,7 +86,7 @@ def enter_time():
     employee_id = current_uid()  # always clock in as yourself
     if not employee_id:
         return jsonify({"error": "authentication required"}), 401
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     with get_db() as db:
         row = db.execute(
             "INSERT INTO clock_sessions (employee_id, clock_in, notes) VALUES (?, ?, ?) RETURNING *",
@@ -102,7 +102,7 @@ def exit_time():
     session_id = data.get("session_id")
     if not session_id:
         return jsonify({"error": "session_id required"}), 400
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     with get_db() as db:
         row = db.execute("SELECT * FROM clock_sessions WHERE id = ?", (session_id,)).fetchone()
         if not row:
@@ -115,7 +115,7 @@ def exit_time():
             clock_in = datetime.fromisoformat(row["clock_in"])
         except (TypeError, ValueError):
             return jsonify({"error": "session has an invalid clock-in time"}), 409
-        duration = max(0, int((datetime.utcnow() - clock_in).total_seconds() / 60))
+        duration = max(0, int((datetime.now(timezone.utc).replace(tzinfo=None) - clock_in).total_seconds() / 60))
         db.execute(
             "UPDATE clock_sessions SET clock_out = ?, duration_minutes = ? WHERE id = ?",
             (now, duration, session_id),

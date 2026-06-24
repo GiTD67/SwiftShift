@@ -13,7 +13,7 @@ def _resolve_punch_ts(client_ts):
     """Punch time for a clock in/out. Uses the client-supplied timestamp (sent
     when an offline-queued punch is replayed) only if it's valid: parseable,
     not in the future, and not older than 24 hours. Falls back to server time."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     if client_ts:
         try:
             ts = datetime.fromisoformat(str(client_ts).replace("Z", "+00:00"))
@@ -87,7 +87,7 @@ def clock_in():
         ).fetchone()
         if existing:
             try:
-                recent = datetime.utcnow() - datetime.fromisoformat(str(existing["clock_in"])) <= timedelta(hours=20)
+                recent = datetime.now(timezone.utc).replace(tzinfo=None) - datetime.fromisoformat(str(existing["clock_in"])) <= timedelta(hours=20)
             except (TypeError, ValueError):
                 recent = True
             if recent:
@@ -103,7 +103,7 @@ def clock_in():
 
 def _compute_session_duration(clock_in_str: str, until=None) -> int:
     clock_in = datetime.fromisoformat(clock_in_str)
-    return int(((until or datetime.utcnow()) - clock_in).total_seconds() / 60)
+    return int(((until or datetime.now(timezone.utc).replace(tzinfo=None)) - clock_in).total_seconds() / 60)
 
 
 @bp.route("/api/clock-sessions/<int:session_id>", methods=["PUT"])

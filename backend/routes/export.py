@@ -3,7 +3,7 @@ import csv
 import io
 import json
 import zipfile
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import Blueprint, Response, jsonify, request
 
@@ -314,7 +314,7 @@ def export_me():
         profile = db.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
         balance = db.execute("SELECT * FROM pto_balances WHERE user_id = ?", (uid,)).fetchone()
         bundle = {
-            "exported_at": datetime.utcnow().isoformat(),
+            "exported_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             "profile": _strip_password(profile) if profile else None,
             "clock_sessions": _rows(db, "SELECT * FROM clock_sessions WHERE employee_id = ? ORDER BY clock_in DESC", (uid,)),
             "time_entries": _rows(db, "SELECT * FROM time_entries WHERE employee_id = ? ORDER BY date DESC, start_time DESC", (uid,)),
@@ -323,7 +323,7 @@ def export_me():
             "shift_swaps": _rows(db, "SELECT * FROM shift_swaps WHERE requester_id = ? OR target_id = ? ORDER BY shift_date DESC", (uid, uid)),
             "timesheet_submissions": _rows(db, "SELECT * FROM timesheet_submissions WHERE user_id = ? ORDER BY period_start DESC", (uid,)),
         }
-    filename = f"swiftshift-my-data-{datetime.utcnow().date().isoformat()}.json"
+    filename = f"swiftshift-my-data-{datetime.now(timezone.utc).replace(tzinfo=None).date().isoformat()}.json"
     return _attachment(json.dumps(bundle, indent=2, default=str), filename, "application/json")
 
 
@@ -349,7 +349,7 @@ def export_me_csv():
             "time_entry", e["id"], e["date"] or "", e["start_time"] or "", e["end_time"] or "",
             e["duration_minutes"] if e["duration_minutes"] is not None else "", "", _csv_safe(e["project"]), _csv_safe(e["task"]), _csv_safe(e["description"]),
         ])
-    filename = f"swiftshift-my-time-{datetime.utcnow().date().isoformat()}.csv"
+    filename = f"swiftshift-my-time-{datetime.now(timezone.utc).replace(tzinfo=None).date().isoformat()}.csv"
     return _attachment(buf.getvalue(), filename, "text/csv")
 
 
@@ -394,5 +394,5 @@ def export_company():
     with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for name, rows in tables.items():
             zf.writestr(f"{name}.csv", _table_csv(rows))
-    filename = f"swiftshift-company-export-{datetime.utcnow().date().isoformat()}.zip"
+    filename = f"swiftshift-company-export-{datetime.now(timezone.utc).replace(tzinfo=None).date().isoformat()}.zip"
     return _attachment(zip_buf.getvalue(), filename, "application/zip")

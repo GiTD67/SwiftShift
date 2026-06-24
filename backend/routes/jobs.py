@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request
 
@@ -69,7 +69,7 @@ def create_job():
     hiring_manager_id = data.get("hiring_manager_id")
     salary = data.get("salary")
     location = data.get("location")
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     with get_db() as db:
         viewer_company = _viewer_company_id(db, current_uid())
         if viewer_company is not None:

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, jsonify, request
 
@@ -111,9 +111,9 @@ def create_swap():
                     shift_dt = datetime.fromisoformat(f"{shift_date}T{shift_start}")
                 except ValueError:
                     shift_dt = None
-                if shift_dt and shift_dt - datetime.utcnow() >= timedelta(hours=float(min_hours)):
+                if shift_dt and shift_dt - datetime.now(timezone.utc).replace(tzinfo=None) >= timedelta(hours=float(min_hours)):
                     status = "accepted"
-                    reviewed_at = datetime.utcnow().isoformat()
+                    reviewed_at = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
         row = db.execute(
             """
             INSERT INTO shift_swaps (requester_id, target_id, shift_date, shift_start, shift_end, reason, status, reviewed_at)
@@ -149,7 +149,7 @@ def update_swap(swap_id):
     if status not in ("open", "accepted", "denied", "cancelled"):
         return jsonify({"error": "status must be open, accepted, denied, or cancelled"}), 400
 
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     with get_db() as db:
         _ensure_table(db)
         row = db.execute("SELECT id, requester_id, target_id FROM shift_swaps WHERE id = ?", (swap_id,)).fetchone()

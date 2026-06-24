@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request
 
@@ -44,6 +44,20 @@ def _parse_iso(value):
         return None
 
 
+def _to_naive_utc(dt):
+    """Coerce a datetime to naive UTC for storage in clock_sessions.
+
+    clock_sessions stores every timestamp as a NAIVE UTC string, and the
+    duration math in clock_sessions.py subtracts a naive UTC "now" from
+    datetime.fromisoformat(stored). Writing an offset-aware value (e.g. a
+    proposed time parsed from a '+00:00'/'Z' string) would make that subtraction
+    raise "can't subtract offset-naive and offset-aware datetimes". A naive
+    input is returned unchanged."""
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
+
 # POST /api/corrections - employee requests a fix to one of their own completed sessions
 @bp.route("/api/corrections", methods=["POST"])
 def create_correction():
@@ -78,7 +92,7 @@ def create_correction():
             VALUES (?, ?, ?, ?, ?)
             RETURNING *
             """,
-            (uid, session_id, new_in.isoformat(), new_out.isoformat(), data.get("reason")),
+            (uid, session_id, _to_naive_utc(new_in).isoformat(), _to_naive_utc(new_out).isoformat(), data.get("reason")),
         ).fetchone()
         db.commit()
     log_event(uid, None, "correction_request", f"Requested time correction for session #{session_id}")
@@ -140,7 +154,7 @@ def approve_correction(req_id):
     err = manager_required()
     if err:
         return err
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     with get_db() as db:
         _ensure_table(db)
         row = db.execute("SELECT * FROM clock_correction_requests WHERE id = ?", (req_id,)).fetchone()
@@ -171,7 +185,7 @@ def approve_correction(req_id):
         net_minutes = max(0, total_minutes - break_minutes)
         db.execute(
             "UPDATE clock_sessions SET clock_in = ?, clock_out = ?, duration_minutes = ? WHERE id = ?",
-            (new_in.isoformat(), new_out.isoformat(), net_minutes, row["session_id"]),
+            (_to_naive_utc(new_in).isoformat(), _to_naive_utc(new_out).isoformat(), net_minutes, row["session_id"]),
         )
         db.execute(
             "UPDATE clock_correction_requests SET status = 'approved', reviewed_by = ?, reviewed_at = ? WHERE id = ?",
@@ -192,7 +206,7 @@ def deny_correction(req_id):
     err = manager_required()
     if err:
         return err
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     with get_db() as db:
         _ensure_table(db)
         row = db.execute("SELECT * FROM clock_correction_requests WHERE id = ?", (req_id,)).fetchone()
