@@ -26,6 +26,27 @@ def _resolve_punch_ts(client_ts):
     return now
 
 
+def _serialize_session(row):
+    """Return a clock session as a JSON-ready dict with its timestamps marked UTC.
+
+    Timestamps are stored as naive UTC strings (no zone designator). A browser
+    parses a zone-less datetime as LOCAL time, which shifts every punch by the
+    viewer's UTC offset - for users behind UTC that pushes an open session into
+    the future and zeroes the live timer on refresh. Append 'Z' so clients read
+    them as UTC; leave any value that already carries a zone (e.g. a correction
+    stored with '+00:00') untouched. Use only for full datetime columns: a
+    date-only value has no time part and would be wrongly suffixed."""
+    d = dict(row)
+    for k in ("clock_in", "clock_out"):
+        v = d.get(k)
+        if v:
+            s = str(v)
+            tail = s[10:]  # the time portion, after the YYYY-MM-DD date
+            if "Z" not in tail and "+" not in tail and "-" not in tail:
+                d[k] = s + "Z"
+    return d
+
+
 @bp.route("/api/clock-sessions", methods=["GET"])
 def list_clock_sessions():
     employee_id = current_uid()  # only ever your own sessions
@@ -43,7 +64,7 @@ def list_clock_sessions():
             sql += " WHERE " + " AND ".join(where)
         sql += " ORDER BY clock_in DESC"
         rows = db.execute(sql, params).fetchall()
-    return jsonify([dict(r) for r in rows])
+    return jsonify([_serialize_session(r) for r in rows])
 
 
 @bp.route("/api/clock-sessions", methods=["POST"])
@@ -70,14 +91,14 @@ def clock_in():
             except (TypeError, ValueError):
                 recent = True
             if recent:
-                return jsonify(dict(existing)), 200
+                return jsonify(_serialize_session(existing)), 200
         row = db.execute(
             "INSERT INTO clock_sessions (employee_id, clock_in, notes) VALUES (?, ?, ?) RETURNING *",
             (employee_id, now, data.get("notes")),
         ).fetchone()
         db.commit()
     log_event(employee_id, None, "clock_in", f"Clocked in (session #{row['id']})")
-    return jsonify(dict(row)), 201
+    return jsonify(_serialize_session(row)), 201
 
 
 def _compute_session_duration(clock_in_str: str, until=None) -> int:
@@ -120,4 +141,4 @@ def clock_out(session_id):
         db.commit()
         row = db.execute("SELECT * FROM clock_sessions WHERE id = ?", (session_id,)).fetchone()
     log_event(current_uid(), None, "clock_out", f"Clocked out (session #{session_id}, {net_minutes} min worked)")
-    return jsonify(dict(row))
+    return jsonify(_serialize_session(row))

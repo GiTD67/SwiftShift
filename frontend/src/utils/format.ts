@@ -1,5 +1,30 @@
 import { format, parse, differenceInMinutes, addDays } from 'date-fns'
 
+// Parse a timestamp string that came from the backend.
+//
+// The Flask API serializes datetimes as NAIVE UTC with no timezone designator
+// (e.g. "2026-06-24T15:30:00.123456"), and Postgres NOW()::text yields a bare
+// "+00" offset. JavaScript's `new Date()` interprets a date-time string WITHOUT
+// a zone as LOCAL time, which shifts every server timestamp by the viewer's UTC
+// offset. For users behind UTC that pushes an open clock session into the future
+// and makes `now - clockInAt` clamp to 0, silently wiping all worked time on a
+// refresh. Always read server timestamps as UTC.
+//
+// Returns a Date (Invalid Date for empty/garbage input, like `new Date`) so it
+// is a drop-in replacement for `new Date(serverString)`. Date-only values
+// ("YYYY-MM-DD") are left untouched (parsed as UTC midnight, exactly as a bare
+// `new Date` would do); values that already carry a zone are passed through as-is.
+export function parseServerDate(value: string | null | undefined): Date {
+  if (!value) return new Date(NaN)
+  let s = String(value).trim().replace(' ', 'T')
+  // Postgres' bare "+00" / "+00:00" offset -> canonical 'Z'.
+  s = s.replace(/\+00(?::?00)?$/, 'Z')
+  const hasTimePart = s.includes('T')
+  const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(s)
+  if (hasTimePart && !hasZone) s = s + 'Z'
+  return new Date(s)
+}
+
 export function formatDuration(minutes: number): string {
   // Guard against NaN/Infinity/negative durations from corrupt data, which
   // would otherwise render as "NaNm" / "Infinityh" / "-1h -30m".
@@ -24,7 +49,7 @@ export function calculateDuration(startTime: string, endTime: string): number {
 
 export function formatTime(isoString: string | null): string {
   if (!isoString) return ''
-  const d = new Date(isoString)
+  const d = parseServerDate(isoString)
   // date-fns format() throws RangeError on an invalid Date; guard the render.
   if (isNaN(d.getTime())) return ''
   return format(d, 'h:mm a')

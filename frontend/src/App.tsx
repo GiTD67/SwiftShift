@@ -24,9 +24,37 @@ import EmployeeOnboarding from './components/EmployeeOnboarding'
 import PayrollRunsPanel from './components/PayrollRunsPanel'
 import PayoutSetupCard from './components/PayoutSetupCard'
 import { queuePunch, hasQueuedPunches, flushQueuedPunches } from './utils/offlineQueue'
+import { parseServerDate } from './utils/format'
 import { LandingPage, LoginPage, SignupPage, LogoSVG, getThemeAccentHex } from './landing'
 
 const API_BASE = ''
+
+// Break state (accumulated break time plus any in-progress break) lives in React
+// state that is wiped on every refresh/rehydrate. Persist it to localStorage,
+// keyed to the clock-in it belongs to, so a refresh taken mid-break doesn't erase
+// the break, which would otherwise pay out unpaid break time as worked time.
+const BREAK_STATE_KEY = 'swiftshift-break-state'
+interface PersistedBreakState {
+  clockInRef: string
+  breakStartedAt: string | null
+  breakType: 'paid' | 'unpaid' | null
+  breakMsAccum: number
+  paidBreakMsAccum: number
+}
+function readBreakState(): PersistedBreakState | null {
+  try {
+    const raw = localStorage.getItem(BREAK_STATE_KEY)
+    return raw ? (JSON.parse(raw) as PersistedBreakState) : null
+  } catch {
+    return null
+  }
+}
+function writeBreakState(s: PersistedBreakState) {
+  try { localStorage.setItem(BREAK_STATE_KEY, JSON.stringify(s)) } catch {}
+}
+function clearBreakState() {
+  try { localStorage.removeItem(BREAK_STATE_KEY) } catch {}
+}
 
 type View = 'clock' | 'timesheet' | 'rewards' | 'xpcenter' | 'admin' | 'profile' | 'insurance' | 'orgchart' | 'taxes' | 'groktax' | 'grokky' | 'applications' | 'jobs' | 'schedules' | 'payroll' | 'reports' | 'leaves' | 'compliance' | 'hiring' | 'kpi' | 'teamkpi' | 'announcements' | 'pricing' | 'auditlog' | 'enterprise' | 'alerts' | 'leaderboard' | 'holidays'
 
@@ -831,7 +859,7 @@ function TimesheetView({ user, gamification, holidays, wakeKey }: { user: any; g
 <div class="row"><span>Employee</span><span>${esc(user?.first_name)} ${esc(user?.last_name)}</span></div>
 <div class="row"><span>Role</span><span>${esc(user?.job_role || 'N/A')}</span></div>
 <div class="row"><span>Pay Period</span><span>${esc(sub.period_start)} to ${esc(sub.period_end)}</span></div>
-<div class="row"><span>Submitted</span><span>${sub.submitted_at ? new Date(sub.submitted_at).toLocaleDateString() : 'N/A'}</span></div>
+<div class="row"><span>Submitted</span><span>${sub.submitted_at ? parseServerDate(sub.submitted_at).toLocaleDateString() : 'N/A'}</span></div>
 </div>
 <div class="section"><h2 style="font-size:16px">Earnings</h2>
 <div class="row"><span>Hourly Rate</span><span>$${hourlyRate.toFixed(2)}/hr</span></div>
@@ -938,7 +966,7 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
   // Time-punch correction helpers
-  const fmtPunch = (iso: string) => new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  const fmtPunch = (iso: string) => parseServerDate(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
   const openCorrectionForm = (s: any) => {
     setCorrectionSessionId(s.id)
@@ -1006,9 +1034,9 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
                   {sessions.length > 0 && sessions.map((s: any, si: number) => (
                     <div key={si} className="text-[10px] text-zinc-400 mt-0.5 leading-tight">
                       <span style={{ color: 'var(--accent-color)', opacity: 0.9 }}>
-                        {new Date(s.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {parseServerDate(s.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
-                      {s.clock_out && <span className="text-zinc-300">–{new Date(s.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+                      {s.clock_out && <span className="text-zinc-300">–{parseServerDate(s.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
                     </div>
                   ))}
                 </div>
@@ -1295,10 +1323,10 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
                     {daySessions.map((s: any, si: number) => (
                       <div key={si} className="mt-0.5 text-[10px] leading-tight text-center hidden sm:block">
                         <span style={{ color: 'var(--accent-color)', opacity: 0.9 }}>
-                          {new Date(s.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {parseServerDate(s.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                         {s.clock_out
-                          ? <span className="text-zinc-400">–{new Date(s.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          ? <span className="text-zinc-400">–{parseServerDate(s.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                           : <span className="text-amber-400"> •</span>}
                       </div>
                     ))}
@@ -1493,7 +1521,7 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
                         >
                           <td className="px-4 py-2.5">
                             <div className="font-medium text-zinc-200 truncate">{sub.period_start} to {sub.period_end}</div>
-                            <div className="text-zinc-600 text-[10px]">submitted {sub.submitted_at ? new Date(sub.submitted_at).toLocaleDateString() : 'N/A'}</div>
+                            <div className="text-zinc-600 text-[10px]">submitted {sub.submitted_at ? parseServerDate(sub.submitted_at).toLocaleDateString() : 'N/A'}</div>
                           </td>
                           <td className="px-3 py-2.5 font-mono text-zinc-300 text-right">{sub.total_hours.toFixed(1)}h</td>
                           <td className="px-3 py-2.5 font-mono text-right" style={{ color: 'var(--accent-color)' }}>${p.gross.toFixed(2)}</td>
@@ -2766,7 +2794,9 @@ export default function App() {
     const saved = localStorage.getItem('swiftshift-clock-in-at')
     if (saved) {
       const d = new Date(saved)
-      if (!isNaN(d.getTime())) return d
+      // Ignore corrupt or future-dated values (e.g. a clock-in poisoned by the
+      // pre-fix UTC parsing bug) so they can't zero out the live timer on load.
+      if (!isNaN(d.getTime()) && d.getTime() <= Date.now() + 60_000) return d
     }
     return null
   })
@@ -2884,15 +2914,35 @@ export default function App() {
 
         // If active session exists (clock_out IS NULL), restore clockInAt
         if (active && active.clock_in) {
-          const clockInDate = new Date(active.clock_in)
-          // sessionWorkedMs derives live time from clockInAt, so only sum completed sessions here
-          setClockInAt(clockInDate)
-          localStorage.setItem('swiftshift-clock-in-at', clockInDate.toISOString())
+          // Parse as UTC. The API returns naive UTC strings with no zone, and a
+          // bare new Date() would read them as LOCAL time, pushing an open
+          // session into the future for users behind UTC and clamping the live
+          // timer (Math.max(0, now - clockInAt)) to 0, wiping the day's worked time.
+          const clockInDate = parseServerDate(active.clock_in)
           setActiveSessionId(active.id)
-          setBreakStartedAt(null)
-          setBreakType(null)
-          setBreakMsAccum(0)
-          setPaidBreakMsAccum(0)
+          // Defense in depth: never let a malformed or future-dated timestamp
+          // become clockInAt. If it is bad, keep the (correct, 'Z'-suffixed)
+          // localStorage value rather than zeroing the timer.
+          if (!isNaN(clockInDate.getTime()) && clockInDate.getTime() <= Date.now() + 60_000) {
+            // sessionWorkedMs derives live time from clockInAt, so only sum completed sessions here
+            setClockInAt(clockInDate)
+            localStorage.setItem('swiftshift-clock-in-at', clockInDate.toISOString())
+            // Restore a break taken before the refresh instead of zeroing it
+            // (zeroing would credit unpaid break time as paid). Only restore when
+            // the saved break belongs to this same clock-in; otherwise start clean.
+            const savedBreak = readBreakState()
+            if (savedBreak && Math.abs(new Date(savedBreak.clockInRef).getTime() - clockInDate.getTime()) < 2000) {
+              setBreakStartedAt(savedBreak.breakStartedAt ? new Date(savedBreak.breakStartedAt) : null)
+              setBreakType(savedBreak.breakType)
+              setBreakMsAccum(Number(savedBreak.breakMsAccum) || 0)
+              setPaidBreakMsAccum(Number(savedBreak.paidBreakMsAccum) || 0)
+            } else {
+              setBreakStartedAt(null)
+              setBreakType(null)
+              setBreakMsAccum(0)
+              setPaidBreakMsAccum(0)
+            }
+          }
         } else {
           // Only clear clock state if localStorage also has no active session.
           // If localStorage has a clock-in time but DB doesn't (race condition,
@@ -3164,8 +3214,12 @@ export default function App() {
   // Actions
   const handleClockIn = (e?: React.MouseEvent<HTMLButtonElement>) => {
     if (!isClockedIn) {
-      setClockInAt(now)
-      localStorage.setItem('swiftshift-clock-in-at', now.toISOString())
+      // Capture the punch instant fresh rather than the up-to-1s-stale `now` tick
+      // so the localStorage and DB clock-in timestamps agree to the millisecond.
+      const punchNow = new Date()
+      setClockInAt(punchNow)
+      localStorage.setItem('swiftshift-clock-in-at', punchNow.toISOString())
+      clearBreakState()
       setActiveSessionId(null)
       setBreakStartedAt(null)
       setBreakType(null)
@@ -3174,7 +3228,7 @@ export default function App() {
 
       // Persist clock-in to DB; queue it offline if the network is down
       if (user?.id) {
-        const punchTs = now.toISOString()
+        const punchTs = punchNow.toISOString()
         const queueOffline = () => {
           queuePunch({ action: 'clock_in', timestamp: punchTs })
           setOfflinePunchPending(true)
@@ -3277,16 +3331,32 @@ export default function App() {
     }
   }
 
+  // Persist the live break state to localStorage so a refresh taken mid-break or
+  // after a break (before clock-out) keeps the deduction instead of losing it.
+  const persistBreak = (next: { breakStartedAt: Date | null; breakType: 'paid' | 'unpaid' | null; breakMsAccum: number; paidBreakMsAccum: number }) => {
+    if (!clockInAt) return
+    writeBreakState({
+      clockInRef: clockInAt.toISOString(),
+      breakStartedAt: next.breakStartedAt ? next.breakStartedAt.toISOString() : null,
+      breakType: next.breakType,
+      breakMsAccum: next.breakMsAccum,
+      paidBreakMsAccum: next.paidBreakMsAccum,
+    })
+  }
+
   const handleStartBreak = (type: 'paid' | 'unpaid') => {
     if (isClockedIn && !isOnBreak) {
       setBreakStartedAt(now)
       setBreakType(type)
+      persistBreak({ breakStartedAt: now, breakType: type, breakMsAccum, paidBreakMsAccum })
     }
   }
 
   const handleEndBreak = () => {
     if (isOnBreak && breakStartedAt) {
       const delta = Math.max(0, now.getTime() - breakStartedAt.getTime())
+      const nextBreakMs = breakType === 'paid' ? breakMsAccum : breakMsAccum + delta
+      const nextPaidMs = breakType === 'paid' ? paidBreakMsAccum + delta : paidBreakMsAccum
       if (breakType === 'paid') {
         setPaidBreakMsAccum(v => v + delta)
       } else {
@@ -3294,6 +3364,7 @@ export default function App() {
       }
       setBreakStartedAt(null)
       setBreakType(null)
+      persistBreak({ breakStartedAt: null, breakType: null, breakMsAccum: nextBreakMs, paidBreakMsAccum: nextPaidMs })
       const breakMins = Math.round(delta / 60000)
       const msgs = [
         "You're back - let's get it!",
@@ -3359,6 +3430,7 @@ export default function App() {
       setTodayWorkedMs(v => v + session)
       setClockInAt(null)
       localStorage.removeItem('swiftshift-clock-in-at')
+      clearBreakState()
       setBreakStartedAt(null)
       setBreakType(null)
       setBreakMsAccum(0)
@@ -5324,7 +5396,7 @@ export default function App() {
                   </div>
                   <div className="space-y-3">
                     {pendingCorrections.map(c => {
-                      const fmtPunch = (iso: string | null) => iso ? new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'
+                      const fmtPunch = (iso: string | null) => iso ? parseServerDate(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'
                       return (
                         <div key={c.id} className="flex flex-wrap items-center gap-3 bg-white/5 rounded-xl px-4 py-3">
                           <div className="flex-1 min-w-0">
@@ -6800,7 +6872,7 @@ export default function App() {
                         )}
                         <h3 className="font-semibold text-white">{a.title}</h3>
                       </div>
-                      <span className="text-xs text-zinc-500 flex-shrink-0">{new Date(a.created_at).toLocaleDateString()}</span>
+                      <span className="text-xs text-zinc-500 flex-shrink-0">{parseServerDate(a.created_at).toLocaleDateString()}</span>
                     </div>
                     <p className="text-sm text-zinc-300 mb-4 leading-relaxed">{a.body}</p>
                     <div className="flex items-center justify-between flex-wrap gap-3">
@@ -8073,8 +8145,9 @@ export default function App() {
               swap_auto_approve: { label: 'Shift swap auto-approved', category: 'admin' },
               org_settings_update: { label: 'Updated workflow settings', category: 'admin' },
             }
-            // created_at comes from Postgres NOW()::text ("YYYY-MM-DD HH:MM:SS.ssssss+00") - normalize to ISO for Date()
-            const parseTs = (ts: string) => new Date(String(ts || '').replace(' ', 'T').replace(/\+00$/, 'Z'))
+            // created_at comes from Postgres NOW()::text ("YYYY-MM-DD HH:MM:SS.ssssss+00");
+            // parseServerDate normalizes the space, the bare "+00", and naive UTC to a proper Date.
+            const parseTs = (ts: string) => parseServerDate(ts)
             const entries = auditEvents.map(e => {
               const meta = actionMeta[e.action] || { label: e.action, category: 'admin' as const }
               return { id: e.id, ts: e.created_at, actor: e.actor_name || `User #${e.user_id ?? '?'}`, userId: e.user_id, action: meta.label, target: e.detail || '', category: meta.category }

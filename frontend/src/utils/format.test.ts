@@ -6,7 +6,51 @@ import {
   getWeekDates,
   getDayName,
   getDayNumber,
+  parseServerDate,
 } from './format'
+
+describe('parseServerDate', () => {
+  it('reads a naive backend timestamp (no zone) as UTC, not local time', () => {
+    // Regression for the clock-in refresh bug: the API returns naive UTC like
+    // this, and a bare new Date() would parse it as local time and shift the
+    // value by the viewer's offset (zeroing the live timer for users behind UTC).
+    const naive = '2026-06-24T15:30:00.123456'
+    expect(parseServerDate(naive).getTime()).toBe(Date.parse(naive + 'Z'))
+  })
+
+  it('leaves a value that already has a Z designator untouched', () => {
+    const z = '2026-06-24T15:30:00.000Z'
+    expect(parseServerDate(z).getTime()).toBe(Date.parse(z))
+  })
+
+  it('normalizes a Postgres bare "+00" offset to UTC', () => {
+    expect(parseServerDate('2026-06-24 15:30:00.123+00').getTime()).toBe(
+      Date.parse('2026-06-24T15:30:00.123Z'),
+    )
+  })
+
+  it('treats an explicit +00:00 offset as UTC', () => {
+    expect(parseServerDate('2026-06-24T15:30:00+00:00').getTime()).toBe(
+      Date.parse('2026-06-24T15:30:00Z'),
+    )
+  })
+
+  it('honors a real non-UTC offset instead of forcing UTC', () => {
+    expect(parseServerDate('2026-06-24T15:30:00-07:00').getTime()).toBe(
+      Date.parse('2026-06-24T15:30:00-07:00'),
+    )
+  })
+
+  it('leaves a date-only value as local midnight (does not append Z)', () => {
+    expect(parseServerDate('2026-06-24').getTime()).toBe(new Date('2026-06-24').getTime())
+  })
+
+  it('returns an Invalid Date for empty or garbage input', () => {
+    expect(isNaN(parseServerDate(null).getTime())).toBe(true)
+    expect(isNaN(parseServerDate('').getTime())).toBe(true)
+    expect(isNaN(parseServerDate('not-a-date').getTime())).toBe(true)
+  })
+})
 
 describe('formatDuration', () => {
   it('formats minutes only', () => {
