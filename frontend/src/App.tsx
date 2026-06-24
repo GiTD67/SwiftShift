@@ -4703,19 +4703,18 @@ export default function App() {
                 onRateChange={(rate) => {
                   setClockHourlyRate(rate)
                   localStorage.setItem('swiftshift-hourly-rate', String(rate))
-                  // Optimistically keep the cached user object in sync so the next
-                  // refresh reads the new rate immediately (clockHourlyRate and
-                  // computeHourlyRate both prefer user.hourly_rate). The PUT
-                  // persists it server-side; a transient failure no longer strands
-                  // the typed value at a stale DB default.
-                  try {
-                    const cached = localStorage.getItem('user')
-                    if (cached) {
-                      const u = JSON.parse(cached)
-                      localStorage.setItem('user', JSON.stringify({ ...u, hourly_rate: rate }))
-                    }
-                  } catch {}
-                  if (user?.id) {
+                  // Only managers may persist the hourly rate (it feeds payroll
+                  // cost reports). For a manager, optimistically sync the cached
+                  // user so the next refresh reads the new rate immediately
+                  // (clockHourlyRate / computeHourlyRate both prefer user.hourly_rate).
+                  if (user?.is_manager && user?.id) {
+                    try {
+                      const cached = localStorage.getItem('user')
+                      if (cached) {
+                        const u = JSON.parse(cached)
+                        localStorage.setItem('user', JSON.stringify({ ...u, hourly_rate: rate }))
+                      }
+                    } catch {}
                     fetch(`${API_BASE}/api/users/${user.id}`, {
                       method: 'PUT',
                       headers: { 'Content-Type': 'application/json' },

@@ -72,6 +72,9 @@ const LEVEL_NAMES = ['Rookie', 'Associate', 'Pro', 'Senior', 'Expert', 'Elite', 
 
 export function Rewards({ totalHours, isClockedIn, theme = 'green', user, onFocus, highlightRate, onRateChange, xpTotalForPTO }: RewardsProps) {
   const [hourlyRate, setHourlyRate] = useState(() => computeHourlyRate(user))
+  // Only managers may change the hourly rate (it feeds payroll cost reports);
+  // employees see the manager-set rate read-only.
+  const canEditRate = !!user?.is_manager
   const [ptoAccrualRate, setPtoAccrualRate] = useState(1 / 30)
   const [dailyGoalHours, setDailyGoalHours] = useState(() => {
     const saved = parseFloat(localStorage.getItem('swiftshift-daily-goal-hours') || '')
@@ -389,7 +392,7 @@ export function Rewards({ totalHours, isClockedIn, theme = 'green', user, onFocu
           >
             <div>
               <div className="text-xs uppercase tracking-[2px] text-zinc-400 mb-0.5">Your Hourly Rate</div>
-              <div className="text-xs text-zinc-600">Click the amount to edit your rate</div>
+              <div className="text-xs text-zinc-600">{canEditRate ? 'Click the amount to edit your rate' : 'Set by your manager'}</div>
             </div>
             <div
               className="flex items-center rounded-xl px-4 py-2.5 gap-1 transition-all duration-300"
@@ -403,9 +406,12 @@ export function Rewards({ totalHours, isClockedIn, theme = 'green', user, onFocu
                 ref={rateInputRef}
                 type="number"
                 value={hourlyRate}
-                onChange={(e) => setHourlyRate(Math.max(1, parseFloat(e.target.value) || 0))}
+                onChange={(e) => { if (canEditRate) setHourlyRate(Math.max(1, parseFloat(e.target.value) || 0)) }}
+                readOnly={!canEditRate}
+                aria-readonly={!canEditRate}
+                title={canEditRate ? undefined : 'Only a manager can change your hourly rate'}
                 className="w-full bg-transparent text-right font-mono text-3xl font-bold focus:outline-none"
-                style={{ color: accentColor }}
+                style={{ color: accentColor, cursor: canEditRate ? 'text' : 'not-allowed' }}
                 min="1"
                 step="0.01"
               />
