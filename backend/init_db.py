@@ -5,19 +5,29 @@ import sys
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
-    raise SystemExit("DATABASE_URL not set - add it in your Railway/Render environment variables.")
+    # Exit 0 (not 1) so the container's "init_db.py && gunicorn" startup still
+    # launches the web server; the database-independent frontend stays up.
+    print(
+        "WARNING: DATABASE_URL not set - skipping table init and starting the "
+        "server anyway. Set DATABASE_URL for data features.",
+        file=sys.stderr,
+    )
+    sys.exit(0)
 
 try:
     conn = psycopg2.connect(DATABASE_URL)
-except psycopg2.OperationalError as e:
-    print(f"ERROR: Cannot connect to database: {e}", file=sys.stderr)
+except Exception as e:
+    # A startup bootstrap must never block the web server from booting. If the
+    # database is unreachable (e.g. an expired or rotated DB host), log and exit
+    # 0 so gunicorn still starts and serves the frontend. Tables get created on
+    # the next start once DATABASE_URL points at a reachable database.
+    print(f"WARNING: cannot connect to database, skipping table init: {e}", file=sys.stderr)
     print(
-        "Check that DATABASE_URL is set to your actual PostgreSQL connection string.\n"
-        "On Railway: link a Postgres service and Railway will inject DATABASE_URL automatically.\n"
-        "On Render: add DATABASE_URL in Environment → Environment Variables.",
+        "Set DATABASE_URL to a reachable PostgreSQL connection string (Render or "
+        "Neon) to enable login and data features.",
         file=sys.stderr,
     )
-    sys.exit(1)
+    sys.exit(0)
 conn.autocommit = True
 cur = conn.cursor()
 
@@ -152,10 +162,16 @@ tables = [
     """,
 ]
 
-for sql in tables:
-    cur.execute(sql)
-    print(f"Created/verified table")
-
-cur.close()
-conn.close()
-print("All tables created successfully!")
+try:
+    for sql in tables:
+        cur.execute(sql)
+    print("All tables created/verified successfully!")
+except Exception as e:
+    # Best-effort: a schema hiccup must not block the server from starting.
+    print(f"WARNING: table init incomplete (starting server anyway): {e}", file=sys.stderr)
+finally:
+    try:
+        cur.close()
+        conn.close()
+    except Exception:
+        pass
