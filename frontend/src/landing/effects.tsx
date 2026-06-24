@@ -117,15 +117,16 @@ export function LiveMoney({
 }
 
 // ---------------------------------------------------------------------------
-// GalaxyCanvas - a lightweight spiral-galaxy particle field. Rotation is
-// driven from outside (scroll progress) via rotationRef, plus a slow idle
-// drift so it never feels frozen.
+// DepositCanvas - a "direct deposit" money field for the friction-scale finale
+// (replaces the old galaxy, which didn't fit "get paid"). Lime/gold bills drift
+// down, sway and flip like cash landing in an account; intensity ramps up with
+// scroll progress (progressRef, ~0..2.6) so it blooms as the section pins.
 // ---------------------------------------------------------------------------
-export function GalaxyCanvas({
-  rotationRef,
+export function DepositCanvas({
+  progressRef,
   className,
 }: {
-  rotationRef: React.MutableRefObject<number>
+  progressRef: React.MutableRefObject<number>
   className?: string
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -136,58 +137,83 @@ export function GalaxyCanvas({
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    // 3-arm logarithmic spiral, normalized coordinates (radius 0..1)
-    const N = 520
-    const particles: { r: number; a: number; size: number; alpha: number; warm: boolean }[] = []
-    for (let i = 0; i < N; i++) {
-      const arm = i % 3
-      const t = Math.pow(Math.random(), 0.75) * 2.6           // distance along the arm
-      const spread = (Math.random() - 0.5) * 0.34 * (0.4 + t / 2.6)
-      particles.push({
-        r: 0.06 + (t / 2.6) * 0.92,
-        a: arm * ((Math.PI * 2) / 3) + t * 1.9 + spread,
-        size: Math.random() < 0.12 ? 1.8 : Math.random() * 1.1 + 0.4,
-        alpha: 0.25 + Math.random() * 0.75,
-        warm: Math.random() < 0.18,
-      })
-    }
-
-    let raf = 0
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    let w = 0, h = 0
     const resize = () => {
-      const { width, height } = canvas.getBoundingClientRect()
-      canvas.width = width * dpr
-      canvas.height = height * dpr
+      const rect = canvas.getBoundingClientRect()
+      w = rect.width; h = rect.height
+      canvas.width = Math.floor(w * dpr)
+      canvas.height = Math.floor(h * dpr)
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     }
     resize()
     const ro = new ResizeObserver(resize)
     ro.observe(canvas)
 
-    const render = (time: number) => {
-      const w = canvas.width
-      const h = canvas.height
+    type Bill = {
+      x: number; y: number; vy: number
+      sway: number; swayAmp: number
+      rot: number; vr: number
+      flip: number; vf: number
+      size: number; warm: boolean
+    }
+    const N = 44
+    const bills: Bill[] = []
+    for (let i = 0; i < N; i++) {
+      bills.push({
+        x: Math.random(),
+        y: Math.random(),
+        vy: 0.05 + Math.random() * 0.07,
+        sway: Math.random() * Math.PI * 2,
+        swayAmp: 6 + Math.random() * 16,
+        rot: (Math.random() - 0.5) * 0.6,
+        vr: (Math.random() - 0.5) * 0.012,
+        flip: Math.random() * Math.PI * 2,
+        vf: 0.6 + Math.random() * 1.3,
+        size: 13 + Math.random() * 13,
+        warm: Math.random() < 0.28,
+      })
+    }
+
+    let raf = 0
+    let last = performance.now()
+    const render = (t: number) => {
+      const dt = Math.min(0.05, (t - last) / 1000); last = t
       ctx.clearRect(0, 0, w, h)
-      const cx = w / 2
-      const cy = h / 2
-      const R = Math.min(w, h) * 0.46
-      const rot = rotationRef.current + time * 0.000045
-      // soft core glow
-      const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 0.45)
-      core.addColorStop(0, 'rgba(255,244,214,0.5)')
-      core.addColorStop(0.4, 'rgba(255,220,170,0.12)')
-      core.addColorStop(1, 'rgba(0,0,0,0)')
-      ctx.fillStyle = core
-      ctx.fillRect(0, 0, w, h)
-      // tilt the disc for a 3/4 view like the reference galaxy
-      for (const p of particles) {
-        const ang = p.a + rot
-        const x = cx + Math.cos(ang) * p.r * R
-        const y = cy + Math.sin(ang) * p.r * R * 0.42
-        ctx.globalAlpha = p.alpha
-        ctx.fillStyle = p.warm ? 'rgba(255,214,160,1)' : 'rgba(235,240,255,1)'
+      // Opacity + fall speed ramp with scroll progress through phase 3 (~1.9..2.5).
+      const prog = Math.max(0, Math.min(1, (progressRef.current - 1.9) / 0.55))
+      const intensity = 0.3 + prog * 0.7
+      for (const b of bills) {
+        b.y += b.vy * dt * (0.6 + prog)
+        b.sway += dt * 1.2
+        b.rot += b.vr
+        b.flip += b.vf * dt
+        if (b.y > 1.1) { b.y = -0.1; b.x = Math.random() }
+        const px = b.x * w + Math.sin(b.sway) * b.swayAmp
+        const py = b.y * h
+        const fade = Math.min(1, b.y * 5 + 0.15) * Math.min(1, (1.1 - b.y) * 2.2)
+        const alpha = intensity * 0.85 * Math.max(0, fade)
+        if (alpha <= 0.01) continue
+        const wBill = b.size * 1.7
+        const hBill = b.size
+        const sx = Math.cos(b.flip)               // horizontal flip = spinning bill
+        const col = b.warm ? '255,210,90' : '215,254,81'
+        ctx.save()
+        ctx.translate(px, py)
+        ctx.rotate(b.rot)
+        ctx.scale(Math.max(0.12, Math.abs(sx)), 1)
+        ctx.globalAlpha = alpha
+        ctx.fillStyle = `rgba(${col},0.92)`
         ctx.beginPath()
-        ctx.arc(x, y, p.size * dpr, 0, Math.PI * 2)
+        ctx.rect(-wBill / 2, -hBill / 2, wBill, hBill)
         ctx.fill()
+        ctx.globalAlpha = alpha * 0.9
+        ctx.fillStyle = 'rgba(8,14,8,0.85)'
+        ctx.font = `${Math.round(b.size * 0.66)}px ui-sans-serif, system-ui, sans-serif`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText('$', 0, 1)
+        ctx.restore()
       }
       ctx.globalAlpha = 1
       raf = requestAnimationFrame(render)
@@ -197,40 +223,21 @@ export function GalaxyCanvas({
       cancelAnimationFrame(raf)
       ro.disconnect()
     }
-  }, [rotationRef])
+  }, [progressRef])
 
   return <canvas ref={canvasRef} className={className} aria-hidden="true" />
 }
 
 // ---------------------------------------------------------------------------
-// HandwrittenNote - a Caveat-script annotation with a hand-drawn circled
-// arrow. The strokes use pathLength=1 so GSAP can write them on with a
-// simple dashoffset 1→0 scrub; the text reveals via a clip-path sweep.
-// Targets carry stable classes: .lp-hw-stroke (paths) and .lp-handwrite-clip.
+// HandwrittenNote - a Caveat-script annotation (.lp-handwrite-clip). The text
+// reveals via a clip-path sweep wired up in LandingPage's pay timeline.
 // ---------------------------------------------------------------------------
 export function HandwrittenNote({ text, className }: { text: string; className?: string }) {
+  // The hand-drawn circle-arrow doodle was removed: the circle wasn't circling
+  // anything next to "your money, live". Just the handwritten label remains.
   return (
     <div className={className} data-handwrite aria-hidden="true">
       <span className="lp-handwrite lp-handwrite-clip">{text}</span>
-      <svg width="74" height="58" viewBox="0 0 74 58" fill="none" className="inline-block ml-1 -mt-2">
-        <path
-          className="lp-hw-stroke"
-          d="M10 12 C 28 2, 56 4, 60 14 C 64 24, 40 30, 24 26 C 10 23, 8 16, 14 11"
-          stroke="rgba(244,244,245,0.8)"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          pathLength={1}
-        />
-        <path
-          className="lp-hw-stroke"
-          d="M34 30 C 40 38, 46 44, 56 50 M56 50 L46 47 M56 50 L52 41"
-          stroke="rgba(244,244,245,0.8)"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          pathLength={1}
-        />
-      </svg>
     </div>
   )
 }
@@ -393,6 +400,87 @@ export function WorkdayMorph({ className }: { className?: string }) {
         <path className="lp-wd-mouth" d="M45 86 Q60 73 75 86" />
         <path className="lp-wd-tear" d="M47 63 q-4.5 7.5 0 11 q4.5 -3.5 0 -11 z" />
       </svg>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// EarningsTickerDemo - a landing-page replica of the in-app "Real Time Rewards"
+// card (Rewards.tsx). Simulates a clocked-in worker, ticking every frame via
+// rAF from a plausible mid-shift balance. No live session needed; styled to the
+// landing's dark aesthetic with the lime accent and a live pulse badge.
+// ---------------------------------------------------------------------------
+export function EarningsTickerDemo({
+  rate = 36.5,
+  start = 247.38,
+  className,
+}: {
+  rate?: number
+  start?: number
+  className?: string
+}) {
+  const amountRef = useRef<HTMLSpanElement>(null)
+  const milliRef = useRef<HTMLSpanElement>(null)
+
+  useEffect(() => {
+    let raf = 0
+    const t0 = performance.now()
+    const loop = (t: number) => {
+      const v = start + ((t - t0) / 3_600_000) * rate
+      const fixed = v.toFixed(3)
+      const dot = fixed.indexOf('.')
+      const dollars = Number(fixed.slice(0, dot)).toLocaleString('en-US')
+      if (amountRef.current) amountRef.current.textContent = `$${dollars}.${fixed.slice(dot + 1, dot + 3)}`
+      if (milliRef.current) milliRef.current.textContent = fixed.slice(dot + 3)
+      raf = requestAnimationFrame(loop)
+    }
+    raf = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(raf)
+  }, [rate, start])
+
+  return (
+    <div
+      className={`relative rounded-3xl p-6 overflow-hidden ${className ?? ''}`}
+      style={{
+        background: 'rgba(10,12,18,0.82)',
+        border: '1px solid rgba(215,254,81,0.18)',
+        boxShadow: '0 0 48px -16px rgba(215,254,81,0.14), inset 0 1px 0 rgba(255,255,255,0.06)',
+      }}
+    >
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse at 50% 0%, rgba(215,254,81,0.10) 0%, transparent 65%)' }}
+      />
+      <div className="text-[0.68rem] uppercase tracking-[0.22em] mb-0.5 relative" style={{ color: 'rgba(244,244,245,0.9)' }}>
+        Real Time Rewards
+      </div>
+      <div className="text-[0.62rem] uppercase tracking-[0.18em] mb-4 relative" style={{ color: 'rgba(244,244,245,0.38)' }}>
+        Today&apos;s Earnings
+      </div>
+      <div className="relative mb-3">
+        <span
+          className="lp-money block"
+          style={{ fontSize: 'clamp(1.8rem,4vw,2.6rem)', color: '#d7fe51', letterSpacing: '-0.03em', fontWeight: 550 }}
+        >
+          <span ref={amountRef}>${start.toFixed(2)}</span>
+          <span ref={milliRef} style={{ fontSize: '0.44em', opacity: 0.55, verticalAlign: 'baseline' }} />
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5 relative">
+        <span
+          className="w-2 h-2 rounded-full animate-pulse"
+          style={{ background: '#22ff7a', boxShadow: '0 0 6px #22ff7a, 0 0 12px #22ff7a55' }}
+        />
+        <span className="text-[0.62rem] uppercase tracking-[0.22em] font-medium" style={{ color: 'rgba(244,244,245,0.6)' }}>
+          live
+        </span>
+      </div>
+      <div
+        className="mt-4 pt-4 text-[0.62rem] relative"
+        style={{ borderTop: '1px solid rgba(255,255,255,0.07)', color: 'rgba(244,244,245,0.26)' }}
+      >
+        accruing at ${rate}/hr &middot; every second counts
+      </div>
     </div>
   )
 }

@@ -106,6 +106,19 @@
 .ta-app[data-bg="gravity-grid"] {
   background: #000;
 }
+.ta-app[data-bg="gravity-dots"] {
+  background: #000;
+}
+/* Full-screen gravity-dot canvas (same cursor-reactive effect as the landing
+   hero), sitting behind all app content so the shell matches the marketing page. */
+.ta-gravity-dots {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 0;
+}
 
 .ta-navbar {
   position: fixed;

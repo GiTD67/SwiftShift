@@ -372,7 +372,8 @@ def signup():
     try:
         _issue_verification_email(user["id"], email)
     except Exception:
-        pass
+        import logging as _logging
+        _logging.getLogger(__name__).exception("_issue_verification_email failed for user %s", user["id"])
     user["email_verified"] = False
     return jsonify(user), 201
 
@@ -441,6 +442,7 @@ def google_auth():
             "SELECT * FROM users WHERE LOWER(email) = LOWER(?) ORDER BY (email = ?) DESC, id ASC LIMIT 1",
             (email, email),
         ).fetchone()
+        is_new_account = row is None
         if not row:
             row = db.execute(
                 "INSERT INTO users (first_name, last_name, email, password_hash, is_fulltime, is_manager)"
@@ -459,6 +461,15 @@ def google_auth():
     session.permanent = True
     session["uid"] = row["id"]
     session.pop("pending_2fa_uid", None)
+    # Brand-new Google accounts need a verification email too. Password signup
+    # already sends one; Google signup previously sent nothing, so these accounts
+    # could never verify. Best-effort, mirroring signup().
+    if is_new_account:
+        try:
+            _issue_verification_email(row["id"], row["email"])
+        except Exception:
+            import logging as _logging
+            _logging.getLogger(__name__).exception("_issue_verification_email failed for Google user %s", row["id"])
     log_event(row["id"], f"{row['first_name']} {row['last_name']}", "login", f"Signed in with Google as {row['email']}")
     return jsonify(_auth_user_payload(row))
 
@@ -572,7 +583,12 @@ def resend_verification():
         return jsonify({"error": "not found"}), 404
     if row.get("email_verified"):
         return jsonify({"message": "Email already verified.", "email_verified": True})
-    _issue_verification_email(uid, row["email"])
+    try:
+        _issue_verification_email(uid, row["email"])
+    except Exception:
+        import logging as _logging
+        _logging.getLogger(__name__).exception("_issue_verification_email failed during resend for user %s", uid)
+        return jsonify({"error": "Could not send verification email. Please try again later."}), 500
     return jsonify({"message": "Verification email sent."})
 
 

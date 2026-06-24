@@ -51,6 +51,12 @@ interface RewardsProps {
 const HOURLY_RATE_KEY = 'swiftshift-hourly-rate'
 
 function computeHourlyRate(user: any): number {
+  // Prefer the DB-backed rate carried on the user object (set at login/signup),
+  // so a saved rate is never silently overridden by a stale localStorage value.
+  if (user?.hourly_rate != null) {
+    const dbRate = Number(user.hourly_rate)
+    if (Number.isFinite(dbRate) && dbRate > 0) return dbRate
+  }
   const saved = localStorage.getItem(HOURLY_RATE_KEY)
   if (saved) {
     const n = parseFloat(saved)

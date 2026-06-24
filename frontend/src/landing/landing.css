@@ -56,9 +56,11 @@
 /* hero headline words - each is its own inline box so GSAP can transform it.
    .lp-sad deflates to gray on scroll; .lp-brand (SwiftShift) brightens + grows. */
 .lp-hw { display: inline-block; color: var(--lp-fg); will-change: transform; }
-.lp-sad { transform-origin: 50% 0%; }
+/* "heavy, slow, and joyless" reads gray from the first paint (then deflates on
+   scroll); "SwiftShift" reads brand-green from the first paint (then grows). */
+.lp-sad { color: #6b7280; transform-origin: 50% 0%; }
 .lp-brand {
-  color: var(--lp-fg);
+  color: #d7fe51;
   font-weight: 650;
   transform-origin: 50% 100%;
 }

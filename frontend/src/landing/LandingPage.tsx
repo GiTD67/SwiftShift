@@ -5,7 +5,7 @@ import Lenis from 'lenis'
 import '@fontsource/caveat/600.css'
 import './landing.css'
 import { LogoSVG } from './shared'
-import { WordReveal, HeroHeadline, LiveMoney, GalaxyCanvas, HandwrittenNote, CountUp, GravityDots, WorkdayMorph } from './effects'
+import { WordReveal, HeroHeadline, LiveMoney, DepositCanvas, HandwrittenNote, CountUp, GravityDots, WorkdayMorph, EarningsTickerDemo } from './effects'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -67,7 +67,7 @@ const STATS = [
 
 export default function LandingPage() {
   const rootRef = useRef<HTMLDivElement>(null)
-  const galaxyRotation = useRef(0)
+  const depositProgress = useRef(0)
 
   useLayoutEffect(() => {
     const root = rootRef.current
@@ -124,9 +124,11 @@ export default function LandingPage() {
           transformOrigin: '50% 0%', ease: 'none', stagger: 0.05, immediateRender: false,
           scrollTrigger: { trigger: '.lp-hero', start: 'top top', end: '62% top', scrub: true },
         })
+        // "SwiftShift" is already brand-green from first paint (see .lp-brand in
+        // landing.css); scroll only lifts and grows it, no color change.
         gsap.set('.lp-hero .lp-brand', { textShadow: '0px 0px 0px rgba(215,254,81,0)' })
         gsap.to('.lp-hero .lp-brand', {
-          color: '#d7fe51', scale: 1.16, y: -3, textShadow: '0px 0px 28px rgba(215,254,81,0.6)',
+          scale: 1.16, y: -3, textShadow: '0px 0px 28px rgba(215,254,81,0.6)',
           transformOrigin: '50% 100%', ease: 'none', immediateRender: false,
           scrollTrigger: { trigger: '.lp-hero', start: 'top top', end: '45% top', scrub: true },
         })
@@ -169,13 +171,13 @@ export default function LandingPage() {
           }
         })
 
-        // -- The Friction Scale: pinned orb morph (ring -> sun -> galaxy) ----
+        // -- The Friction Scale: pinned orb morph (ring -> sun -> direct deposit) --
         const steps = gsap.utils.toArray<HTMLElement>('.lp-step')
         const scaleTl = gsap.timeline({
           scrollTrigger: {
             trigger: '.lp-scale', start: 'top top', end: '+=320%', pin: true, scrub: 1,
             invalidateOnRefresh: true,
-            onUpdate: self => { galaxyRotation.current = self.progress * 2.6 },
+            onUpdate: self => { depositProgress.current = self.progress * 2.6 },
           },
         })
         scaleTl
@@ -190,16 +192,15 @@ export default function LandingPage() {
           .fromTo('.lp-orb-sun-el', { scale: 0.3, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: 'power1.out' }, 0.95)
           .fromTo('.lp-orb-money', { opacity: 0 }, { opacity: 1, duration: 0.3 }, 1.3)
           .to('.lp-orb-sun-el', { scale: 1.32, duration: 0.7, ease: 'none' }, 1.5)
-          // phase 3 - galaxy (payroll for the whole team)
+          // phase 3 - direct deposit (payroll lands for the whole team)
           .to('.lp-orb-money', { opacity: 0, duration: 0.2 }, 1.95)
           .to(steps[1], { opacity: 0.3, duration: 0.25 }, 2.0)
           .to(steps[2], { opacity: 1, duration: 0.25 }, 2.05)
           .to('.lp-orb-sun-el', { scale: 0.45, opacity: 0, duration: 0.5 }, 2.0)
-          .fromTo('.lp-galaxy', { opacity: 0, scale: 1.3 }, { opacity: 1, scale: 1, duration: 0.6 }, 2.25)
+          .fromTo('.lp-deposit', { opacity: 0, scale: 1.06 }, { opacity: 1, scale: 1, duration: 0.6 }, 2.25)
           .to({}, { duration: 0.45 })
 
         // -- Live pay: glow rises, handwriting writes, letterbox collapse ----
-        gsap.set('.lp-hw-stroke', { strokeDasharray: 1, strokeDashoffset: 1 })
         const payTl = gsap.timeline({
           scrollTrigger: { trigger: '.lp-pay', start: 'top top', end: '+=180%', pin: true, scrub: 1, invalidateOnRefresh: true },
         })
@@ -208,7 +209,6 @@ export default function LandingPage() {
           .fromTo('.lp-pay-money', { scale: 0.85, opacity: 0.4 }, { scale: 1, opacity: 1, duration: 0.7 }, 0.2)
           .fromTo('.lp-pay-bullet', { opacity: 0.18, x: -14 }, { opacity: 1, x: 0, stagger: 0.2, duration: 0.5 }, 0.45)
           .fromTo('.lp-handwrite-clip', { clipPath: 'inset(-20% 100% -20% 0)' }, { clipPath: 'inset(-20% 0% -20% 0)', duration: 0.5 }, 0.75)
-          .to('.lp-hw-stroke', { strokeDashoffset: 0, stagger: 0.3, duration: 0.55 }, 0.85)
           .to({}, { duration: 0.4 })
           .to('.lp-pay-frame', { clipPath: 'inset(44% 0% 44% 0%)', ease: 'power1.in', duration: 0.9 })
           .to('.lp-pay-content', { scale: 0.93, opacity: 0.4, duration: 0.9 }, '<')
@@ -299,7 +299,6 @@ export default function LandingPage() {
         gsap.set('.lp-step, .lp-pay-bullet', { opacity: 1 })
         gsap.set('.lp-orb-ring-el', { opacity: 1 })
         gsap.set('.lp-handwrite-clip', { clipPath: 'none' })
-        gsap.set('.lp-hw-stroke', { strokeDasharray: 'none' })
         gsap.set('.lp-wd-orb', { fill: '#6b7280' })
         gsap.set('.lp-wd-mark, .lp-wd-sheen', { opacity: 0 })
         gsap.set('.lp-wd-eye, .lp-wd-mouth, .lp-wd-tear', { opacity: 1 })
@@ -347,8 +346,12 @@ export default function LandingPage() {
       </header>
 
       {/* ===================== statement ===================== */}
-      <section className="relative py-[12vh] sm:py-[26vh] px-[clamp(20px,6vw,84px)]">
-        <WordReveal as="h2" text={STATEMENT_TEXT} className="lp-h2 max-w-[820px]" />
+      <section className="relative py-[12vh] sm:py-[22vh] px-[clamp(20px,6vw,84px)]">
+        <div className="max-w-[1100px] mx-auto grid lg:grid-cols-[1fr_auto] gap-10 lg:gap-16 items-center">
+          <WordReveal as="h2" text={STATEMENT_TEXT} className="lp-h2 max-w-[640px]" />
+          {/* A live replica of the in-app real-time earnings module (Rewards). */}
+          <EarningsTickerDemo rate={36.5} start={247.38} className="w-full lg:w-[300px] shrink-0" />
+        </div>
       </section>
 
       {/* ===================== features (light up on scroll) ===================== */}
@@ -368,7 +371,7 @@ export default function LandingPage() {
 
       {/* ===================== the friction scale (pinned) ===================== */}
       <section className="lp-scale relative h-[100svh] overflow-hidden">
-        <GalaxyCanvas rotationRef={galaxyRotation} className="lp-galaxy absolute inset-0 w-full h-full opacity-0" />
+        <DepositCanvas progressRef={depositProgress} className="lp-deposit absolute inset-0 w-full h-full opacity-0" />
         <div aria-hidden="true" className="absolute right-[50%] translate-x-1/2 top-[6%] w-[56vw] max-w-[300px] aspect-square lg:translate-x-0 lg:right-[4vw] lg:top-1/2 lg:-translate-y-1/2 lg:w-[min(44vw,520px)] lg:max-w-none">
           <div className="lp-orb-ring-el absolute inset-0 opacity-0"><div className="lp-orb-ring" /></div>
           <div className="lp-orb-sun-el absolute inset-0 opacity-0">

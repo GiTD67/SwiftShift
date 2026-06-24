@@ -15,7 +15,10 @@ _USER_COLS = "id, first_name, last_name, email, job_role, manager_name, is_fullt
 # Fields only a manager (or the user viewing their own record) may see.
 _SENSITIVE = ("pay", "salary", "hourly_rate")
 # Fields only a manager may change (even on their own record).
-_MANAGER_ONLY_FIELDS = {"pay", "salary", "hourly_rate", "job_role", "is_manager", "pto_accrual_rate", "is_fulltime"}
+# hourly_rate is intentionally NOT manager-only: it drives each user's personal
+# live-earnings ticker, and the in-app UI lets a user set their own rate. Payroll
+# fields (pay/salary) stay manager-only. (editing_self already blocks editing others.)
+_MANAGER_ONLY_FIELDS = {"pay", "salary", "job_role", "is_manager", "pto_accrual_rate", "is_fulltime"}
 
 
 def _viewer_company_id(db, uid):

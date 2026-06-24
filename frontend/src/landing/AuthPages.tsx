@@ -2,7 +2,15 @@ import { useEffect, useState } from 'react'
 import './landing.css'
 import { API_BASE, LogoSVG, getThemeAccentHex } from './shared'
 import { FeaturePreview } from '../components/FeaturePreview'
-import { Tour } from '../components/Tour'
+
+// Launch the full guided product tour as a guest: drop the visitor into the
+// real app in a sandboxed demo session (App.tsx synthesizes a demo user when
+// this flag is set) and auto-run the spotlight Tour over the real pages.
+// sessionStorage so the demo never outlives the browser tab.
+function startDemoTour() {
+  sessionStorage.setItem('swiftshift-demo-tour', '1')
+  window.location.href = '.'
+}
 
 // Sign-in and create-account pages in the scrollytelling landing aesthetic:
 // pure black, hairline borders, white CTA. All auth behavior (endpoints,
@@ -386,7 +394,6 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showFeaturePreview, setShowFeaturePreview] = useState(false)
   const [showForgotPassword, setShowForgotPassword] = useState(false)
-  const [showLoginTour, setShowLoginTour] = useState(false)
   const [totpRequired, setTotpRequired] = useState(false)
 
   const isReturningUser = !!localStorage.getItem('lastEmail')
@@ -472,8 +479,8 @@ export function LoginPage() {
           <a href="signup" className="text-zinc-400 hover:text-white underline underline-offset-4">Create account, it's free</a>
         </div>
         <div className="flex justify-center gap-6 pt-4 mt-2 border-t" style={{ borderColor: 'var(--lp-hairline)' }}>
-          <button type="button" onClick={() => setShowLoginTour(true)} className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
-            Explore features →
+          <button type="button" onClick={startDemoTour} className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
+            Take a tour →
           </button>
           <button type="button" onClick={() => setShowFeaturePreview(true)} className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
             Preview the app →
@@ -493,9 +500,6 @@ export function LoginPage() {
       {totpRequired && (
         <TotpChallengeModal email={email} accentHex={accentHex} onClose={() => setTotpRequired(false)} />
       )}
-      {showLoginTour && (
-        <Tour onClose={() => setShowLoginTour(false)} onComplete={() => setShowLoginTour(false)} accentHex={accentHex} />
-      )}
     </AuthShell>
   )
 }
@@ -510,7 +514,6 @@ export function SignupPage() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showFeaturePreview, setShowFeaturePreview] = useState(false)
-  const [showSignupTour, setShowSignupTour] = useState(false)
   // Optional invite code (prefilled from invite links like /signup?invite=SW-XXXXXXXX)
   const [inviteCode, setInviteCode] = useState(() => (new URLSearchParams(window.location.search).get('invite') ?? '').toUpperCase())
   const [inviteInfo, setInviteInfo] = useState<any | null>(null)
@@ -705,8 +708,8 @@ export function SignupPage() {
           <a href="login" className="text-zinc-400 hover:text-white underline underline-offset-4">Already have an account?</a>
         </div>
         <div className="flex justify-center gap-6 pt-4 mt-2 border-t" style={{ borderColor: 'var(--lp-hairline)' }}>
-          <button type="button" onClick={() => setShowSignupTour(true)} className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
-            Explore features →
+          <button type="button" onClick={startDemoTour} className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
+            Take a tour →
           </button>
           <button type="button" onClick={() => setShowFeaturePreview(true)} className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
             Preview the app →
@@ -719,9 +722,6 @@ export function SignupPage() {
       </form>
       {showFeaturePreview && (
         <FeaturePreview onClose={() => setShowFeaturePreview(false)} accentHex={accentHex} />
-      )}
-      {showSignupTour && (
-        <Tour onClose={() => setShowSignupTour(false)} onComplete={() => setShowSignupTour(false)} accentHex={accentHex} />
       )}
     </AuthShell>
   )

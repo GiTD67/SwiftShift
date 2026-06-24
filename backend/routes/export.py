@@ -5,7 +5,7 @@ import json
 import zipfile
 from datetime import datetime
 
-from flask import Blueprint, Response, jsonify
+from flask import Blueprint, Response, jsonify, request
 
 from audit import _ensure_table as _ensure_audit_table
 from db import get_db
@@ -70,6 +70,237 @@ def _attachment(body, filename, mimetype):
         mimetype=mimetype,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# ---------------------------------------------------------------------------
+# Minimal stdlib .xlsx writer (no openpyxl / third-party dep). A .xlsx is just
+# a ZIP of XML parts; inline strings (t="inlineStr") keep us clear of the
+# sharedStrings table and are read fine by Excel 2007+, Numbers and Sheets.
+# ---------------------------------------------------------------------------
+
+def _xlsx_safe(value):
+    """Guard xlsx cell text against spreadsheet formula injection (same rule as
+    _csv_safe): prefix a leading =,+,-,@ etc. with a single quote."""
+    if value is None:
+        return ""
+    s = str(value)
+    if s and s[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + s
+    return s
+
+
+def _xml_escape(s):
+    return (
+        str(s)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&apos;")
+    )
+
+
+def _col_letter(idx):
+    """0-based column index -> spreadsheet column letters (A, B, ..., Z, AA, ...)."""
+    letters = ""
+    idx += 1
+    while idx:
+        idx, rem = divmod(idx - 1, 26)
+        letters = chr(65 + rem) + letters
+    return letters
+
+
+def _build_xlsx(headers, rows, sheet_name="Timecards"):
+    """Return the bytes of a one-sheet .xlsx workbook.
+
+    headers: list[str]; rows: list[list[str|int|float|None]].
+    Numeric cells are stored as numbers (so Excel can sum/sort); the rest as
+    formula-guarded inline strings."""
+    def _cell(col_idx, row_idx, value, style=None):
+        ref = f"{_col_letter(col_idx)}{row_idx}"
+        s_attr = f' s="{style}"' if style is not None else ""
+        if isinstance(value, bool):
+            value = str(value)
+        if isinstance(value, (int, float)):
+            return f'<c r="{ref}"{s_attr}><v>{value}</v></c>'
+        text = _xml_escape(_xlsx_safe(value))
+        return f'<c r="{ref}"{s_attr} t="inlineStr"><is><t xml:space="preserve">{text}</t></is></c>'
+
+    rows_xml = ['<row r="1">' + "".join(_cell(ci, 1, h, style=1) for ci, h in enumerate(headers)) + "</row>"]
+    for ri, row in enumerate(rows, start=2):
+        rows_xml.append(f'<row r="{ri}">' + "".join(_cell(ci, ri, v) for ci, v in enumerate(row)) + "</row>")
+
+    sheet_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        "<sheetData>" + "".join(rows_xml) + "</sheetData></worksheet>"
+    )
+    styles_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font>'
+        '<font><b/><sz val="11"/><name val="Calibri"/></font></fonts>'
+        '<fills count="1"><fill><patternFill patternType="none"/></fill></fills>'
+        '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'
+        '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+        '<cellXfs count="2">'
+        '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+        '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
+        "</cellXfs>"
+        '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
+        "</styleSheet>"
+    )
+    content_types = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+        "</Types>"
+    )
+    rels = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+        "</Relationships>"
+    )
+    workbook_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        f'<sheets><sheet name="{_xml_escape(sheet_name)}" sheetId="1" r:id="rId1"/></sheets></workbook>'
+    )
+    wb_rels = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+        '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+        "</Relationships>"
+    )
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("[Content_Types].xml", content_types)
+        zf.writestr("_rels/.rels", rels)
+        zf.writestr("xl/workbook.xml", workbook_xml)
+        zf.writestr("xl/_rels/workbook.xml.rels", wb_rels)
+        zf.writestr("xl/styles.xml", styles_xml)
+        zf.writestr("xl/worksheets/sheet1.xml", sheet_xml)
+    return buf.getvalue()
+
+
+_XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+# GET /api/export/timecards.xlsx?employee_id=<id|all>&start=YYYY-MM-DD&end=YYYY-MM-DD
+@bp.route("/api/export/timecards.xlsx", methods=["GET"])
+def export_timecards_xlsx():
+    """Manager-only: clock-in / clock-out data as an Excel workbook.
+
+    employee_id=all (default) -> every employee in the manager's company.
+    employee_id=<n>           -> a single employee (must be in the same company).
+    start / end               -> YYYY-MM-DD range (default: current calendar month).
+    """
+    err = manager_required()
+    if err:
+        return err
+
+    from datetime import date as _date
+    today = _date.today()
+    start = request.args.get("start") or today.replace(day=1).isoformat()
+    end = request.args.get("end") or today.isoformat()
+    try:
+        datetime.strptime(start, "%Y-%m-%d")
+        datetime.strptime(end, "%Y-%m-%d")
+    except ValueError:
+        return jsonify({"error": "start and end must be YYYY-MM-DD"}), 400
+
+    emp_param = request.args.get("employee_id", "all")
+    single_emp_id = None
+    if emp_param != "all":
+        try:
+            single_emp_id = int(emp_param)
+        except (ValueError, TypeError):
+            return jsonify({"error": "employee_id must be an integer or 'all'"}), 400
+
+    headers = ["Employee", "Email", "Date", "Clock In", "Clock Out", "Hours Worked", "Break (min)", "Notes"]
+
+    with get_db() as db:
+        viewer_company = _viewer_company_id(db, current_uid())
+        if viewer_company is not None:
+            member_ids_sql = "SELECT id FROM users WHERE company_id = ?"
+            member_params = (viewer_company,)
+        else:
+            member_ids_sql = "SELECT id FROM users"
+            member_params = ()
+
+        if single_emp_id is not None:
+            belongs = db.execute(
+                f"SELECT 1 FROM users WHERE id = ? AND id IN ({member_ids_sql})",
+                (single_emp_id,) + member_params,
+            ).fetchone()
+            if not belongs:
+                return jsonify({"error": "employee not found in your company"}), 404
+            user_rows = db.execute(
+                "SELECT id, first_name, last_name, email FROM users WHERE id = ?",
+                (single_emp_id,),
+            ).fetchall()
+        else:
+            user_rows = db.execute(
+                f"SELECT id, first_name, last_name, email FROM users WHERE id IN ({member_ids_sql}) ORDER BY last_name, first_name",
+                member_params,
+            ).fetchall()
+
+        user_map = {
+            r["id"]: {
+                "name": f"{r['first_name'] or ''} {r['last_name'] or ''}".strip() or (r["email"] or f"User {r['id']}"),
+                "email": r["email"] or "",
+            }
+            for r in user_rows
+        }
+        uid_list = list(user_map.keys())
+
+        sessions, entries = [], []
+        if uid_list:
+            placeholders = ",".join("?" * len(uid_list))
+            sessions = db.execute(
+                f"""
+                SELECT employee_id, LEFT(clock_in, 10) AS day, clock_in, clock_out,
+                       duration_minutes, break_minutes, notes
+                FROM clock_sessions
+                WHERE employee_id IN ({placeholders})
+                  AND LEFT(clock_in, 10) BETWEEN ? AND ?
+                ORDER BY employee_id, clock_in
+                """,
+                uid_list + [start, end],
+            ).fetchall()
+            entries = db.execute(
+                f"""
+                SELECT employee_id, date AS day, start_time AS clock_in, end_time AS clock_out,
+                       duration_minutes, NULL AS break_minutes, description AS notes
+                FROM time_entries
+                WHERE employee_id IN ({placeholders})
+                  AND date BETWEEN ? AND ?
+                ORDER BY employee_id, date, start_time
+                """,
+                uid_list + [start, end],
+            ).fetchall()
+
+    data_rows = []
+    for r in list(sessions) + list(entries):
+        info = user_map.get(r["employee_id"], {"name": f"User {r['employee_id']}", "email": ""})
+        mins = r["duration_minutes"]
+        hours = round(float(mins) / 60, 2) if mins is not None else ""
+        brk = r["break_minutes"] if r["break_minutes"] is not None else 0
+        data_rows.append([
+            info["name"], info["email"], (r["day"] or "")[:10],
+            (r["clock_in"] or "")[:19], (r["clock_out"] or "")[:19],
+            hours, brk, r["notes"],
+        ])
+    data_rows.sort(key=lambda row: (row[2], str(row[0])))
+
+    filename = f"timecards-{start}-to-{end}.xlsx"
+    return _attachment(_build_xlsx(headers, data_rows), filename, _XLSX_MIME)
 
 
 # GET /api/export/me - everything the logged-in user owns, as one JSON bundle

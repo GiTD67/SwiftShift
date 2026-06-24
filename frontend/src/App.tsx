@@ -16,6 +16,7 @@ import { Tour } from './components/Tour'
 import { BreakReminderModal } from './components/BreakReminderModal'
 import { SalesKPI } from './components/SalesKPI'
 import { GravityGridBackground } from './components/GravityGridBackground'
+import { GravityDots } from './landing/effects'
 import { STATE_BREAK_RULES, STATE_CODES } from './data/stateBreakRules'
 import { Leaderboard } from './components/Leaderboard'
 import ManagerOnboarding, { InviteManagerPanel } from './components/ManagerOnboarding'
@@ -297,7 +298,7 @@ function holidayOnDate<T extends { date: string; recurring: number }>(holidays: 
   return holidays.find(h => (h.recurring ? h.date.slice(5) === mmdd : h.date === `${d.getFullYear()}-${mmdd}`))
 }
 
-function usePayPeriodRange(periodOffset: number) {
+function usePayPeriodRange(periodOffset: number, todayKey?: string) {
   return useMemo(() => {
     const anchor = new Date(2026, 2, 22)
     anchor.setHours(0, 0, 0, 0)
@@ -323,8 +324,9 @@ function usePayPeriodRange(periodOffset: number) {
       return d
     })
     const periodId = periodStart.toISOString().slice(0, 10)
+    // todayKey is in the deps so the current period recomputes at midnight / on wake.
     return { start: periodStart, end: periodEnd, dayDates, periodId }
-  }, [periodOffset])
+  }, [periodOffset, todayKey])
 }
 
 // ===== NLP Parser =====
@@ -646,7 +648,7 @@ function useGamification() {
 }
 
 // ===== TimesheetView component =====
-function TimesheetView({ user, gamification, holidays }: { user: any; gamification: ReturnType<typeof useGamification>; holidays: { name: string; date: string; recurring: number }[] }) {
+function TimesheetView({ user, gamification, holidays, wakeKey }: { user: any; gamification: ReturnType<typeof useGamification>; holidays: { name: string; date: string; recurring: number }[]; wakeKey?: string }) {
   const [periodOffset, setPeriodOffset] = useState(0)
   const [entries, setEntries] = useState<Record<string, string>>(() => {
     try { const s = localStorage.getItem(`swiftshift-ts-entries-${user?.id}`); return s ? JSON.parse(s) : {} } catch { return {} }
@@ -684,10 +686,10 @@ function TimesheetView({ user, gamification, holidays }: { user: any; gamificati
   const swiftyBottomRef = useRef<HTMLDivElement>(null)
 
   const { gState, currentLevel, xpProgress, floatingXP, addXP, recordNLPUse, recordSubmit } = gamification
-  const { start, end, dayDates, periodId } = usePayPeriodRange(periodOffset)
+  const { start, end, dayDates, periodId } = usePayPeriodRange(periodOffset, wakeKey)
 
-  const prevPeriod1 = usePayPeriodRange(periodOffset - 1)
-  const prevPeriod2 = usePayPeriodRange(periodOffset - 2)
+  const prevPeriod1 = usePayPeriodRange(periodOffset - 1, wakeKey)
+  const prevPeriod2 = usePayPeriodRange(periodOffset - 2, wakeKey)
 
   const hourlyRate = user?.hourly_rate || 20
 
@@ -748,7 +750,7 @@ function TimesheetView({ user, gamification, holidays }: { user: any; gamificati
         setHistoryEntries(nextHistory)
       })
       .catch(() => {})
-  }, [user?.id, periodId])
+  }, [user?.id, periodId, wakeKey])
 
   // Fetch all submitted pay periods
   useEffect(() => {
@@ -2011,6 +2013,23 @@ function VerifyEmailPage() {
   )
 }
 
+// A read-only fake user used only for the guest product tour (launched from the
+// sign-in / create-account pages). When the sessionStorage demo flag is set and
+// nobody is logged in, App renders the real app shell around this user so the
+// spotlight Tour can walk through actual pages. Cleared on exit / tab close.
+const DEMO_TOUR_USER = {
+  id: 'demo',
+  first_name: 'Alex',
+  last_name: 'Rivera',
+  email: 'demo@swiftshift.work',
+  is_manager: true,
+  hourly_rate: 36.5,
+  job_role: 'Operations Manager',
+  company_id: null,
+  email_verified: true,
+  streak_count: 12,
+}
+
 // ===== Main App (existing) =====
 export default function App() {
   const pathname = window.location.pathname
@@ -2021,6 +2040,10 @@ export default function App() {
   } catch {
     localStorage.removeItem('user')
   }
+  // Guest product tour: when nobody is logged in but the demo flag is set,
+  // synthesize a demo user so the real app shell renders and the Tour can run.
+  const isDemoTour = !user && typeof sessionStorage !== 'undefined' && sessionStorage.getItem('swiftshift-demo-tour') === '1'
+  if (isDemoTour) user = DEMO_TOUR_USER
   // Manager/admin role - drives which manager-only UI is shown. Refreshed at each
   // login (the signin response includes is_manager). The backend is the real gate.
   const isManager = !!(user && user.is_manager)
@@ -2066,7 +2089,7 @@ export default function App() {
     return pay > 0 ? pay : 65
   })
   const [highlightRate, setHighlightRate] = useState(false)
-  const [showTour, setShowTour] = useState(() => localStorage.getItem('swiftshift-tour-pending') === '1')
+  const [showTour, setShowTour] = useState(() => localStorage.getItem('swiftshift-tour-pending') === '1' || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('swiftshift-demo-tour') === '1'))
   // First-run onboarding: GET /api/onboarding/status decides which wizard (if any)
   // this account still needs. null = still loading (no prompt yet). Dismissal is
   // session-memory only, so legacy accounts are re-prompted on next login.
@@ -2077,7 +2100,7 @@ export default function App() {
   const [onboardingIntent, setOnboardingIntent] = useState<string | null>(() => localStorage.getItem('swiftshift-onboarding-intent'))
   const onboardingNeeds: string | null = onboardingStatus?.needs ?? null
   const onboardingMode = onboardingNeeds === 'employee_link' && onboardingIntent === 'create-company' ? 'manager_setup' : onboardingNeeds
-  const onboardingActive = !onboardingDismissed && onboardingNeeds != null
+  const onboardingActive = !isDemoTour && !onboardingDismissed && onboardingNeeds != null
   const [inviteListRefresh, setInviteListRefresh] = useState(0)
   const [chatMessage, setChatMessage] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
@@ -2089,7 +2112,17 @@ export default function App() {
     return (saved === 'green' || saved === 'white' || saved === 'orange' || saved === 'cyan' || saved === 'pink' || saved === 'purple' || saved === 'red' || saved === 'gold' || saved === 'teal' || saved === 'blue' || saved === 'custom') ? saved : 'green'
   })
   const [customAccentColor, setCustomAccentColor] = useState<string>(() => localStorage.getItem('swiftshift-custom-accent') || '#00FF88')
-  const [backgroundStyle, setBackgroundStyle] = useState<string>(() => localStorage.getItem('swiftshift-bg-style') || 'default')
+  const [backgroundStyle, setBackgroundStyle] = useState<string>(() => {
+    const saved = localStorage.getItem('swiftshift-bg-style')
+    if (saved) return saved
+    // First-run experience (just signed up, or the guided demo): open on the
+    // landing-style gravity-dot background so the app matches the marketing page.
+    if (localStorage.getItem('swiftshift-tour-pending') === '1' ||
+        (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('swiftshift-demo-tour') === '1')) {
+      return 'gravity-dots'
+    }
+    return 'default'
+  })
   const [avatarFrame, setAvatarFrame] = useState<string>(() => localStorage.getItem('swiftshift-avatar-frame') || 'none')
   const [isMasterMode, setIsMasterMode] = useState<boolean>(() => localStorage.getItem('swiftshift-master-mode') === '1')
 
@@ -2229,6 +2262,10 @@ export default function App() {
   const [reportSummary, setReportSummary] = useState<any>(null)
   const [reportHours, setReportHours] = useState<any[]>([])
   const [reportsLoading, setReportsLoading] = useState(false)
+  // Timecards Excel export controls (manager reports view)
+  const [xlsxEmpId, setXlsxEmpId] = useState<string>('all')
+  const [xlsxStart, setXlsxStart] = useState<string>(() => `${new Date().toISOString().slice(0, 8)}01`)
+  const [xlsxEnd, setXlsxEnd] = useState<string>(() => new Date().toISOString().slice(0, 10))
 
   // Announcements state
   const [announcements, setAnnouncements] = useState<Array<{ id: number; title: string; body: string; author: string; priority: 'normal' | 'urgent'; created_at: string; read_by: string[] }>>([
@@ -2549,7 +2586,7 @@ export default function App() {
 
   // Load users for admin + org chart + schedules (swap-with teammate picker)
   useEffect(() => {
-    if (activeView === 'admin' || activeView === 'orgchart' || activeView === 'schedules') {
+    if (activeView === 'admin' || activeView === 'orgchart' || activeView === 'schedules' || activeView === 'reports') {
       fetch(`${API_BASE}/api/users`)
         .then(r => (r.ok ? r.json() : []))
         .then(data => setUsers(Array.isArray(data) ? data : []))
@@ -2793,6 +2830,26 @@ export default function App() {
     return localStorage.getItem('lastStreakDate') || ''
   })
 
+  // "Wake key": a YYYY-MM-DD string that changes when the calendar day rolls
+  // over or the tab is re-focused after the computer was asleep. It flows into
+  // the clock-state fetch below and down into TimesheetView so a tab left open
+  // overnight refreshes to "today" instead of showing yesterday's hours.
+  const [wakeKey, setWakeKey] = useState(() => new Date().toISOString().slice(0, 10))
+  const wakeKeyRef = useRef(wakeKey)
+  useEffect(() => { wakeKeyRef.current = wakeKey }, [wakeKey])
+  useEffect(() => {
+    const bump = () => {
+      const today = new Date().toISOString().slice(0, 10)
+      if (today !== wakeKeyRef.current) setWakeKey(today)
+    }
+    document.addEventListener('visibilitychange', bump)
+    window.addEventListener('focus', bump)
+    return () => {
+      document.removeEventListener('visibilitychange', bump)
+      window.removeEventListener('focus', bump)
+    }
+  }, [])
+
   // Restore clock state from DB on login / user change
   useEffect(() => {
     const uid = user?.id
@@ -2851,7 +2908,7 @@ export default function App() {
         setPeriodTotalMs(periodMs)
       })
       .catch(() => {})
-  }, [user?.id])
+  }, [user?.id, wakeKey])
 
   // Replay punches queued while offline - on app load and whenever connectivity returns
   useEffect(() => {
@@ -2880,9 +2937,15 @@ export default function App() {
     }
   }, [user?.id])
 
-  // Live clock tick every second
+  // Live clock tick every second - also rolls the wake key at midnight so a
+  // page left open across midnight advances to the new day on its own.
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000)
+    const id = setInterval(() => {
+      const n = new Date()
+      setNow(n)
+      const today = n.toISOString().slice(0, 10)
+      if (today !== wakeKeyRef.current) setWakeKey(today)
+    }, 1000)
     return () => clearInterval(id)
   }, [])
 
@@ -3457,6 +3520,11 @@ export default function App() {
     }
   }
 
+  const exitDemoTour = () => {
+    sessionStorage.removeItem('swiftshift-demo-tour')
+    window.location.href = 'signup'
+  }
+
   const handleLogout = () => {
     localStorage.removeItem('user')
     // Clear the server-side session too, so the auth cookie can't outlive logout.
@@ -3569,6 +3637,16 @@ export default function App() {
   return (
     <div className="ta-app" data-theme={theme} data-bg={backgroundStyle} data-overdrive={isOvertimeOverdrive ? 'true' : undefined}>
       {backgroundStyle === 'gravity-grid' && <GravityGridBackground />}
+      {backgroundStyle === 'gravity-dots' && <GravityDots className="ta-gravity-dots" />}
+      {isDemoTour && (
+        <button
+          onClick={exitDemoTour}
+          className="fixed left-4 z-[310] flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-opacity hover:opacity-80"
+          style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))', background: 'rgba(215,254,81,0.16)', border: '1px solid rgba(215,254,81,0.4)', color: '#d7fe51', backdropFilter: 'blur(8px)' }}
+        >
+          You're in a live demo · Exit &amp; sign up →
+        </button>
+      )}
       <nav className="ta-navbar">
         <div className="flex items-center gap-2">
           {/* Hamburger (mobile only) */}
@@ -4028,6 +4106,7 @@ export default function App() {
                 <div className="grid grid-cols-2 gap-3">
                   {[
                     { id: 'default', label: 'Aurora (default)', unlock: 1, preview: 'radial-gradient(circle at 72% 18%, rgba(var(--accent-color-rgb),0.55), #06080F 68%)' },
+                    { id: 'gravity-dots', label: 'Gravity Dots', unlock: 1, preview: 'radial-gradient(circle,rgba(215,254,81,0.6) 1px,transparent 1px)' },
                     { id: 'grid', label: 'Grid', unlock: 2, preview: 'repeating-linear-gradient(0deg,rgba(255,255,255,0.12) 0,rgba(255,255,255,0.12) 1px,transparent 1px,transparent 12px),repeating-linear-gradient(90deg,rgba(255,255,255,0.12) 0,rgba(255,255,255,0.12) 1px,transparent 1px,transparent 12px)' },
                     { id: 'dots', label: 'Dots', unlock: 3, preview: 'radial-gradient(circle,rgba(255,255,255,0.3) 1px,transparent 1px)' },
                     { id: 'gradient', label: 'Gradient', unlock: 5, preview: 'linear-gradient(135deg,#0d1322,#1a1030,#06080F)' },
@@ -4038,7 +4117,7 @@ export default function App() {
                     { id: 'gravity-grid', label: 'Gravity Grid', unlock: 11, preview: 'radial-gradient(ellipse at 40% 60%,rgba(100,130,255,0.5),rgba(50,0,80,0.6) 60%,#06080F)' },
                   ].map(bg => {
                     const unlocked = isMasterMode || appCurrentLevel.level >= bg.unlock
-                    const tiled = ['grid', 'dots', 'stars'].includes(bg.id)
+                    const tiled = ['grid', 'dots', 'stars', 'gravity-dots'].includes(bg.id)
                     return (
                       <button
                         key={bg.id}
@@ -4609,7 +4688,7 @@ export default function App() {
           )}
 
           {activeView === 'timesheet' && (
-            <TimesheetView user={user} gamification={gamification} holidays={holidays} />
+            <TimesheetView user={user} gamification={gamification} holidays={holidays} wakeKey={wakeKey} />
           )}
           {activeView === 'rewards' && (
             <div className="space-y-6">
@@ -4624,6 +4703,18 @@ export default function App() {
                 onRateChange={(rate) => {
                   setClockHourlyRate(rate)
                   localStorage.setItem('swiftshift-hourly-rate', String(rate))
+                  // Optimistically keep the cached user object in sync so the next
+                  // refresh reads the new rate immediately (clockHourlyRate and
+                  // computeHourlyRate both prefer user.hourly_rate). The PUT
+                  // persists it server-side; a transient failure no longer strands
+                  // the typed value at a stale DB default.
+                  try {
+                    const cached = localStorage.getItem('user')
+                    if (cached) {
+                      const u = JSON.parse(cached)
+                      localStorage.setItem('user', JSON.stringify({ ...u, hourly_rate: rate }))
+                    }
+                  } catch {}
                   if (user?.id) {
                     fetch(`${API_BASE}/api/users/${user.id}`, {
                       method: 'PUT',
@@ -5830,6 +5921,51 @@ export default function App() {
                       {label}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {/* Timecards Excel Export (.xlsx) */}
+              <div className="glass rounded-3xl p-6">
+                <h2 className="text-lg font-semibold mb-1 text-white">Timecards Excel Export</h2>
+                <p className="text-xs text-zinc-500 mb-4">Download clock-in / clock-out records as an Excel (.xlsx) file. Pick one employee or all, and set a date range.</p>
+                <div className="flex flex-wrap gap-3 items-end">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-zinc-400">Employee</label>
+                    <select
+                      value={xlsxEmpId}
+                      onChange={e => setXlsxEmpId(e.target.value)}
+                      className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white min-w-[170px]"
+                    >
+                      <option value="all">All employees</option>
+                      {users.map((u: any) => (
+                        <option key={u.id} value={String(u.id)}>
+                          {`${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email || `User ${u.id}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-zinc-400">From</label>
+                    <input type="date" value={xlsxStart} onChange={e => setXlsxStart(e.target.value)} className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-zinc-400">To</label>
+                    <input type="date" value={xlsxEnd} onChange={e => setXlsxEnd(e.target.value)} className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white" />
+                  </div>
+                  <button
+                    onClick={() => {
+                      const params = new URLSearchParams({ employee_id: xlsxEmpId, start: xlsxStart, end: xlsxEnd })
+                      const empLabel = xlsxEmpId === 'all' ? 'all-employees' : `employee-${xlsxEmpId}`
+                      downloadFile(`${API_BASE}/api/export/timecards.xlsx?${params.toString()}`, `timecards-${empLabel}-${xlsxStart}-to-${xlsxEnd}.xlsx`)
+                        .then(() => toast.success('Timecards Excel file downloaded'))
+                        .catch(() => toast.error('Failed to export timecards'))
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border border-white/10 transition-opacity hover:opacity-90"
+                    style={{ backgroundColor: 'var(--accent-color)', color: '#000' }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Export to Excel (.xlsx)
+                  </button>
                 </div>
               </div>
             </div>
@@ -8470,14 +8606,16 @@ export default function App() {
         {/* Guided tour modal - also waits for the onboarding status fetch to
             resolve so a fresh signup's tour isn't yanked mid-display when the
             wizard turns out to be needed */}
-        {showTour && !onboardingActive && onboardingStatus !== null && (
+        {showTour && (isDemoTour || (!onboardingActive && onboardingStatus !== null)) && (
           <Tour
             onClose={() => {
               setShowTour(false)
               localStorage.setItem('swiftshift-tour-seen', '1')
+              if (isDemoTour) exitDemoTour()
             }}
             onNavigate={(viewId) => navTo(viewId as any)}
             onComplete={() => {
+              if (isDemoTour) return
               gamification.addXP(50)
               toast.success('Tour complete! +50 XP', { description: 'You unlocked the Explorer badge!' })
             }}
