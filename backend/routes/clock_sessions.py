@@ -92,9 +92,13 @@ def clock_in():
                 recent = True
             if recent:
                 return jsonify(_serialize_session(existing)), 200
+        # local_date is the employee's local calendar day at punch time, captured
+        # by the client (NULL for legacy/offline callers; reports COALESCE to the
+        # UTC date prefix until backfilled).
+        local_date = data.get("local_date")
         row = db.execute(
-            "INSERT INTO clock_sessions (employee_id, clock_in, notes) VALUES (?, ?, ?) RETURNING *",
-            (employee_id, now, data.get("notes")),
+            "INSERT INTO clock_sessions (employee_id, clock_in, notes, local_date) VALUES (?, ?, ?, ?) RETURNING *",
+            (employee_id, now, data.get("notes"), local_date),
         ).fetchone()
         db.commit()
     log_event(employee_id, None, "clock_in", f"Clocked in (session #{row['id']})")

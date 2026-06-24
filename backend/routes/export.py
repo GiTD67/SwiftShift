@@ -265,11 +265,11 @@ def export_timecards_xlsx():
             placeholders = ",".join("?" * len(uid_list))
             sessions = db.execute(
                 f"""
-                SELECT employee_id, LEFT(clock_in, 10) AS day, clock_in, clock_out,
+                SELECT employee_id, COALESCE(local_date, LEFT(clock_in, 10)) AS day, clock_in, clock_out,
                        duration_minutes, break_minutes, notes
                 FROM clock_sessions
                 WHERE employee_id IN ({placeholders})
-                  AND LEFT(clock_in, 10) BETWEEN ? AND ?
+                  AND COALESCE(local_date, LEFT(clock_in, 10)) BETWEEN ? AND ?
                 ORDER BY employee_id, clock_in
                 """,
                 uid_list + [start, end],

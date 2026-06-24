@@ -191,6 +191,9 @@ def _ensure_users_table():
         # (IF EXISTS: on a fresh database this table is created later, with the
         # column already included).
         db.execute("ALTER TABLE IF EXISTS clock_sessions ADD COLUMN IF NOT EXISTS break_minutes INTEGER DEFAULT 0")
+        # Employee's local calendar day of clock-in (YYYY-MM-DD). NULL on legacy
+        # rows; reports fall back to the UTC date prefix via COALESCE until backfilled.
+        db.execute("ALTER TABLE IF EXISTS clock_sessions ADD COLUMN IF NOT EXISTS local_date TEXT")
         db.commit()
         # Always keep one admin: make the founder a manager if that account exists.
         try:
@@ -275,7 +278,8 @@ def _ensure_clock_sessions_table():
               clock_out TEXT,
               duration_minutes INTEGER,
               break_minutes INTEGER DEFAULT 0,
-              notes TEXT
+              notes TEXT,
+              local_date TEXT
             )
             """
         )

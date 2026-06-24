@@ -183,9 +183,12 @@ def approve_correction(req_id):
         break_minutes = int(sess["break_minutes"] or 0)
         total_minutes = int((new_out - new_in).total_seconds() / 60)
         net_minutes = max(0, total_minutes - break_minutes)
+        # The corrected clock-in can change which day the session belongs to, so
+        # keep local_date in step with it (date of the new naive-UTC clock_in).
+        corrected_local_date = _to_naive_utc(new_in).isoformat()[:10]
         db.execute(
-            "UPDATE clock_sessions SET clock_in = ?, clock_out = ?, duration_minutes = ? WHERE id = ?",
-            (_to_naive_utc(new_in).isoformat(), _to_naive_utc(new_out).isoformat(), net_minutes, row["session_id"]),
+            "UPDATE clock_sessions SET clock_in = ?, clock_out = ?, duration_minutes = ?, local_date = ? WHERE id = ?",
+            (_to_naive_utc(new_in).isoformat(), _to_naive_utc(new_out).isoformat(), net_minutes, corrected_local_date, row["session_id"]),
         )
         db.execute(
             "UPDATE clock_correction_requests SET status = 'approved', reviewed_by = ?, reviewed_at = ? WHERE id = ?",

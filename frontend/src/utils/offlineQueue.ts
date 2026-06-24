@@ -10,6 +10,7 @@ export const PUNCH_QUEUE_EVENT = 'swiftshift-punch-queue'
 export interface QueuedPunch {
   action: 'clock_in' | 'clock_out'
   timestamp: string // ISO time of the original punch, sent to the API as client_ts
+  localDate?: string // employee's local calendar day (YYYY-MM-DD) at punch time
   sessionId?: number | null // known session id for a clock_out (null if the clock_in is itself queued)
   breakMinutes?: number // unpaid break minutes for a clock_out
 }
@@ -66,7 +67,7 @@ export async function flushQueuedPunches(apiBase: string): Promise<{ synced: num
         const res = await fetch(`${apiBase}/api/clock-sessions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ client_ts: punch.timestamp }),
+          body: JSON.stringify({ client_ts: punch.timestamp, local_date: punch.localDate }),
         })
         if (res.status >= 500) break // server hiccup - retry later
         if (res.ok) {

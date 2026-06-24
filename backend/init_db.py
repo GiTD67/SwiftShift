@@ -76,7 +76,8 @@ tables = [
       clock_out TEXT,
       duration_minutes INTEGER,
       break_minutes INTEGER DEFAULT 0,
-      notes TEXT
+      notes TEXT,
+      local_date TEXT
     )
     """,
     """

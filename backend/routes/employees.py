@@ -88,9 +88,12 @@ def enter_time():
         return jsonify({"error": "authentication required"}), 401
     now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     with get_db() as db:
+        # Legacy server-time endpoint with no client clock; use the client-sent
+        # local_date if present, else fall back to the UTC date of `now`.
+        local_date = data.get("local_date") or now[:10]
         row = db.execute(
-            "INSERT INTO clock_sessions (employee_id, clock_in, notes) VALUES (?, ?, ?) RETURNING *",
-            (employee_id, now, data.get("notes")),
+            "INSERT INTO clock_sessions (employee_id, clock_in, notes, local_date) VALUES (?, ?, ?, ?) RETURNING *",
+            (employee_id, now, data.get("notes"), local_date),
         ).fetchone()
         db.commit()
     return jsonify(dict(row)), 201

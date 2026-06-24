@@ -943,8 +943,8 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: user?.id,
-          period_start: start.toISOString().slice(0, 10),
-          period_end: end.toISOString().slice(0, 10),
+          period_start: localDay(start),
+          period_end: localDay(end),
           total_hours: totalHours,
         }),
       }).then(r => r.ok ? r.json() : null).then(row => {
@@ -2292,8 +2292,8 @@ export default function App() {
   const [reportsLoading, setReportsLoading] = useState(false)
   // Timecards Excel export controls (manager reports view)
   const [xlsxEmpId, setXlsxEmpId] = useState<string>('all')
-  const [xlsxStart, setXlsxStart] = useState<string>(() => `${new Date().toISOString().slice(0, 8)}01`)
-  const [xlsxEnd, setXlsxEnd] = useState<string>(() => new Date().toISOString().slice(0, 10))
+  const [xlsxStart, setXlsxStart] = useState<string>(() => localDay(new Date()).slice(0, 8) + '01')
+  const [xlsxEnd, setXlsxEnd] = useState<string>(() => localDay(new Date()))
 
   // Announcements state
   const [announcements, setAnnouncements] = useState<Array<{ id: number; title: string; body: string; author: string; priority: 'normal' | 'urgent'; created_at: string; read_by: string[] }>>([
@@ -2773,8 +2773,9 @@ export default function App() {
   useEffect(() => {
     if (activeView !== 'reports' || !user?.id) return
     const now = new Date()
-    const start = `${now.toISOString().slice(0, 8)}01`
-    const end = now.toISOString().slice(0, 10)
+    const todayLocal = localDay(now)
+    const start = todayLocal.slice(0, 8) + '01'
+    const end = todayLocal
     setReportsLoading(true)
     Promise.all([
       fetch(`${API_BASE}/api/reports/summary?start=${start}&end=${end}`).then(r => (r.ok ? r.json() : null)),
@@ -3236,8 +3237,9 @@ export default function App() {
       // Persist clock-in to DB; queue it offline if the network is down
       if (user?.id) {
         const punchTs = punchNow.toISOString()
+        const punchLocalDate = localDay(punchNow)
         const queueOffline = () => {
-          queuePunch({ action: 'clock_in', timestamp: punchTs })
+          queuePunch({ action: 'clock_in', timestamp: punchTs, localDate: punchLocalDate })
           setOfflinePunchPending(true)
           toast.info('Saved offline - will sync when you reconnect', {
             description: 'Your clock-in is queued with its original time.',
@@ -3253,7 +3255,7 @@ export default function App() {
           fetch(`${API_BASE}/api/clock-sessions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ employee_id: user.id, client_ts: punchTs }),
+            body: JSON.stringify({ employee_id: user.id, client_ts: punchTs, local_date: punchLocalDate }),
           })
             .then(r => { if (!r.ok) throw new Error('clock-in not saved'); return r.json() })
             .then(row => { if (row?.id) setActiveSessionId(row.id) })
@@ -5855,8 +5857,8 @@ export default function App() {
               {isManager && (
                 <PayrollRunsPanel
                   status={paymentsStatus}
-                  defaultPeriodStart={period.start.toISOString().slice(0, 10)}
-                  defaultPeriodEnd={period.end.toISOString().slice(0, 10)}
+                  defaultPeriodStart={localDay(period.start)}
+                  defaultPeriodEnd={localDay(period.end)}
                 />
               )}
             </div>

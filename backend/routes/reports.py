@@ -59,11 +59,11 @@ def _daily_hours(db, start, end):
     hours = {}  # (employee_id, "YYYY-MM-DD") -> hours
     rows = db.execute(
         """
-        SELECT employee_id, LEFT(clock_in, 10) AS day, SUM(duration_minutes) AS minutes
+        SELECT employee_id, COALESCE(local_date, LEFT(clock_in, 10)) AS day, SUM(duration_minutes) AS minutes
         FROM clock_sessions
         WHERE clock_out IS NOT NULL AND duration_minutes IS NOT NULL
-          AND LEFT(clock_in, 10) BETWEEN ? AND ?
-        GROUP BY employee_id, LEFT(clock_in, 10)
+          AND COALESCE(local_date, LEFT(clock_in, 10)) BETWEEN ? AND ?
+        GROUP BY employee_id, COALESCE(local_date, LEFT(clock_in, 10))
         """,
         (start, end),
     ).fetchall()
