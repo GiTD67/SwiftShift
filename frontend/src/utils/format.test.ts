@@ -7,7 +7,29 @@ import {
   getDayName,
   getDayNumber,
   parseServerDate,
+  localDay,
 } from './format'
+
+describe('localDay', () => {
+  it('returns the LOCAL calendar day as YYYY-MM-DD, zero-padded', () => {
+    const d = new Date(2026, 0, 5, 14, 30) // Jan 5 2026, local
+    expect(localDay(d)).toBe('2026-01-05')
+  })
+
+  it('buckets an evening server timestamp on the local day it was worked', () => {
+    // A naive-UTC clock_in for 8pm in a UTC-negative zone lands on the next UTC
+    // day; localDay(parseServerDate(...)) must report the local day, not the UTC one.
+    const local = localDay(parseServerDate('2026-06-25T03:00:00')) // 03:00 UTC
+    // Whatever the test machine's zone, localDay must agree with a plain local Date.
+    expect(local).toBe(localDay(new Date(Date.parse('2026-06-25T03:00:00Z'))))
+  })
+
+  it('agrees with the local fields of a Date built from a known instant', () => {
+    const inst = new Date(Date.parse('2026-12-31T23:00:00Z'))
+    const expected = `${inst.getFullYear()}-${String(inst.getMonth() + 1).padStart(2, '0')}-${String(inst.getDate()).padStart(2, '0')}`
+    expect(localDay(inst)).toBe(expected)
+  })
+})
 
 describe('parseServerDate', () => {
   it('reads a naive backend timestamp (no zone) as UTC, not local time', () => {

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
+import { localDay } from '../utils/format'
 
 interface XPCenterProps {
   gState: {
@@ -25,7 +26,7 @@ function getWeekMonday(): string {
   const diff = d.getDate() - day + (day === 0 ? -6 : 1)
   const monday = new Date(d)
   monday.setDate(diff)
-  return monday.toISOString().slice(0, 10)
+  return localDay(monday)
 }
 
 const XP_LEVELS_LOCAL = [

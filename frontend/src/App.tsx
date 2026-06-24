@@ -24,7 +24,7 @@ import EmployeeOnboarding from './components/EmployeeOnboarding'
 import PayrollRunsPanel from './components/PayrollRunsPanel'
 import PayoutSetupCard from './components/PayoutSetupCard'
 import { queuePunch, hasQueuedPunches, flushQueuedPunches } from './utils/offlineQueue'
-import { parseServerDate } from './utils/format'
+import { parseServerDate, localDay } from './utils/format'
 import { LandingPage, LoginPage, SignupPage, LogoSVG, getThemeAccentHex } from './landing'
 
 const API_BASE = ''
@@ -351,7 +351,7 @@ function usePayPeriodRange(periodOffset: number, todayKey?: string) {
       d.setHours(0, 0, 0, 0)
       return d
     })
-    const periodId = periodStart.toISOString().slice(0, 10)
+    const periodId = localDay(periodStart)
     // todayKey is in the deps so the current period recomputes at midnight / on wake.
     return { start: periodStart, end: periodEnd, dayDates, periodId }
   }, [periodOffset, todayKey])
@@ -375,24 +375,24 @@ function parseNLPEntry(text: string, dayDates: Date[]): { dayIndex: number; hour
 
   // "today"
   if (t.includes('today')) {
-    const todayStr = today.toISOString().slice(0, 10)
-    const idx = dayDates.findIndex(d => d.toISOString().slice(0, 10) === todayStr)
+    const todayStr = localDay(today)
+    const idx = dayDates.findIndex(d => localDay(d) === todayStr)
     if (idx !== -1) targetDayIndex = idx
   }
 
   // "yesterday"
   if (targetDayIndex === null && t.includes('yesterday')) {
     const yest = new Date(today.getTime() - 86400000)
-    const yestStr = yest.toISOString().slice(0, 10)
-    const idx = dayDates.findIndex(d => d.toISOString().slice(0, 10) === yestStr)
+    const yestStr = localDay(yest)
+    const idx = dayDates.findIndex(d => localDay(d) === yestStr)
     if (idx !== -1) targetDayIndex = idx
   }
 
   // "tomorrow"
   if (targetDayIndex === null && t.includes('tomorrow')) {
     const tom = new Date(today.getTime() + 86400000)
-    const tomStr = tom.toISOString().slice(0, 10)
-    const idx = dayDates.findIndex(d => d.toISOString().slice(0, 10) === tomStr)
+    const tomStr = localDay(tom)
+    const idx = dayDates.findIndex(d => localDay(d) === tomStr)
     if (idx !== -1) targetDayIndex = idx
   }
 
@@ -424,8 +424,8 @@ function parseNLPEntry(text: string, dayDates: Date[]): { dayIndex: number; hour
   if (targetDayIndex === null) {
     const workedMatch = t.match(/(?:worked|logged|clocked|did|put in|had)\s+.*?(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)/)
     if (workedMatch) {
-      const todayStr = today.toISOString().slice(0, 10)
-      const idx = dayDates.findIndex(d => d.toISOString().slice(0, 10) === todayStr)
+      const todayStr = localDay(today)
+      const idx = dayDates.findIndex(d => localDay(d) === todayStr)
       if (idx !== -1) targetDayIndex = idx
     }
   }
@@ -525,7 +525,7 @@ function getWeekMondayId(): string {
   const diff = d.getDate() - day + (day === 0 ? -6 : 1)
   const monday = new Date(d)
   monday.setDate(diff)
-  return monday.toISOString().slice(0, 10)
+  return localDay(monday)
 }
 
 function useGamification() {
@@ -744,7 +744,7 @@ function TimesheetView({ user, gamification, holidays, wakeKey }: { user: any; g
         const durationByDate: Record<string, number> = {}
         for (const row of rows) {
           if (!row.clock_in) continue
-          const d = row.clock_in.slice(0, 10)
+          const d = localDay(parseServerDate(row.clock_in))
           if (!byDate[d]) byDate[d] = []
           byDate[d].push(row)
           durationByDate[d] = (durationByDate[d] || 0) + (Number(row.duration_minutes) || 0)
@@ -756,7 +756,7 @@ function TimesheetView({ user, gamification, holidays, wakeKey }: { user: any; g
         setEntries(prev => {
           const next = { ...prev }
           dayDates.forEach((d, i) => {
-            const dateStr = d.toISOString().slice(0, 10)
+            const dateStr = localDay(d)
             const mins = durationByDate[dateStr] || 0
             const key = entryKey(periodId, i)
             if (!next[key] && mins > 0) next[key] = (mins / 60).toFixed(1)
@@ -769,7 +769,7 @@ function TimesheetView({ user, gamification, holidays, wakeKey }: { user: any; g
         for (const p of [prevPeriod1, prevPeriod2]) {
           const pMap: Record<string, string> = {}
           p.dayDates.forEach((d, i) => {
-            const dateStr = d.toISOString().slice(0, 10)
+            const dateStr = localDay(d)
             const mins = durationByDate[dateStr] || 0
             if (mins > 0) pMap[entryKey(p.periodId, i)] = (mins / 60).toFixed(1)
           })
@@ -808,8 +808,8 @@ function TimesheetView({ user, gamification, holidays, wakeKey }: { user: any; g
   const overtimeHours = Math.max(0, totalHours - 80)
   const isSubmitted = submittedPeriods.has(periodId)
 
-  const todayStr = new Date().toISOString().slice(0, 10)
-  const todayIndex = dayDates.findIndex(d => d.toISOString().slice(0, 10) === todayStr)
+  const todayStr = localDay(new Date())
+  const todayIndex = dayDates.findIndex(d => localDay(d) === todayStr)
 
   // Company holidays falling inside this pay period (for grid markers + submit confirm)
   const periodHolidays = dayDates
@@ -1018,7 +1018,7 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
               const h = pHours[i]
               const isOT = h > 8
               const isWeekend = d.getDay() === 0 || d.getDay() === 6
-              const dateStr = d.toISOString().slice(0, 10)
+              const dateStr = localDay(d)
               const sessions = clockSessionsByDate[dateStr] || []
               return (
                 <div key={i} className="flex-1 text-center min-w-[36px]">
@@ -1266,7 +1266,7 @@ ${sub.total_hours>80?`<div class="row"><span>Overtime (${(sub.total_hours-80).to
               const isToday = i === todayIndex
               const isHighlighted = i === highlightedDay
               const isWeekend = d.getDay() === 0 || d.getDay() === 6
-              const dateStr = d.toISOString().slice(0, 10)
+              const dateStr = localDay(d)
               const daySessions = clockSessionsByDate[dateStr] || []
               const holiday = holidayOnDate(holidays, d)
               const fill = Math.min(h / 8, 1) // 0..1 of an 8-hour day
@@ -2650,7 +2650,7 @@ export default function App() {
   // suppressed on previous days as one combined "Your daily summary" notification.
   useEffect(() => {
     if (!user?.id) return
-    const today = new Date().toISOString().slice(0, 10)
+    const today = localDay(new Date())
     if (localStorage.getItem(NOTIF_DIGEST_SHOWN_KEY) === today) return
     let queued: Array<{ category: NotifCategory; title: string; ts: string }> = []
     try { queued = JSON.parse(localStorage.getItem(NOTIF_DIGEST_KEY) || '[]') } catch { queued = [] }
@@ -2813,7 +2813,7 @@ export default function App() {
       try {
         const { ms, date } = JSON.parse(saved)
         // Only use if it's still the same day
-        if (date === new Date().toISOString().slice(0, 10)) return Number(ms)
+        if (date === localDay(new Date())) return Number(ms)
       } catch {
         localStorage.removeItem('swiftshift-today-ms')
       }
@@ -2864,7 +2864,7 @@ export default function App() {
   // over or the tab is re-focused after the computer was asleep. It flows into
   // the clock-state fetch below and down into TimesheetView so a tab left open
   // overnight refreshes to "today" instead of showing yesterday's hours.
-  const [wakeKey, setWakeKey] = useState(() => new Date().toISOString().slice(0, 10))
+  const [wakeKey, setWakeKey] = useState(() => localDay(new Date()))
   const wakeKeyRef = useRef(wakeKey)
   useEffect(() => { wakeKeyRef.current = wakeKey }, [wakeKey])
   // Bumped after offline punches finish syncing so the clock-state effect below
@@ -2872,7 +2872,7 @@ export default function App() {
   const [syncKey, setSyncKey] = useState(0)
   useEffect(() => {
     const bump = () => {
-      const today = new Date().toISOString().slice(0, 10)
+      const today = localDay(new Date())
       if (today !== wakeKeyRef.current) setWakeKey(today)
     }
     document.addEventListener('visibilitychange', bump)
@@ -2894,17 +2894,17 @@ export default function App() {
       .then(([activeRes, allRes]) => Promise.all([activeRes.json(), allRes.json()]))
       .then(([activeRows, allRows]) => {
         const active = Array.isArray(activeRows) && activeRows.length ? activeRows[0] : null
-        const todayStr = new Date().toISOString().slice(0, 10)
+        const todayStr = localDay(new Date())
         const currentPeriod = payPeriodFor(new Date())
-        const periodStartStr = currentPeriod.start.toISOString().slice(0, 10)
-        const periodEndStr = currentPeriod.end.toISOString().slice(0, 10)
+        const periodStartStr = localDay(currentPeriod.start)
+        const periodEndStr = localDay(currentPeriod.end)
 
         // Sum duration_minutes for today's completed sessions, and for the full pay period
         let todayMs = 0
         let periodMs = 0
         for (const row of allRows) {
           if (!row.clock_in) continue
-          const d = row.clock_in.slice(0, 10)
+          const d = localDay(parseServerDate(row.clock_in))
           if (d === todayStr) {
             const mins = Number(row.duration_minutes) || 0
             todayMs += mins * 60 * 1000
@@ -3000,7 +3000,7 @@ export default function App() {
     const id = setInterval(() => {
       const n = new Date()
       setNow(n)
-      const today = n.toISOString().slice(0, 10)
+      const today = localDay(n)
       if (today !== wakeKeyRef.current) setWakeKey(today)
     }, 1000)
     return () => clearInterval(id)
@@ -3011,7 +3011,7 @@ export default function App() {
     if (todayWorkedMs > 0) {
       localStorage.setItem('swiftshift-today-ms', JSON.stringify({
         ms: todayWorkedMs,
-        date: new Date().toISOString().slice(0, 10),
+        date: localDay(new Date()),
       }))
     }
   }, [todayWorkedMs])
@@ -3154,8 +3154,8 @@ export default function App() {
   const paydayFiredRef = useRef(false)
   useEffect(() => {
     const period = payPeriodFor(now)
-    const todayStr = now.toISOString().slice(0, 10)
-    const endStr = period.end.toISOString().slice(0, 10)
+    const todayStr = localDay(now)
+    const endStr = localDay(period.end)
     if (todayStr === endStr && !paydayFiredRef.current) {
       paydayFiredRef.current = true
       setTimeout(() => {
@@ -3165,12 +3165,12 @@ export default function App() {
         })
       }, 3000)
     }
-  }, [now.toISOString().slice(0, 10)])
+  }, [localDay(now)])
 
   // Clock-in reminder if not clocked in by 9:30 AM
   const clockInReminderFiredRef = useRef(false)
   useEffect(() => {
-    const todayStr = now.toISOString().slice(0, 10)
+    const todayStr = localDay(now)
     const key = `swiftshift-clockin-remind-${todayStr}`
     if (isClockedIn || localStorage.getItem(key)) return
     const hour = now.getHours()
@@ -3262,7 +3262,7 @@ export default function App() {
       }
 
       // Update daily streak (freeze over weekends)
-      const todayStr = now.toISOString().slice(0, 10)
+      const todayStr = localDay(now)
       const todayDay = now.getDay() // 0=Sun, 1=Mon, ..., 6=Sat
       const isWeekday = todayDay >= 1 && todayDay <= 5
       if (isWeekday) {

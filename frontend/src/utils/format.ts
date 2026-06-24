@@ -25,6 +25,20 @@ export function parseServerDate(value: string | null | undefined): Date {
   return new Date(s)
 }
 
+// Returns a YYYY-MM-DD string in the browser's LOCAL timezone (not UTC).
+// `date.toISOString().slice(0,10)` gives the UTC calendar day, which for users
+// behind UTC rolls to the next day in the afternoon — so a shift worked at 8pm
+// local can be bucketed/labelled on the following day. Use this for any
+// user-facing calendar-day label, bucket key, "today" check, or localStorage
+// day tag. To get the local day a server timestamp falls on, combine with
+// parseServerDate: localDay(parseServerDate(row.clock_in)).
+export function localDay(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 export function formatDuration(minutes: number): string {
   // Guard against NaN/Infinity/negative durations from corrupt data, which
   // would otherwise render as "NaNm" / "Infinityh" / "-1h -30m".
