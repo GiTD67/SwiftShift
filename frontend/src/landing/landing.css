@@ -52,6 +52,7 @@
 }
 .lp-word { color: var(--lp-dim); }
 .lp-word--em { color: var(--lp-fg); }
+.lp-word--brand { color: var(--lp-accent); }
 
 /* hero headline words - each is its own inline box so GSAP can transform it.
    .lp-sad deflates to gray on scroll; .lp-brand (SwiftShift) brightens + grows. */

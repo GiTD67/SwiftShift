@@ -265,10 +265,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-weight: 600;
-  font-size: 1.15rem;
-  letter-spacing: -0.01em;
-  text-transform: none;
+  /* The wordmark <span> carries its own Tailwind type utilities
+     (font-semibold tracking-[0.18em] text-sm) to match the landing
+     page nav; keep font metrics off the container so the span wins. */
 }
 
 .ta-navbar-user {

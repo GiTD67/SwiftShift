@@ -19,7 +19,7 @@ const HERO_TEXT =
   'Workforce software became ~~heavy, slow, and joyless.~~ **SwiftShift** makes it easy and fun. 7x your company’s efficiency by gamifying pay, PTO, and payroll with **SwiftShift.**'
 
 const STATEMENT_TEXT =
-  '**Instant gratification,** built in. SwiftShift closes the gap between doing the work and seeing the money, so the reward lands the moment you earn it.'
+  '**Instant gratification,** built in. ^^SwiftShift^^ closes the gap between doing the work and seeing the money, so the reward lands the moment you earn it.'
 
 const CAPABILITIES = ['Time clock', 'Live pay', 'PTO', 'Payroll', 'Documents', 'Rewards', 'AI taxes']
 
@@ -47,7 +47,7 @@ const PAY_BULLETS = [
 ]
 
 const CMP_ROWS: [string, string, string, string][] = [
-  ['Time to first clock-in', '≈ 3 minutes', 'Weeks of deployment', 'Days of setup'],
+  ['Time to first clock-in', '~7 seconds', 'Weeks of deployment', 'Days of setup'],
   ['Learning curve', 'None, it’s one button', 'Training courses', 'Admin configuration'],
   ['Clocking in', '1 tap, even offline', 'Portal login + module', 'App + menus'],
   ['Live pay & PTO ticker', '✓ To the cent, every second', '-', '-'],
@@ -136,7 +136,7 @@ export default function LandingPage() {
         // -- Scroll-linked word reveals (statement section) ------------------
         gsap.utils.toArray<HTMLElement>('[data-word-reveal]').forEach(el => {
           gsap.fromTo(
-            el.querySelectorAll('.lp-word'),
+            el.querySelectorAll('.lp-word:not(.lp-word--brand)'),
             { color: 'rgba(244,244,245,0.18)' },
             {
               color: '#f4f4f5', ease: 'none', stagger: 0.5,
@@ -290,7 +290,7 @@ export default function LandingPage() {
       // We still show the *final* emotion (sad words gray, brand lit, the
       // heavyweight mark already a sad face) so the story reads without motion.
       mm.add('(prefers-reduced-motion: reduce)', () => {
-        gsap.set('.lp-word', { color: '#f4f4f5' })
+        gsap.set('.lp-word:not(.lp-word--brand)', { color: '#f4f4f5' })
         gsap.set('.lp-hw', { color: '#f4f4f5' })
         gsap.set('.lp-sad', { color: '#6b7280' })
         gsap.set('.lp-brand', { color: '#d7fe51' })
@@ -479,7 +479,7 @@ export default function LandingPage() {
           <div className="lp-bars hidden lg:flex items-end gap-10 pb-2" aria-label="Setup time comparison: SwiftShift about three minutes, enterprise HR suites measured in weeks">
             <div className="text-center">
               <div className="lp-bar lp-bar--swift h-[14px] mx-auto" style={{ background: 'var(--lp-accent)' }} />
-              <div className="mt-3 text-xs" style={{ color: 'var(--lp-dim)' }}>SwiftShift<br />≈ 3 min setup</div>
+              <div className="mt-3 text-xs" style={{ color: 'var(--lp-dim)' }}><span style={{ color: 'var(--lp-accent)' }}>SwiftShift</span><br />≈ 3 min setup</div>
             </div>
             <div className="text-center">
               <div className="lp-bar lp-bar--hris h-[380px] mx-auto" style={{ background: 'rgba(255,255,255,0.16)' }} />
@@ -524,7 +524,7 @@ export default function LandingPage() {
       {/* ===================== CTA + footer ===================== */}
       <section className="relative py-[14vh] sm:py-[18vh] px-[clamp(20px,6vw,84px)] text-center">
         <div className="lp-dots" />
-        <h2 className="lp-h2 mb-4" data-rise>Run your team at SwiftShift speed.</h2>
+        <h2 className="lp-h2 mb-4" data-rise>Run your team at <span style={{ color: 'var(--lp-accent)' }}>SwiftShift</span> speed.</h2>
         <p className="text-sm mb-10" style={{ color: 'var(--lp-dim)' }} data-rise>
           Set up in minutes. Free to start. Nothing to install.
         </p>
@@ -533,7 +533,7 @@ export default function LandingPage() {
           <a href="login" className="lp-btn lp-btn--ghost">Sign in <span aria-hidden="true">→</span></a>
         </div>
         <footer className="mt-[14vh] pt-8 border-t border-white/10 flex flex-wrap items-center justify-between gap-4 text-[11px]" style={{ color: 'var(--lp-faint)' }}>
-          <span>© 2026 SwiftShift. All rights reserved.</span>
+          <span>© 2026 <span style={{ color: 'var(--lp-accent)' }}>SwiftShift</span>. All rights reserved.</span>
           <span className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--lp-accent)' }} />
             System status: online

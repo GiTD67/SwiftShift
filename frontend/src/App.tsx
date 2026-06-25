@@ -62,6 +62,22 @@ type View = 'clock' | 'timesheet' | 'rewards' | 'xpcenter' | 'admin' | 'profile'
 type NotifCategory = 'pto' | 'swaps' | 'timesheet' | 'manager'
 type NotifPrefs = { pto: boolean; swaps: boolean; timesheet: boolean; manager: boolean; mode: 'instant' | 'digest' }
 const DEFAULT_NOTIF_PREFS: NotifPrefs = { pto: true, swaps: true, timesheet: true, manager: true, mode: 'instant' }
+
+// Fire an OS-level desktop notification when a mandatory meal/lunch break is due.
+// No-op unless the browser supports the Notifications API and the user has granted
+// permission. Lets the reminder reach a user whose SwiftShift tab is in the
+// background (the in-app modal only shows on the active tab).
+function fireBreakDesktopNotif(stateName: string, minutes: number, isSecond: boolean) {
+  if (typeof window === 'undefined' || !('Notification' in window) || Notification.permission !== 'granted') return
+  try {
+    new Notification(isSecond ? 'Second meal break due' : 'Meal break due', {
+      body: `${stateName}: time to take your ${minutes}-minute break.`,
+      tag: isSecond ? 'swiftshift-break-second' : 'swiftshift-break-first',
+      requireInteraction: true,
+      icon: '/logo.png',
+    })
+  } catch { /* notifications can throw on some platforms; ignore */ }
+}
 const NOTIF_DIGEST_KEY = 'swiftshift-notif-digest' // suppressed events queued for the daily summary
 const NOTIF_DIGEST_SHOWN_KEY = 'swiftshift-notif-digest-shown' // date the summary was last surfaced
 
@@ -1766,7 +1782,7 @@ function ResetPasswordPage() {
       <div className="glass w-full max-w-[380px] rounded-3xl p-8 border border-white/10 relative z-10" style={{ boxShadow: `0 0 80px -20px ${accentHex}35, 0 28px 72px -14px rgba(0,0,0,0.85)` }}>
         <div className="flex items-center gap-3 mb-6">
           <LogoSVG className="h-8 w-auto" />
-          <span className="font-semibold text-xl tracking-[1px]">SWIFTSHIFT</span>
+          <span className="font-semibold text-sm tracking-[0.18em]">SWIFTSHIFT</span>
         </div>
         {!token ? (
           <div className="text-center py-4 space-y-3">
@@ -2012,7 +2028,7 @@ function VerifyEmailPage() {
         <div className="glass w-full max-w-[380px] rounded-3xl p-8 border border-white/10 relative z-10 text-center" style={{ boxShadow: `0 0 80px -20px ${accentHex}35, 0 28px 72px -14px rgba(0,0,0,0.85)` }}>
           <div className="flex items-center justify-center gap-3 mb-6">
             <LogoSVG className="h-8 w-auto" />
-            <span className="font-semibold text-xl tracking-[1px]">SWIFTSHIFT</span>
+            <span className="font-semibold text-sm tracking-[0.18em]">SWIFTSHIFT</span>
           </div>
           {status === 'verifying' && (
             <p className="text-sm text-zinc-400 py-4">Verifying your email…</p>
@@ -2861,6 +2877,46 @@ export default function App() {
     return localStorage.getItem('lastStreakDate') || ''
   })
 
+  // Email-verified banner: the cached `user` in localStorage can be stale (e.g.
+  // the user verified in another tab), which left the "verify your email" banner
+  // stuck. Reconcile with the server's live value on mount, keep localStorage in
+  // sync, and react to cross-tab updates so the banner clears without a refresh.
+  const [emailVerifiedLive, setEmailVerifiedLive] = useState<boolean | null>(null)
+  useEffect(() => {
+    if (!user?.id) return
+    fetch(`${API_BASE}/api/auth/account-status`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (!d || d.error || typeof d.email_verified !== 'boolean') return
+        setEmailVerifiedLive(d.email_verified)
+        try {
+          const u = JSON.parse(localStorage.getItem('user') || 'null')
+          if (u && u.email_verified !== d.email_verified) {
+            u.email_verified = d.email_verified
+            localStorage.setItem('user', JSON.stringify(u))
+          }
+        } catch { /* ignore */ }
+      })
+      .catch(() => {})
+  }, [])
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== 'user' || !e.newValue) return
+      try {
+        const u = JSON.parse(e.newValue)
+        if (typeof u?.email_verified === 'boolean') setEmailVerifiedLive(u.email_verified)
+      } catch { /* ignore */ }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
+  // Desktop (OS-level) notification permission state, surfaced in the Notifications
+  // settings tab and used to gate the break-reminder desktop alert.
+  const [desktopNotifPerm, setDesktopNotifPerm] = useState<NotificationPermission | 'unsupported'>(
+    () => (typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported')
+  )
+
   // "Wake key": a YYYY-MM-DD string that changes when the calendar day rolls
   // over or the tab is re-focused after the computer was asleep. It flows into
   // the clock-state fetch below and down into TimesheetView so a tab left open
@@ -3263,39 +3319,48 @@ export default function App() {
         }
       }
 
-      // Update daily streak (freeze over weekends)
-      const todayStr = localDay(now)
-      const todayDay = now.getDay() // 0=Sun, 1=Mon, ..., 6=Sat
+      // Update daily streak (freeze over weekends). Use punchNow (the fresh
+      // clock-in instant) and parse stored dates as LOCAL midnight so weekday
+      // and day-gap math reflect the user's calendar, not UTC.
+      const todayStr = localDay(punchNow)
+      const todayDay = punchNow.getDay() // 0=Sun, 1=Mon, ..., 6=Sat
       const isWeekday = todayDay >= 1 && todayDay <= 5
       if (isWeekday) {
-        let newStreak = 1
-        if (lastStreakDate) {
-          const lastDate = new Date(lastStreakDate)
-          const lastDay = lastDate.getDay()
-          const diffDays = Math.floor((now.getTime() - lastDate.getTime()) / 86400000)
-          // Continue streak if: yesterday (weekday) or Friday→Monday (weekend freeze)
-          if (diffDays === 1 && lastDay >= 1 && lastDay <= 5) {
-            newStreak = streak + 1
-          } else if (diffDays <= 3 && lastDay === 5 && todayDay === 1) {
-            // Friday to Monday (weekend freeze)
-            newStreak = streak + 1
+        // A second clock-in on the same day must not reset/recount the streak.
+        const alreadyCountedToday = lastStreakDate === todayStr
+        let newStreak = streak
+        if (!alreadyCountedToday) {
+          newStreak = 1
+          if (lastStreakDate) {
+            // 'T00:00:00' (no Z) parses as LOCAL midnight, so getDay() returns the
+            // local weekday and the day gap is a whole-day, DST-safe difference.
+            const lastDate = new Date(lastStreakDate + 'T00:00:00')
+            const lastDay = lastDate.getDay()
+            const diffDays = Math.round((new Date(todayStr + 'T00:00:00').getTime() - lastDate.getTime()) / 86400000)
+            // Continue streak if: yesterday (weekday) or Friday→Monday (weekend freeze)
+            if (diffDays === 1 && lastDay >= 1 && lastDay <= 5) {
+              newStreak = streak + 1
+            } else if (diffDays <= 3 && lastDay === 5 && todayDay === 1) {
+              // Friday to Monday (weekend freeze)
+              newStreak = streak + 1
+            }
+          }
+          setStreak(newStreak)
+          setLastStreakDate(todayStr)
+          localStorage.setItem('streak', String(newStreak))
+          localStorage.setItem('lastStreakDate', todayStr)
+          // Persist streak to DB
+          if (user?.id) {
+            fetch(`${API_BASE}/api/users/${user.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ streak_count: newStreak, streak_last_date: todayStr }),
+            }).catch(() => {})
           }
         }
-        setStreak(newStreak)
-        setLastStreakDate(todayStr)
-        localStorage.setItem('streak', String(newStreak))
-        localStorage.setItem('lastStreakDate', todayStr)
-        // Persist streak to DB
-        if (user?.id) {
-          fetch(`${API_BASE}/api/users/${user.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ streak_count: newStreak, streak_last_date: todayStr }),
-          }).catch(() => {})
-        }
 
-        // Streak milestone celebrations
-        if ([5, 10, 20, 30, 50].includes(newStreak)) {
+        // Streak milestone celebrations (only when the milestone is newly reached)
+        if (!alreadyCountedToday && [5, 10, 20, 30, 50].includes(newStreak)) {
           setTimeout(() => {
             confetti({ particleCount: 300, spread: 120, origin: { y: 0.5 }, colors: [themeAccentHex, '#FFD700', '#FF6B6B'] })
             setTimeout(() => confetti({ particleCount: 200, spread: 80, origin: { y: 0.65 }, colors: [themeAccentHex, '#FFD700'] }), 200)
@@ -3398,6 +3463,11 @@ export default function App() {
     if (isClockedIn) {
       breakReminderFiredRef.current = new Set()
       setShowBreakReminder(false)
+      // Ask for desktop-notification permission at a natural moment so a user
+      // whose tab is backgrounded still gets an OS pop-up when a break is due.
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().then(p => setDesktopNotifPerm(p)).catch(() => {})
+      }
     }
   }, [isClockedIn])
 
@@ -3414,6 +3484,7 @@ export default function App() {
       breakReminderFiredRef.current.add('first')
       setBreakReminderIsSecond(false)
       setShowBreakReminder(true)
+      fireBreakDesktopNotif(rule.name, rule.mealBreakMinutes, false)
     }
 
     // Second meal break check (California and similar states)
@@ -3425,6 +3496,7 @@ export default function App() {
       breakReminderFiredRef.current.add('second')
       setBreakReminderIsSecond(true)
       setShowBreakReminder(true)
+      fireBreakDesktopNotif(rule.name, rule.mealBreakMinutes, true)
     }
   }, [sessionWorkedMs, isClockedIn, isOnBreak, workState])
 
@@ -3742,7 +3814,7 @@ export default function App() {
           </button>
           <div className="ta-navbar-brand cursor-pointer" role="button" tabIndex={0} aria-label="Go to Time Clock" onClick={() => navTo('clock')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navTo('clock') } }}>
             <LogoSVG className="h-10 w-auto" />
-            <span>SwiftShift</span>
+            <span className="font-semibold tracking-[0.18em] text-sm">SWIFTSHIFT</span>
           </div>
         </div>
         <div className="ta-navbar-user flex-1 min-w-0 justify-end">
@@ -4336,7 +4408,7 @@ export default function App() {
 
       <div className="ta-content">
         <main className="ta-main">
-          {user && user.email_verified === false && (
+          {user && (emailVerifiedLive ?? user.email_verified) === false && (
             <div className="max-w-[1200px] mx-auto mb-4 px-4 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-sm text-amber-300 flex items-center gap-2.5">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 6h20v12H2z"/><path d="M2 6l10 7 10-7"/></svg>
               <span>Please verify your email to secure your account.{' '}
@@ -7930,6 +8002,26 @@ export default function App() {
                         ? 'Notifications are held and combined into one "Your daily summary" on your first visit each day.'
                         : 'Notifications appear as they happen.'}
                     </p>
+                  </div>
+                  <div className="mt-4 bg-white/5 rounded-2xl p-4">
+                    <div className="text-xs uppercase tracking-[1px] text-zinc-500 mb-2">Desktop break alerts</div>
+                    <p className="text-xs text-zinc-500 mb-3">Get an OS pop-up when a mandatory meal/lunch break is due, even when SwiftShift is in a background tab. Requires allowing notifications in your browser.</p>
+                    <button onClick={async () => {
+                      if (typeof window === 'undefined' || !('Notification' in window)) { toast.error('This browser does not support desktop notifications'); return }
+                      try {
+                        const perm = await Notification.requestPermission()
+                        setDesktopNotifPerm(perm)
+                        if (perm === 'granted') toast.success('Desktop break alerts enabled!')
+                        else if (perm === 'denied') toast.error('Blocked - allow notifications for this site in your browser settings.')
+                      } catch { toast.error('Could not enable notifications') }
+                    }}
+                      disabled={desktopNotifPerm === 'granted' || desktopNotifPerm === 'unsupported' || desktopNotifPerm === 'denied'}
+                      className="px-5 py-2 rounded-xl text-sm font-medium glass hover:bg-white/10 text-zinc-200 disabled:opacity-60">
+                      {desktopNotifPerm === 'unsupported' ? 'Not supported in this browser'
+                        : desktopNotifPerm === 'granted' ? 'Desktop alerts: Enabled'
+                        : desktopNotifPerm === 'denied' ? 'Blocked - change in browser settings'
+                        : 'Enable desktop break alerts'}
+                    </button>
                   </div>
                   <button onClick={() => {
                     fetch(`${API_BASE}/api/users/me/notification-prefs`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(notifPrefs) })

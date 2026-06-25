@@ -18,17 +18,18 @@ export function WordReveal({
   as?: 'p' | 'h1' | 'h2' | 'h3' | 'div'
   reveal?: boolean
 }) {
-  const plain = text.replace(/\*\*/g, '')
-  const words: { text: string; em: boolean }[] = []
-  text.split(/(\*\*[^*]+\*\*)/).forEach(seg => {
+  const plain = text.replace(/\*\*|\^\^/g, '')
+  const words: { text: string; em: boolean; brand: boolean }[] = []
+  text.split(/(\*\*[^*]+\*\*|\^\^[^^]+\^\^)/).forEach(seg => {
     if (!seg) return
     const em = seg.startsWith('**')
-    seg.replace(/\*\*/g, '').split(/\s+/).filter(Boolean).forEach(w => words.push({ text: w, em }))
+    const brand = seg.startsWith('^^')
+    seg.replace(/\*\*|\^\^/g, '').split(/\s+/).filter(Boolean).forEach(w => words.push({ text: w, em, brand }))
   })
   return (
     <Tag className={className} aria-label={plain} {...(reveal ? { 'data-word-reveal': '' } : {})}>
       {words.map((w, i) => (
-        <span key={i} aria-hidden="true" className={`lp-word${w.em ? ' lp-word--em' : ''}`}>
+        <span key={i} aria-hidden="true" className={`lp-word${w.em ? ' lp-word--em' : ''}${w.brand ? ' lp-word--brand' : ''}`}>
           {w.text}
           {i < words.length - 1 ? ' ' : ''}
         </span>
