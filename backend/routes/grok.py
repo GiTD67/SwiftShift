@@ -8,7 +8,7 @@ from openai import OpenAI
 import chromadb
 from werkzeug.utils import secure_filename
 
-from db import get_db
+from db import get_db, safe_bootstrap
 from permissions import current_uid
 from routes.reports import (
     _DEFAULT_HOURLY_RATE,
@@ -19,6 +19,91 @@ from routes.reports import (
 from routes.billing import swifty_access
 
 bp = Blueprint("grok", __name__)
+
+
+# --- Swifty fair-use limits (anti-abuse, applies even on Pro) ------------------
+# Per-user message caps, configurable via env (SWIFTY_DAILY_LIMIT /
+# SWIFTY_MONTHLY_LIMIT). Defaults are generous for normal use but stop a single
+# user from running up xAI costs. Applies to everyone who passes the Pro gate
+# (trial, Pro, grandfathered).
+_SWIFTY_DAILY_DEFAULT = 50
+_SWIFTY_MONTHLY_DEFAULT = 500
+
+
+def _int_env(name, default):
+    try:
+        return int(os.environ.get(name) or default)
+    except (TypeError, ValueError):
+        return default
+
+
+def _ensure_swifty_usage_table():
+    with get_db() as db:
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS swifty_usage (
+              user_id INTEGER NOT NULL,
+              period_type TEXT NOT NULL,
+              period_key TEXT NOT NULL,
+              count INTEGER NOT NULL DEFAULT 0,
+              PRIMARY KEY (user_id, period_type, period_key)
+            )
+            """
+        )
+        db.commit()
+
+
+safe_bootstrap(_ensure_swifty_usage_table)
+
+
+def _swifty_periods():
+    now = datetime.now(timezone.utc)
+    return now.strftime("%Y-%m-%d"), now.strftime("%Y-%m")
+
+
+def _swifty_usage_check(uid):
+    """(allowed, message): compare the user's day/month message counts to caps.
+    Never blocks on a counter-read failure (fails open)."""
+    daily = _int_env("SWIFTY_DAILY_LIMIT", _SWIFTY_DAILY_DEFAULT)
+    monthly = _int_env("SWIFTY_MONTHLY_LIMIT", _SWIFTY_MONTHLY_DEFAULT)
+    day_key, month_key = _swifty_periods()
+    try:
+        with get_db() as db:
+            d = db.execute(
+                "SELECT count FROM swifty_usage WHERE user_id = ? AND period_type = 'day' AND period_key = ?",
+                (uid, day_key),
+            ).fetchone()
+            m = db.execute(
+                "SELECT count FROM swifty_usage WHERE user_id = ? AND period_type = 'month' AND period_key = ?",
+                (uid, month_key),
+            ).fetchone()
+    except Exception:
+        return True, None
+    if d and d["count"] >= daily:
+        return False, f"You've reached today's Swifty limit of {daily} messages. It resets tomorrow."
+    if m and m["count"] >= monthly:
+        return False, f"You've reached this month's Swifty limit of {monthly} messages. It resets at the start of next month."
+    return True, None
+
+
+def _swifty_usage_increment(uid):
+    """Count one successful Swifty message against the user's day + month totals."""
+    day_key, month_key = _swifty_periods()
+    try:
+        with get_db() as db:
+            for pt, pk in (("day", day_key), ("month", month_key)):
+                db.execute(
+                    """
+                    INSERT INTO swifty_usage (user_id, period_type, period_key, count)
+                    VALUES (?, ?, ?, 1)
+                    ON CONFLICT (user_id, period_type, period_key)
+                    DO UPDATE SET count = swifty_usage.count + 1
+                    """,
+                    (uid, pt, pk),
+                )
+            db.commit()
+    except Exception:
+        pass
 
 
 def chunk_text(text: str, chunk_size: int = 4000, overlap: int = 400) -> list[str]:
@@ -345,6 +430,12 @@ def chat():
             "Pricing page, and I can answer questions about your hours, pay, and schedule."
         )})
 
+    # Fair-use cap (anti-abuse): block when the user is over their daily/monthly
+    # message limit. Counted only on success, below.
+    usage_ok, usage_message = _swifty_usage_check(uid)
+    if not usage_ok:
+        return jsonify({"response": usage_message})
+
     try:
         client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1", timeout=60)
 
@@ -405,6 +496,7 @@ def chat():
                     },
                 ],
             )
+            _swifty_usage_increment(uid)
             return jsonify({"response": resp.output_text})
 
         # Tool-calling loop: Swifty decides which data to pull, we run the query
@@ -451,6 +543,7 @@ def chat():
         if answer is None:
             answer = "I wasn't able to finish looking that up. Could you rephrase your question?"
 
+        _swifty_usage_increment(uid)
         return jsonify({"response": answer})
     except Exception as e:
         return jsonify({"error": str(e)}), 500

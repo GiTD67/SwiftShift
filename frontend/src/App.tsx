@@ -8731,7 +8731,7 @@ export default function App() {
                   </div>
                   <div className="text-zinc-500 text-sm mb-6">Everything in Starter, plus</div>
                   <ul className="space-y-3 mb-8 flex-1">
-                    {['Unlimited employees', 'Manager hub & approvals', 'Payroll & compliance tools', 'Leave management', 'AI assistant (Swifty) - unlimited', 'Custom themes & backgrounds', 'Org chart & hiring tools', 'Advanced KPI dashboards', 'Priority support'].map(f => (
+                    {['Unlimited employees', 'Manager hub & approvals', 'Payroll & compliance tools', 'Leave management', 'AI assistant (Swifty) - 500 msgs/mo', 'Custom themes & backgrounds', 'Org chart & hiring tools', 'Advanced KPI dashboards', 'Priority support'].map(f => (
                       <li key={f} className="flex items-start gap-2.5 text-sm text-zinc-300">
                         <svg className="mt-0.5 flex-shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                         {f}
