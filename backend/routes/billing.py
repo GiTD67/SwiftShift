@@ -275,23 +275,23 @@ def create_checkout():
         if not company:
             return jsonify({"error": "company not found"}), 404
         seats = _seat_count(db, company_id)
-    try:
-        customer_id = company.get("billing_customer_id")
-        if not customer_id:
-            customer = _stripe("POST", "/v1/customers", {
-                "name": company.get("name") or "SwiftShift company",
-                "metadata": {"swiftshift_company_id": str(company_id)},
-            })
-            customer_id = customer["id"]
-            with get_db() as db:
-                db.execute(
-                    "UPDATE companies SET billing_customer_id = ? WHERE id = ?",
-                    (customer_id, company_id),
-                )
-                db.commit()
-        session = _stripe("POST", "/v1/checkout/sessions", {
+    def _new_customer():
+        cust = _stripe("POST", "/v1/customers", {
+            "name": company.get("name") or "SwiftShift company",
+            "metadata": {"swiftshift_company_id": str(company_id)},
+        })
+        with get_db() as db:
+            db.execute(
+                "UPDATE companies SET billing_customer_id = ? WHERE id = ?",
+                (cust["id"], company_id),
+            )
+            db.commit()
+        return cust["id"]
+
+    def _new_session(cid):
+        return _stripe("POST", "/v1/checkout/sessions", {
             "mode": "subscription",
-            "customer": customer_id,
+            "customer": cid,
             "line_items": [{"price": price, "quantity": seats}],
             "payment_method_types": ["card", "us_bank_account"],
             "subscription_data": {"metadata": {"swiftshift_company_id": str(company_id)}},
@@ -299,6 +299,20 @@ def create_checkout():
             "success_url": f"{base}/?billing=success",
             "cancel_url": f"{base}/?billing=cancel",
         })
+
+    try:
+        customer_id = company.get("billing_customer_id") or _new_customer()
+        try:
+            session = _new_session(customer_id)
+        except StripeError as exc:
+            # A saved customer id Stripe can't find (e.g. a test-mode customer
+            # reused after switching to a live key) - drop it, make a fresh one,
+            # and retry once so the manager isn't stuck.
+            if customer_id and "No such customer" in (exc.message or ""):
+                customer_id = _new_customer()
+                session = _new_session(customer_id)
+            else:
+                raise
     except StripeError as exc:
         return jsonify({"error": exc.message}), 502
     return jsonify({"url": session["url"]})
