@@ -25,7 +25,7 @@ import PayrollRunsPanel from './components/PayrollRunsPanel'
 import PayoutSetupCard from './components/PayoutSetupCard'
 import { queuePunch, hasQueuedPunches, flushQueuedPunches } from './utils/offlineQueue'
 import { parseServerDate, localDay } from './utils/format'
-import { LandingPage, LoginPage, SignupPage, LogoSVG, getThemeAccentHex } from './landing'
+import { LandingPage, LoginPage, SignupPage, ContactPage, LogoSVG, getThemeAccentHex } from './landing'
 
 const API_BASE = ''
 
@@ -2099,9 +2099,11 @@ export default function App() {
   const isAdmin = pathname === '/admin' || pathname.endsWith('/admin')
   const isResetPassword = pathname === '/reset-password' || pathname.endsWith('/reset-password')
   const isVerifyEmail = pathname === '/verify-email' || pathname.endsWith('/verify-email')
+  const isContact = pathname === '/contact' || pathname.endsWith('/contact')
 
   if (isResetPassword) return <ResetPasswordPage />
   if (isVerifyEmail) return <VerifyEmailPage />
+  if (isContact) return <ContactPage />  // public: reachable logged-out or logged-in
   if (isSignup) return <SignupPage />
 
   // Gate: nothing visible without login
@@ -2377,6 +2379,68 @@ export default function App() {
     setMobileMenuOpen(false)
     // .ta-main is the scroll container (window never scrolls in this layout)
     document.querySelector('.ta-main')?.scrollTo(0, 0)
+  }
+
+  // Billing (SaaS subscription) state - drives the pricing page banner + actions.
+  // The backend grandfathers every pre-billing company, so existing accounts read
+  // back status 'grandfathered' (no banner, unlimited).
+  const [billingStatus, setBillingStatus] = useState<any | null>(null)
+  const [billingBusy, setBillingBusy] = useState(false)
+  const refreshBillingStatus = useCallback(() => {
+    fetch(`${API_BASE}/api/billing/status`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d && !d.error) setBillingStatus(d) })
+      .catch(() => {})
+  }, [])
+
+  // Start the 30-day Pro trial (logged-out visitors are sent to sign up, where a
+  // new company auto-starts its trial). Idempotent server-side.
+  const handleStartTrial = async () => {
+    if (billingBusy) return
+    if (!user) { window.location.href = 'signup'; return }
+    setBillingBusy(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/billing/start-trial`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      const d = await res.json()
+      if (res.ok) {
+        setBillingStatus((p: any) => ({ ...(p || {}), ...d }))
+        if (d.status === 'trialing' && (d.trial_days_left ?? 0) > 0) toast.success('Your 30-day Pro trial is active', { description: `${d.trial_days_left} days left.` })
+        else if (d.entitled) toast.success("You're on Pro", { description: 'All Pro features are unlocked.' })
+        else toast.info('Your trial has ended', { description: 'Subscribe to keep Pro features.' })
+      } else {
+        toast.error(d.error || 'Could not start the trial')
+      }
+    } catch { toast.error('Could not reach the server') }
+    finally { setBillingBusy(false) }
+  }
+
+  // Subscribe now (skip / end the trial): open Stripe Checkout for card or US bank.
+  const handleCheckout = async () => {
+    if (billingBusy) return
+    if (!user) { window.location.href = 'signup'; return }
+    setBillingBusy(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/billing/checkout`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      const d = await res.json()
+      if (res.ok && d.url) { window.location.href = d.url; return }
+      if (res.status === 503) toast.info('Online payments are not switched on yet', { description: 'Reach us at sales@swiftshift.work and we will get you set up.' })
+      else if (res.status === 403) toast.info('Ask an account owner or manager to upgrade your workspace.')
+      else toast.error(d.error || 'Could not start checkout')
+    } catch { toast.error('Could not reach the server') }
+    finally { setBillingBusy(false) }
+  }
+
+  // Manage an active subscription (update card, cancel) via the Stripe portal.
+  const handleManageBilling = async () => {
+    if (billingBusy) return
+    setBillingBusy(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/billing/portal`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      const d = await res.json()
+      if (res.ok && d.url) { window.location.href = d.url; return }
+      toast.error(d.error || 'Could not open the billing portal')
+    } catch { toast.error('Could not reach the server') }
+    finally { setBillingBusy(false) }
   }
 
   // Appearance slide-over: focus trap, Escape to close, restore focus on close
@@ -2729,6 +2793,13 @@ export default function App() {
     refreshPaymentsStatus()
   }, [user?.id, refreshPaymentsStatus])
 
+  // Billing/subscription status: fetched once after login, refreshed on return
+  // from Stripe Checkout.
+  useEffect(() => {
+    if (!user?.id) return
+    refreshBillingStatus()
+  }, [user?.id, refreshBillingStatus])
+
   // Return-from-Stripe handling: funding=success|cancel (company bank Checkout)
   // and payouts=return|refresh (Express onboarding links). Refetch status, toast,
   // and strip the params so a reload doesn't replay the message.
@@ -2736,11 +2807,21 @@ export default function App() {
     const params = new URLSearchParams(window.location.search)
     const funding = params.get('funding')
     const payouts = params.get('payouts')
-    if (!funding && !payouts) return
+    const billing = params.get('billing')
+    if (!funding && !payouts && !billing) return
     params.delete('funding')
     params.delete('payouts')
+    params.delete('billing')
     const qs = params.toString()
     window.history.replaceState({}, '', `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`)
+    if (billing === 'success') {
+      toast.success('Subscription active', { description: 'Welcome to SwiftShift Pro.' })
+      refreshBillingStatus()
+    } else if (billing === 'cancel') {
+      toast.info('Checkout canceled, no charge was made')
+    } else if (billing === 'portal') {
+      refreshBillingStatus()
+    }
     if (funding === 'success') {
       toast.success('Company bank connected', { description: 'Verification may take a moment - micro-deposits can take 1–2 days.' })
       refreshPaymentsStatus()
@@ -7466,9 +7547,9 @@ export default function App() {
                 {/* SUGGESTIONS - minimal */}
                 <div className="px-6 py-3 border-b border-white/10 flex gap-2 flex-wrap">
                   {[
-                    "Check my hours",
-                    "Request PTO",
-                    "Show overtime",
+                    "How many hours have I worked this pay period?",
+                    "Am I clocked in right now?",
+                    "Show my overtime this period",
                   ].map((s, i) => (
                     <button
                       key={i}
@@ -8587,6 +8668,28 @@ export default function App() {
 
           {activeView === 'pricing' && (
             <div className="max-w-5xl mx-auto">
+              {/* Subscription status banner: trial countdown, paywall, or manage.
+                  Hidden for grandfathered (existing) and company-less accounts. */}
+              {billingStatus && billingStatus.has_company && billingStatus.status !== 'grandfathered' && (
+                <div className="mb-6 rounded-2xl px-5 py-4 border flex flex-wrap items-center justify-between gap-3" style={{ borderColor: 'var(--accent-color)', background: 'linear-gradient(135deg, rgba(var(--accent-color-rgb),0.10), rgba(var(--accent-color-rgb),0.03))' }}>
+                  {billingStatus.status === 'active' ? (
+                    <>
+                      <div className="text-sm text-white"><span className="font-semibold">You're on SwiftShift Pro.</span> Billed for {billingStatus.seats ?? '?'} seat{billingStatus.seats === 1 ? '' : 's'}.</div>
+                      <button onClick={handleManageBilling} disabled={billingBusy} className="px-4 py-2 rounded-xl text-xs font-bold border border-white/20 text-white hover:bg-white/5 transition-colors disabled:opacity-60">Manage billing</button>
+                    </>
+                  ) : billingStatus.entitled ? (
+                    <>
+                      <div className="text-sm text-white"><span className="font-semibold">{billingStatus.trial_days_left} day{billingStatus.trial_days_left === 1 ? '' : 's'} left</span> in your Pro trial.</div>
+                      <button onClick={handleCheckout} disabled={billingBusy} className="px-4 py-2 rounded-xl text-xs font-bold text-black transition-opacity hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: 'var(--accent-color)' }}>Subscribe now</button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-sm text-white"><span className="font-semibold">Your free trial has ended.</span> Add a card or bank to keep Pro features.</div>
+                      <button onClick={handleCheckout} disabled={billingBusy} className="px-4 py-2 rounded-xl text-xs font-bold text-black transition-opacity hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: 'var(--accent-color)' }}>Upgrade to Pro</button>
+                    </>
+                  )}
+                </div>
+              )}
               {/* Trust badges */}
               <div className="flex flex-wrap items-center justify-center gap-4 mb-8">
                 {['SOC 2 Type II', 'GDPR Compliant', 'HIPAA Ready', 'ISO 27001', '99.9% Uptime SLA'].map(label => (
@@ -8608,14 +8711,14 @@ export default function App() {
                   <div className="text-4xl font-bold text-white mb-1">Free</div>
                   <div className="text-zinc-500 text-sm mb-6">Perfect for small teams getting started</div>
                   <ul className="space-y-3 mb-8 flex-1">
-                    {['Up to 5 employees', 'Time clock & timesheets', 'Basic rewards & XP', 'Real-time earnings tracker', 'AI assistant (Swifty) - 20 msgs/mo', 'Mobile responsive'].map(f => (
+                    {['Up to 5 employees', 'Time clock & timesheets', 'Basic rewards & XP', 'Real-time earnings tracker', 'Mobile responsive'].map(f => (
                       <li key={f} className="flex items-start gap-2.5 text-sm text-zinc-300">
                         <svg className="mt-0.5 flex-shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                         {f}
                       </li>
                     ))}
                   </ul>
-                  <button className="w-full py-3 rounded-xl border border-white/20 text-sm font-semibold text-white hover:bg-white/5 transition-colors">Get started free</button>
+                  <button onClick={() => navTo('clock')} className="w-full py-3 rounded-xl border border-white/20 text-sm font-semibold text-white hover:bg-white/5 transition-colors">Get started free</button>
                 </div>
 
                 {/* Pro */}
@@ -8628,14 +8731,15 @@ export default function App() {
                   </div>
                   <div className="text-zinc-500 text-sm mb-6">Everything in Starter, plus</div>
                   <ul className="space-y-3 mb-8 flex-1">
-                    {['Unlimited employees', 'Manager hub & approvals', 'Payroll & compliance tools', 'Leave management', 'AI assistant - unlimited', 'Custom themes & backgrounds', 'Org chart & hiring tools', 'Advanced KPI dashboards', 'Priority support'].map(f => (
+                    {['Unlimited employees', 'Manager hub & approvals', 'Payroll & compliance tools', 'Leave management', 'AI assistant (Swifty) - unlimited', 'Custom themes & backgrounds', 'Org chart & hiring tools', 'Advanced KPI dashboards', 'Priority support'].map(f => (
                       <li key={f} className="flex items-start gap-2.5 text-sm text-zinc-300">
                         <svg className="mt-0.5 flex-shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                         {f}
                       </li>
                     ))}
                   </ul>
-                  <button className="w-full py-3 rounded-xl text-sm font-bold text-black transition-opacity hover:opacity-90" style={{ backgroundColor: 'var(--accent-color)' }}>Start 30-day free trial</button>
+                  <button onClick={handleStartTrial} disabled={billingBusy} className="w-full py-3 rounded-xl text-sm font-bold text-black transition-opacity hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: 'var(--accent-color)' }}>Start 30-day free trial</button>
+                  <button onClick={handleCheckout} disabled={billingBusy} className="w-full mt-2 text-xs font-semibold text-zinc-400 hover:text-white transition-colors disabled:opacity-60">or skip the trial and subscribe now →</button>
                 </div>
 
                 {/* Enterprise */}
@@ -8651,7 +8755,8 @@ export default function App() {
                       </li>
                     ))}
                   </ul>
-                  <button className="w-full py-3 rounded-xl border border-white/20 text-sm font-semibold text-white hover:bg-white/5 transition-colors">Contact sales</button>
+                  <a href="mailto:sales@swiftshift.work?subject=SwiftShift%20Enterprise%20inquiry" className="block text-center w-full py-3 rounded-xl border border-white/20 text-sm font-semibold text-white hover:bg-white/5 transition-colors">Contact sales</a>
+                  <a href="tel:+12092476694" className="block text-center mt-2 text-xs font-medium text-zinc-400 hover:text-white transition-colors">or call (209) 247-6694</a>
                 </div>
               </div>
 

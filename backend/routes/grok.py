@@ -2,13 +2,21 @@ from flask import Blueprint, jsonify, request
 import os
 import json
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, date, timedelta, timezone
 
 from openai import OpenAI
 import chromadb
 from werkzeug.utils import secure_filename
 
+from db import get_db
 from permissions import current_uid
+from routes.reports import (
+    _DEFAULT_HOURLY_RATE,
+    _OT_PREMIUM,
+    _daily_hours,
+    _overtime_by_user,
+)
+from routes.billing import swifty_access
 
 bp = Blueprint("grok", __name__)
 
@@ -130,12 +138,193 @@ def upload():
         return jsonify({"error": str(e)}), 500
 
 
+# --- Swifty live-data helpers: read-only views of the caller's own data --------
+# Identity always comes from current_uid() (the session), never from the request
+# body or anything the model supplies, so Swifty can never read another user.
+
+def _local_today_iso(tz_name):
+    """The user's local calendar date (their company timezone) as YYYY-MM-DD."""
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo(tz_name or "America/New_York")).date().isoformat()
+    except Exception:
+        return datetime.now(timezone.utc).date().isoformat()
+
+
+def _end_of_month(d):
+    nxt = date(d.year + 1, 1, 1) if d.month == 12 else date(d.year, d.month + 1, 1)
+    return nxt - timedelta(days=1)
+
+
+def _pay_period_window(pay_period, today):
+    """(start, end) YYYY-MM-DD for the pay period containing `today` (a date).
+    Anchored deterministically so it works without a stored cycle-start date."""
+    pp = (pay_period or "biweekly").lower()
+    if pp == "weekly":
+        start = today - timedelta(days=today.weekday())  # Monday
+        end = start + timedelta(days=6)
+    elif pp == "semimonthly":
+        if today.day <= 15:
+            start, end = today.replace(day=1), today.replace(day=15)
+        else:
+            start, end = today.replace(day=16), _end_of_month(today)
+    elif pp == "monthly":
+        start, end = today.replace(day=1), _end_of_month(today)
+    else:  # biweekly (default): 14-day blocks anchored on a known Monday
+        anchor = date(2024, 1, 1)
+        idx = (today - anchor).days // 14
+        start = anchor + timedelta(days=idx * 14)
+        end = start + timedelta(days=13)
+    return start.isoformat(), end.isoformat()
+
+
+def _user_context(db, uid):
+    row = db.execute(
+        "SELECT u.first_name, u.last_name, u.job_role, u.hourly_rate, u.company_id, "
+        "c.name AS company_name, c.pay_period, c.timezone "
+        "FROM users u LEFT JOIN companies c ON c.id = u.company_id WHERE u.id = ?",
+        (uid,),
+    ).fetchone()
+    return dict(row) if row else {}
+
+
+def _user_hours(db, uid, start, end):
+    """Worked hours for one user in [start, end], reusing the canonical reports
+    math (clock_sessions + time_entries, with 8h/day & 40h/week overtime)."""
+    daily = _daily_hours(db, start, end)
+    mine = {k: v for k, v in daily.items() if k[0] == uid}
+    total = round(sum(mine.values()), 2)
+    overtime = round(_overtime_by_user(mine).get(uid, 0.0), 2)
+    regular = round(max(0.0, total - overtime), 2)
+    by_day = [
+        {"date": d, "hours": round(h, 2)}
+        for (u, d), h in sorted(mine.items(), key=lambda kv: kv[0][1])
+    ]
+    return {"total_hours": total, "regular_hours": regular, "overtime_hours": overtime, "by_day": by_day}
+
+
+_SWIFTY_TOOLS = [
+    {"type": "function", "function": {
+        "name": "get_my_profile",
+        "description": "The current user's name, job role, hourly rate, company, pay-period cadence, and timezone.",
+        "parameters": {"type": "object", "properties": {}},
+    }},
+    {"type": "function", "function": {
+        "name": "get_clock_status",
+        "description": "Whether the user is currently clocked in, since when (UTC), and hours already completed today.",
+        "parameters": {"type": "object", "properties": {}},
+    }},
+    {"type": "function", "function": {
+        "name": "get_current_pay_period_hours",
+        "description": "Hours the user has worked so far in their CURRENT pay period, with a regular/overtime split and estimated gross and net pay. Use this for 'how many hours have I worked this pay period'.",
+        "parameters": {"type": "object", "properties": {}},
+    }},
+    {"type": "function", "function": {
+        "name": "get_hours_for_range",
+        "description": "Total worked hours (regular + overtime) for an explicit date range.",
+        "parameters": {"type": "object", "properties": {
+            "start_date": {"type": "string", "description": "YYYY-MM-DD"},
+            "end_date": {"type": "string", "description": "YYYY-MM-DD"},
+        }, "required": ["start_date", "end_date"]},
+    }},
+    {"type": "function", "function": {
+        "name": "get_recent_timesheets",
+        "description": "The user's most recently submitted timesheets (period dates and total hours).",
+        "parameters": {"type": "object", "properties": {"limit": {"type": "integer"}}},
+    }},
+]
+
+
+def _build_swifty_tools(uid):
+    """Bind the read-only data tools to one user id. Each opens its own short DB
+    connection; every query is scoped to `uid`."""
+
+    def get_my_profile(_args=None):
+        with get_db() as db:
+            ctx = _user_context(db, uid)
+        return {
+            "name": f"{ctx.get('first_name', '')} {ctx.get('last_name', '')}".strip(),
+            "job_role": ctx.get("job_role"),
+            "hourly_rate": ctx.get("hourly_rate") or _DEFAULT_HOURLY_RATE,
+            "company": ctx.get("company_name"),
+            "pay_period": ctx.get("pay_period") or "biweekly",
+            "timezone": ctx.get("timezone"),
+        }
+
+    def get_clock_status(_args=None):
+        with get_db() as db:
+            ctx = _user_context(db, uid)
+            row = db.execute(
+                "SELECT id, clock_in FROM clock_sessions WHERE employee_id = ? AND clock_out IS NULL ORDER BY id DESC LIMIT 1",
+                (uid,),
+            ).fetchone()
+            today = _local_today_iso(ctx.get("timezone"))
+            completed = _user_hours(db, uid, today, today)["total_hours"]
+        if row:
+            return {"clocked_in": True, "since_utc": str(row["clock_in"]), "completed_hours_today": completed}
+        return {"clocked_in": False, "completed_hours_today": completed}
+
+    def get_current_pay_period_hours(_args=None):
+        with get_db() as db:
+            ctx = _user_context(db, uid)
+            today_iso = _local_today_iso(ctx.get("timezone"))
+            start, end = _pay_period_window(ctx.get("pay_period"), date.fromisoformat(today_iso))
+            worked = _user_hours(db, uid, start, end)
+            rate = float(ctx.get("hourly_rate") or _DEFAULT_HOURLY_RATE)
+        gross = worked["regular_hours"] * rate + worked["overtime_hours"] * rate * (1 + _OT_PREMIUM)
+        deductions = gross * (0.12 + 0.05 + 0.0765)
+        return {
+            "pay_period": ctx.get("pay_period") or "biweekly",
+            "period_start": start,
+            "period_end": end,
+            "as_of": today_iso,
+            "hourly_rate": rate,
+            "estimated_gross": round(gross, 2),
+            "estimated_net": round(gross - deductions, 2),
+            **worked,
+        }
+
+    def get_hours_for_range(args):
+        start = str((args or {}).get("start_date") or "")[:10]
+        end = str((args or {}).get("end_date") or "")[:10]
+        try:
+            date.fromisoformat(start)
+            date.fromisoformat(end)
+        except ValueError:
+            return {"error": "start_date and end_date must be YYYY-MM-DD"}
+        with get_db() as db:
+            worked = _user_hours(db, uid, start, end)
+        return {"start_date": start, "end_date": end, **worked}
+
+    def get_recent_timesheets(args):
+        try:
+            limit = max(1, min(24, int((args or {}).get("limit", 6))))
+        except (TypeError, ValueError):
+            limit = 6
+        with get_db() as db:
+            rows = db.execute(
+                "SELECT period_start, period_end, total_hours, submitted_at "
+                "FROM timesheet_submissions WHERE user_id = ? ORDER BY period_start DESC LIMIT ?",
+                (uid, limit),
+            ).fetchall()
+        return {"timesheets": [dict(r) for r in rows]}
+
+    return {
+        "get_my_profile": get_my_profile,
+        "get_clock_status": get_clock_status,
+        "get_current_pay_period_hours": get_current_pay_period_hours,
+        "get_hours_for_range": get_hours_for_range,
+        "get_recent_timesheets": get_recent_timesheets,
+    }
+
+
 @bp.route("/api/grok/chat", methods=["POST"])
 def chat():
     data = request.get_json() or {}
     message = data.get("message", "").strip()
     file_id = data.get("file_id", "").strip()
-    user_id = str(current_uid() or "")
+    uid = current_uid()
+    user_id = str(uid or "")
     if not message and not file_id:
         return jsonify({"error": "message or file_id required"}), 400
 
@@ -143,23 +332,30 @@ def chat():
     if not api_key:
         return jsonify({"error": "XAI_API_KEY not configured"}), 500
 
+    # Swifty is a Pro feature. The gate only engages once billing is fully
+    # configured, so nobody is ever trapped without a path to upgrade.
     try:
-        client = OpenAI(
-            api_key=api_key,
-            base_url="https://api.x.ai/v1",
-            timeout=60,
-        )
+        with get_db() as db:
+            access = swifty_access(db, uid)
+    except Exception:
+        access = {"allowed": True}
+    if not access.get("allowed", True):
+        return jsonify({"response": (
+            "Swifty is part of SwiftShift Pro. Start your free 30-day trial or upgrade on the "
+            "Pricing page, and I can answer questions about your hours, pay, and schedule."
+        )})
 
-        # RAG: retrieve relevant context from user's ChromaDB if user_id provided
+    try:
+        client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1", timeout=60)
+
+        # RAG: retrieve relevant context from the user's uploaded documents.
         rag_context = ""
         if user_id and message:
             try:
                 _, coll = get_or_create_chroma(user_id)
-                # Fetch more candidates, rerank by cosine similarity (lower distance = better)
                 results = coll.query(query_texts=[message], n_results=10)
                 chunks = results.get("documents", [[]])[0]
                 distances = results.get("distances", [[]])[0] or [0] * len(chunks)
-                # Filter by cosine distance threshold and take top 5
                 scored = [(c, d) for c, d in zip(chunks, distances) if d < 1.5]
                 scored.sort(key=lambda x: x[1])
                 top_chunks = [c for c, _ in scored[:5]]
@@ -168,14 +364,34 @@ def chat():
             except Exception:
                 pass
 
+        # Identity-aware system prompt. Shift/pay data is NOT inlined here; Swifty
+        # pulls it live via tools, scoped server-side to this user.
+        try:
+            with get_db() as db:
+                uctx = _user_context(db, uid)
+        except Exception:
+            uctx = {}
+        display_name = f"{uctx.get('first_name', '')} {uctx.get('last_name', '')}".strip()
+        today_iso = _local_today_iso(uctx.get("timezone"))
+        who = display_name or "an employee"
+        if uctx.get("job_role"):
+            who += f", a {uctx['job_role']}"
+        if uctx.get("company_name"):
+            who += f" at {uctx['company_name']}"
         system_prompt = (
-            "You are Grokky, a helpful general assistant. "
-            "Use the user's uploaded documents as context when relevant. "
-            "If context is provided and relevant to the question, use it; otherwise answer from general knowledge. Be concise."
+            "You are Swifty, the built-in AI assistant for SwiftShift, a workforce "
+            "time-tracking and payroll app. "
+            f"You are helping {who}. Today is {today_iso}. "
+            "You can call tools to read this user's real SwiftShift data: hours worked, "
+            "clock-in status, current pay period, recent timesheets, and profile. When the "
+            "user asks about their hours, pay, pay period, schedule, or clock status, ALWAYS "
+            "call the matching tool and answer from the returned data instead of asking them "
+            "to provide it. All tool data is already scoped to this user. Use the user's "
+            "uploaded documents as context when relevant. Be concise and friendly."
         )
 
         if file_id:
-            # Use Responses API for file attachment support
+            # File analysis goes through the Responses API (tools not needed here).
             resp = client.responses.create(
                 model="grok-4.20-0309-reasoning",
                 input=[
@@ -189,17 +405,51 @@ def chat():
                     },
                 ],
             )
-            answer = resp.output_text
-        else:
-            messages = [{"role": "system", "content": system_prompt}]
-            if rag_context:
-                messages.append({"role": "system", "content": rag_context})
-            messages.append({"role": "user", "content": message})
+            return jsonify({"response": resp.output_text})
+
+        # Tool-calling loop: Swifty decides which data to pull, we run the query
+        # (scoped to current_uid) and feed it back, until it produces an answer.
+        tool_impl = _build_swifty_tools(uid)
+        messages = [{"role": "system", "content": system_prompt}]
+        if rag_context:
+            messages.append({"role": "system", "content": rag_context})
+        messages.append({"role": "user", "content": message})
+
+        answer = None
+        for _ in range(6):  # max 6 tool-call rounds
             resp = client.chat.completions.create(
                 model="grok-4.20-0309-reasoning",
                 messages=messages,
+                tools=_SWIFTY_TOOLS,
+                tool_choice="auto",
             )
-            answer = resp.choices[0].message.content
+            msg = resp.choices[0].message
+            assistant_msg = {"role": "assistant", "content": msg.content}
+            if msg.tool_calls:
+                # Re-serialize tool calls as plain dicts so the next round-trip
+                # sends JSON-safe messages, not SDK Pydantic objects.
+                assistant_msg["tool_calls"] = [
+                    {"id": tc.id, "type": "function",
+                     "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
+                    for tc in msg.tool_calls
+                ]
+            messages.append(assistant_msg)
+            if not msg.tool_calls:
+                answer = msg.content
+                break
+            for tc in msg.tool_calls:
+                try:
+                    t_args = json.loads(tc.function.arguments or "{}")
+                except Exception:
+                    t_args = {}
+                impl = tool_impl.get(tc.function.name)
+                try:
+                    result = impl(t_args) if impl else {"error": "unknown tool"}
+                except Exception as exc:
+                    result = {"error": f"could not load data: {exc}"}
+                messages.append({"role": "tool", "tool_call_id": tc.id, "content": json.dumps(result, default=str)})
+        if answer is None:
+            answer = "I wasn't able to finish looking that up. Could you rephrase your question?"
 
         return jsonify({"response": answer})
     except Exception as e:

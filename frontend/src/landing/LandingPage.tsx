@@ -317,6 +317,7 @@ export default function LandingPage() {
           <span className="font-semibold tracking-[0.18em] text-sm">SWIFTSHIFT</span>
         </a>
         <div className="flex items-center gap-2">
+          <a href="contact" className="lp-btn lp-btn--ghost">Contact</a>
           <a href="login" className="lp-btn lp-btn--ghost">Sign in</a>
           <a href="signup" className="lp-btn">Create account</a>
         </div>
@@ -534,6 +535,7 @@ export default function LandingPage() {
         </div>
         <footer className="mt-[14vh] pt-8 border-t border-white/10 flex flex-wrap items-center justify-between gap-4 text-[11px]" style={{ color: 'var(--lp-faint)' }}>
           <span>© 2026 <span style={{ color: 'var(--lp-accent)' }}>SwiftShift</span>. All rights reserved.</span>
+          <a href="contact" className="hover:opacity-80 transition-opacity" style={{ color: 'var(--lp-dim)' }}>Contact us</a>
           <span className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--lp-accent)' }} />
             System status: online

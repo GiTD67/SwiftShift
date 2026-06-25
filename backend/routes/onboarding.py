@@ -66,6 +66,26 @@ def _ensure_tables():
             "onboarding_complete BOOLEAN DEFAULT FALSE",
         ):
             db.execute(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col_def}")
+        # SaaS subscription / free-trial state lives on the company (per-workspace
+        # billing). Added here because onboarding owns the companies table and
+        # creates new companies; routes/billing.py only ever reads these columns.
+        for col_def in (
+            "plan TEXT NOT NULL DEFAULT 'starter'",
+            "subscription_status TEXT NOT NULL DEFAULT 'trialing'",
+            "trial_started_at TEXT",
+            "trial_ends_at TEXT",
+            "billing_customer_id TEXT",
+            "billing_subscription_id TEXT",
+        ):
+            db.execute(f"ALTER TABLE companies ADD COLUMN IF NOT EXISTS {col_def}")
+        # Grandfather every company that existed before billing shipped (i.e. has
+        # no trial timestamp) to unlimited Pro, so current customers are never
+        # paywalled. New companies created from now on record a real trial
+        # timestamp at creation, so this UPDATE never touches them.
+        db.execute(
+            "UPDATE companies SET subscription_status = 'grandfathered', plan = 'pro' "
+            "WHERE trial_started_at IS NULL AND subscription_status <> 'grandfathered'"
+        )
 
 
 safe_bootstrap(_ensure_tables)
@@ -223,9 +243,13 @@ def create_company():
             return jsonify({"error": "already in a company"}), 409
         # One transaction (commit on with-exit): the creator becomes a manager
         # of their own new company.
+        # A new company starts a 30-day Pro free trial the moment it is created.
+        # Recording trial_started_at here is also what keeps it out of the
+        # grandfather UPDATE in _ensure_tables (which only touches NULL ones).
         company = db.execute(
-            f"""INSERT INTO companies (name, timezone, pay_period, overtime_policy, created_by)
-               VALUES (?, ?, ?, ?, ?)
+            f"""INSERT INTO companies (name, timezone, pay_period, overtime_policy, created_by,
+                                       plan, subscription_status, trial_started_at, trial_ends_at)
+               VALUES (?, ?, ?, ?, ?, 'starter', 'trialing', NOW()::text, (NOW() + INTERVAL '30 days')::text)
                RETURNING {_COMPANY_COLS}""",
             (
                 fields["name"],
