@@ -34,6 +34,14 @@ _SALES_SYSTEM_PROMPT = (
 )
 
 
+@bp.route("/api/live-chat/status", methods=["GET"])
+def status():
+    """Honest availability: the green "agents available" indicator only lights up
+    when the AI assistant is actually configured. Otherwise the widget presents
+    itself as an email contact form, not a live agent."""
+    return jsonify({"available": bool(os.environ.get("XAI_API_KEY"))})
+
+
 @bp.route("/api/live-chat/ask", methods=["POST"])
 @limiter.limit("20 per minute")
 def ask():
@@ -86,8 +94,11 @@ def ask():
 @limiter.limit("5 per minute")
 def contact():
     data = request.get_json(silent=True) or {}
-    name = (data.get("name") or "").strip()[:120]
-    email = (data.get("email") or "").strip()[:254]
+    # Strip CR/LF so a crafted name/email can't poison the email subject line.
+    def _clean(v, n):
+        return (v or "").replace("\r", " ").replace("\n", " ").strip()[:n]
+    name = _clean(data.get("name"), 120)
+    email = _clean(data.get("email"), 254)
     message = (data.get("message") or "").strip()[:4000]
     if not email or "@" not in email:
         return jsonify({"error": "a valid email is required"}), 400

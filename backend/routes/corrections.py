@@ -182,14 +182,19 @@ def approve_correction(req_id):
         new_in = _parse_iso(row["proposed_clock_in"])
         new_out = _parse_iso(row["proposed_clock_out"])
         break_minutes = int(sess["break_minutes"] or 0)
-        total_minutes = int((new_out - new_in).total_seconds() / 60)
+        total_seconds = (new_out - new_in).total_seconds()
+        total_minutes = int(total_seconds / 60)
         net_minutes = max(0, total_minutes - break_minutes)
+        # Keep the second-precise column in step with the corrected times; the
+        # frontend prefers duration_seconds, so leaving it stale would show the
+        # pre-correction worked time. duration_minutes math is unchanged.
+        net_seconds = max(0, round(total_seconds - break_minutes * 60))
         # The corrected clock-in can change which day the session belongs to, so
         # keep local_date in step with it (date of the new naive-UTC clock_in).
         corrected_local_date = _to_naive_utc(new_in).isoformat()[:10]
         db.execute(
-            "UPDATE clock_sessions SET clock_in = ?, clock_out = ?, duration_minutes = ?, local_date = ? WHERE id = ?",
-            (_to_naive_utc(new_in).isoformat(), _to_naive_utc(new_out).isoformat(), net_minutes, corrected_local_date, row["session_id"]),
+            "UPDATE clock_sessions SET clock_in = ?, clock_out = ?, duration_minutes = ?, duration_seconds = ?, local_date = ? WHERE id = ?",
+            (_to_naive_utc(new_in).isoformat(), _to_naive_utc(new_out).isoformat(), net_minutes, net_seconds, corrected_local_date, row["session_id"]),
         )
         db.execute(
             "UPDATE clock_correction_requests SET status = 'approved', reviewed_by = ?, reviewed_at = ? WHERE id = ?",

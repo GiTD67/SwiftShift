@@ -456,12 +456,13 @@ def _handle_billing_event(event_type, event):
     elif event_type in ("customer.subscription.created", "customer.subscription.updated"):
         _apply_subscription(obj)
     elif event_type == "customer.subscription.deleted":
-        cid, _prior = _set_status_by_customer(_customer_id_of(obj), "canceled", plan="starter")
-        if cid is not None:
+        cid, prior = _set_status_by_customer(_customer_id_of(obj), "canceled", plan="starter")
+        # Only on the transition, so a retried webhook (new event id) doesn't re-email.
+        if cid is not None and prior != "canceled":
             notify_billing_event(cid, "canceled")
     elif event_type == "invoice.payment_failed":
-        cid, _prior = _set_status_by_customer(_customer_id_of(obj), "past_due")
-        if cid is not None:
+        cid, prior = _set_status_by_customer(_customer_id_of(obj), "past_due")
+        if cid is not None and prior != "past_due":
             notify_billing_event(cid, "payment_failed")
     elif event_type in ("invoice.paid", "invoice.payment_succeeded"):
         cid, prior = _set_status_by_customer(_customer_id_of(obj), "active", plan="pro")

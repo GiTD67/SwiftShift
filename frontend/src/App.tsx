@@ -2959,13 +2959,15 @@ export default function App() {
   const prefsHydratedRef = useRef(false)
   useEffect(() => {
     if (!user?.id) return
+    // Reset on account change so the save effect can't push the previous user's
+    // values before this user's prefs have loaded.
+    prefsHydratedRef.current = false
     fetch(`${API_BASE}/api/users/me/preferences`)
       .then(r => (r.ok ? r.json() : null))
       .then(p => {
-        if (p && typeof p === 'object' && !p.error) {
-          // Only apply keys the server has actually stored; absent keys keep the
-          // current (localStorage-derived) value, which the save effect then
-          // pushes up - migrating existing users' local prefs to the server.
+        const hasKeys = p && typeof p === 'object' && !p.error && Object.keys(p).length > 0
+        if (hasKeys) {
+          // Apply the keys the server has stored.
           if (typeof p.theme === 'string') setTheme(p.theme as typeof theme)
           if (typeof p.customAccent === 'string') setCustomAccentColor(p.customAccent)
           if (typeof p.backgroundStyle === 'string') setBackgroundStyle(p.backgroundStyle)
@@ -2974,6 +2976,19 @@ export default function App() {
           if (Array.isArray(p.sidebarOrder)) setSidebarOrder(p.sidebarOrder)
           if (Array.isArray(p.favoriteTabs)) setFavoriteTabs(p.favoriteTabs)
           if (typeof p.workState === 'string') setWorkState(p.workState)
+        } else if (p && !p.error) {
+          // First login on this account: seed the server from the current
+          // (localStorage-derived) prefs so existing customizations migrate up
+          // and start syncing across devices. The debounced save effect alone
+          // wouldn't fire here because no pref value changes.
+          fetch(`${API_BASE}/api/users/me/preferences`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              theme, customAccent: customAccentColor, backgroundStyle, avatarFrame,
+              masterMode: isMasterMode, sidebarOrder, favoriteTabs, workState,
+            }),
+          }).catch(() => {})
         }
       })
       .catch(() => {})

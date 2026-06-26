@@ -303,8 +303,8 @@ _MAX_PREFS_BYTES = 20000  # generous cap; guards against a runaway/abusive blob
 def _load_preferences(db, uid):
     """Return the user's stored preferences dict (only explicitly-saved keys), or
     None if the user is gone. Unset keys are absent so the client can distinguish
-    'never saved' from 'saved to a default' and seed the server from localStorage."""
-    db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS user_preferences TEXT")
+    'never saved' from 'saved to a default' and seed the server from localStorage.
+    The user_preferences column is created at startup by auth._ensure_users_table."""
     row = db.execute("SELECT user_preferences FROM users WHERE id = ?", (uid,)).fetchone()
     if not row:
         return None
@@ -322,7 +322,6 @@ def get_my_preferences():
         return jsonify({"error": "authentication required"}), 401
     with get_db() as db:
         prefs = _load_preferences(db, uid)
-        db.commit()
     if prefs is None:
         return jsonify({"error": "not found"}), 404
     return jsonify(prefs)

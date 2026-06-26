@@ -425,53 +425,33 @@ def signin():
 def google_auth():
     data = request.get_json() or {}
     credential = data.get("credential")
-    access_token = data.get("access_token")
+    if not credential:
+        return jsonify({"error": "credential required"}), 400
 
-    google_user = None
-    google_sub = None
-    email_verified_claim = False
-
-    if credential:
-        # Google Identity Services "Sign in with Google" issues a credential (an
-        # id_token JWT). Verify it via Google's tokeninfo endpoint and confirm the
-        # audience is OUR client id, so a token minted for another app is rejected.
-        client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
-        if not client_id:
-            return jsonify({"error": "Google sign-in is not configured"}), 503
-        try:
-            resp = http_requests.get(
-                "https://oauth2.googleapis.com/tokeninfo",
-                params={"id_token": credential},
-                timeout=10,
-            )
-            if not resp.ok:
-                return jsonify({"error": "Invalid Google token"}), 401
-            tok = resp.json()
-        except Exception:
-            return jsonify({"error": "Google verification failed"}), 500
-        if tok.get("aud") != client_id:
-            return jsonify({"error": "Google token audience mismatch"}), 401
-        google_user = tok
-        google_sub = tok.get("sub")
-        email_verified_claim = str(tok.get("email_verified", "")).lower() == "true"
-    elif access_token:
-        # Legacy access-token flow (older Google Sign-In JS SDK). Kept for
-        # backward compatibility.
-        try:
-            resp = http_requests.get(
-                "https://www.googleapis.com/oauth2/v3/userinfo",
-                headers={"Authorization": f"Bearer {access_token}"},
-                timeout=10,
-            )
-            if not resp.ok:
-                return jsonify({"error": "Invalid Google token"}), 401
-            google_user = resp.json()
-        except Exception:
-            return jsonify({"error": "Google verification failed"}), 500
-        google_sub = google_user.get("sub")
-        email_verified_claim = bool(google_user.get("email_verified"))
-    else:
-        return jsonify({"error": "credential or access_token required"}), 400
+    # Google Identity Services "Sign in with Google" issues a credential (an
+    # id_token JWT). Verify it via Google's tokeninfo endpoint and confirm the
+    # audience is OUR client id, so a token minted for another app is rejected.
+    # Only the verified-credential flow is accepted: a bare access_token would let
+    # any Google token (issued to any app) link or take over an account by email.
+    client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+    if not client_id:
+        return jsonify({"error": "Google sign-in is not configured"}), 503
+    try:
+        resp = http_requests.get(
+            "https://oauth2.googleapis.com/tokeninfo",
+            params={"id_token": credential},
+            timeout=10,
+        )
+        if not resp.ok:
+            return jsonify({"error": "Invalid Google token"}), 401
+        tok = resp.json()
+    except Exception:
+        return jsonify({"error": "Google verification failed"}), 500
+    if tok.get("aud") != client_id:
+        return jsonify({"error": "Google token audience mismatch"}), 401
+    google_user = tok
+    google_sub = tok.get("sub")
+    email_verified_claim = str(tok.get("email_verified", "")).lower() == "true"
 
     email = google_user.get("email", "")
     given_name = google_user.get("given_name") or ""
@@ -489,7 +469,7 @@ def google_auth():
             row = db.execute(
                 "INSERT INTO users (first_name, last_name, email, password_hash, is_fulltime, is_manager, email_verified, google_sub)"
                 " VALUES (?, ?, ?, ?, 1, ?, ?, ?)"
-                " RETURNING id, first_name, last_name, email, job_role, manager_name, is_fulltime, pay, salary, hourly_rate, pto_accrual_rate, streak_count, streak_last_date, is_manager",
+                " RETURNING id, first_name, last_name, email, job_role, manager_name, is_fulltime, pay, salary, hourly_rate, pto_accrual_rate, streak_count, streak_last_date, is_manager, email_verified",
                 (given_name or "Google", family_name or "User", email, "google-oauth",
                  email.strip().lower() == FOUNDER_EMAIL, email_verified_claim, google_sub),
             ).fetchone()

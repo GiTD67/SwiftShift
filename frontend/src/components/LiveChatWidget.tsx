@@ -21,11 +21,23 @@ export function LiveChatWidget() {
   const [handoffDone, setHandoffDone] = useState(false)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  // null = unknown (still loading); only an explicit true lights the green
+  // "agents available" indicator, so we never claim availability we don't have.
+  const [available, setAvailable] = useState<boolean | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    fetch('/api/live-chat/status')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => setAvailable(!!(d && d.available)))
+      .catch(() => setAvailable(false))
+  }, [])
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages, open, showHandoff, handoffDone])
+
+  const isLive = available === true
 
   const send = async () => {
     const text = input.trim()
@@ -88,11 +100,13 @@ export function LiveChatWidget() {
           {/* Header */}
           <div className="flex items-center gap-2.5 px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
             <span style={{ position: 'relative', display: 'inline-flex' }}>
-              <span className="animate-pulse" style={{ width: 9, height: 9, borderRadius: '50%', background: ACCENT, boxShadow: `0 0 8px ${ACCENT}` }} />
+              <span className={isLive ? 'animate-pulse' : ''} style={{ width: 9, height: 9, borderRadius: '50%', background: isLive ? ACCENT : 'rgba(255,255,255,0.4)', boxShadow: isLive ? `0 0 8px ${ACCENT}` : 'none' }} />
             </span>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-semibold text-white leading-tight">SwiftShift Help</div>
-              <div className="text-[11px]" style={{ color: ACCENT }}>Agents available now</div>
+              <div className="text-[11px]" style={{ color: isLive ? ACCENT : 'rgba(244,244,245,0.5)' }}>
+                {isLive ? 'Agents available now' : 'Leave a message, we reply by email'}
+              </div>
             </div>
             <button onClick={() => setOpen(false)} aria-label="Close chat" className="text-white/50 hover:text-white transition-colors p-1">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
@@ -187,7 +201,7 @@ export function LiveChatWidget() {
       {/* Launcher */}
       <button
         onClick={() => setOpen(o => !o)}
-        aria-label={open ? 'Minimize chat' : 'Chat with us, agents available'}
+        aria-label={open ? 'Minimize chat' : (isLive ? 'Chat with us, agents available' : 'Chat with us')}
         className="flex items-center gap-2.5 font-semibold transition-transform hover:scale-105 active:scale-95"
         style={{
           marginLeft: 'auto',
@@ -204,7 +218,7 @@ export function LiveChatWidget() {
         ) : (
           <>
             <span style={{ position: 'relative', display: 'inline-flex' }}>
-              <span className="animate-pulse" style={{ width: 9, height: 9, borderRadius: '50%', background: ACCENT, boxShadow: `0 0 8px ${ACCENT}` }} />
+              <span className={isLive ? 'animate-pulse' : ''} style={{ width: 9, height: 9, borderRadius: '50%', background: isLive ? ACCENT : 'rgba(255,255,255,0.5)', boxShadow: isLive ? `0 0 8px ${ACCENT}` : 'none' }} />
             </span>
             <span className="text-sm">Chat with us</span>
           </>
