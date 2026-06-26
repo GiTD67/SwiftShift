@@ -6,10 +6,11 @@ employees. Billing reuses the same Stripe account and secret key
 (STRIPE_SECRET_KEY) but its own recurring price (STRIPE_PRICE_PRO) and its own
 webhook signing secret (STRIPE_BILLING_WEBHOOK_SECRET).
 
-Trial / plan state lives on the companies table (per-workspace). Companies that
-existed before billing shipped are grandfathered to unlimited Pro in
-onboarding._ensure_tables, so nothing breaks for current customers; only
-companies created after a trial timestamp is recorded go through trial -> paywall.
+Trial / plan state lives on the companies table (per-workspace). Every company
+gets a 30-day free trial: companies that predate billing (no trial timestamp and
+no Stripe customer on record) are migrated to a fresh 30-day trial at boot in
+onboarding._ensure_tables, then become read-only until upgraded. Paying customers
+(a Stripe customer/subscription on record, or active/past_due) are never reset.
 
 Honesty constraint mirrors payments.py: with STRIPE_SECRET_KEY unset,
 /api/billing/status reports configured:false, checkout/portal return 503, and the
@@ -235,7 +236,9 @@ def start_trial():
         # fresh free trial (no trial farming); it must manage billing instead.
         if company.get("billing_subscription_id"):
             return jsonify({"error": "subscription exists; manage it in billing"}), 409
-        if (company.get("subscription_status") or "") in ("grandfathered", "active", "trialing"):
+        # past_due / canceled workspaces have engaged Stripe; they must fix or
+        # restart billing, never drop back to a fresh free trial (no trial farming).
+        if (company.get("subscription_status") or "") in ("grandfathered", "active", "trialing", "past_due", "canceled"):
             return jsonify(_entitlement(company))
         started = _now()
         ends = started + timedelta(days=_TRIAL_DAYS)

@@ -80,13 +80,21 @@ def _ensure_tables():
             "billing_subscription_id TEXT",
         ):
             db.execute(f"ALTER TABLE companies ADD COLUMN IF NOT EXISTS {col_def}")
-        # Grandfather every company that existed before billing shipped (i.e. has
-        # no trial timestamp) to unlimited Pro, so current customers are never
-        # paywalled. New companies created from now on record a real trial
-        # timestamp at creation, so this UPDATE never touches them.
+        # The 30-day free trial applies to every workspace, including ones that
+        # predate billing. Any company with no trial timestamp yet (legacy /
+        # pre-billing) is started on a fresh 30-day trial from now, so it shows a
+        # real countdown and then converts to read-only until upgraded. We never
+        # touch a company that has its own trial timestamp (new signups) or that
+        # has ever engaged Stripe (a billing customer/subscription on record), so
+        # paying customers are never reset, even ones whose subscription later
+        # went canceled/past_due. After the first boot the timestamp is set, so
+        # this is a no-op on every later boot (no trial reset / no trial farming).
         db.execute(
-            "UPDATE companies SET subscription_status = 'grandfathered', plan = 'pro' "
-            "WHERE trial_started_at IS NULL AND subscription_status <> 'grandfathered'"
+            "UPDATE companies SET subscription_status = 'trialing', plan = 'starter', "
+            "trial_started_at = NOW()::text, "
+            "trial_ends_at = (NOW() + INTERVAL '30 days')::text "
+            "WHERE trial_started_at IS NULL AND billing_customer_id IS NULL "
+            "AND billing_subscription_id IS NULL"
         )
 
 

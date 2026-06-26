@@ -11,6 +11,11 @@ from db import get_db  # noqa: F401  # ensure db module is loaded
 from limiter import limiter
 from routes import health_bp, employees_bp, time_entries_bp, clock_sessions_bp, users_bp, grok_bp, jobs_bp, timesheet_submissions_bp, pto_bp, availability_bp, shift_swaps_bp, holidays_bp, reports_bp, audit_log_bp, corrections_bp, org_settings_bp, open_shifts_bp, export_bp, onboarding_bp, payments_bp, billing_bp, live_chat_bp
 from auth import bp as auth_bp
+from routes.billing import (
+    entitlement_for_uid,
+    _configured as _billing_configured,
+    _price_id as _billing_price_id,
+)
 
 frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 
@@ -48,6 +53,11 @@ limiter.init_app(app)
 _PUBLIC_API_PREFIXES = ("/api/auth/", "/api/kalshi/", "/api/live-chat/")
 _PUBLIC_API_PATHS = ("/api/health", "/api/onboarding/invites/lookup", "/api/stripe/webhook", "/api/stripe/billing-webhook")
 
+# Routes that stay writable even after a trial lapses, so a locked-out workspace
+# can still pay, sign out, or reach support.
+_READONLY_EXEMPT_PREFIXES = ("/api/auth/", "/api/billing/", "/api/live-chat/")
+_WRITE_METHODS = ("POST", "PUT", "PATCH", "DELETE")
+
 
 @app.before_request
 def _require_login_for_api():
@@ -59,8 +69,27 @@ def _require_login_for_api():
         return None  # let CORS preflight through
     if path in _PUBLIC_API_PATHS or any(path.startswith(prefix) for prefix in _PUBLIC_API_PREFIXES):
         return None
-    if not session.get("uid"):
+    uid = session.get("uid")
+    if not uid:
         return jsonify({"error": "authentication required"}), 401
+    # Read-only paywall: once a workspace's free trial (or paid subscription) has
+    # lapsed, reads still work but writes are blocked with 402 until it upgrades.
+    # Billing/auth/support routes stay open so the workspace can recover. The gate
+    # only engages when billing is fully configured, so unconfigured envs never
+    # lock anyone out (mirrors the Swifty gate's fail-open).
+    if request.method in _WRITE_METHODS and _billing_configured() and _billing_price_id():
+        if not any(path.startswith(p) for p in _READONLY_EXEMPT_PREFIXES):
+            try:
+                with get_db() as db:
+                    ent = entitlement_for_uid(db, uid)
+                if not ent.get("entitled"):
+                    return jsonify({
+                        "error": "billing_required",
+                        "read_only": True,
+                        "message": "This workspace is in read-only mode. Visit billing to restore access.",
+                    }), 402
+            except Exception:
+                pass  # never hard-fail a write because the entitlement check errored
     return None
 
 

@@ -2804,6 +2804,34 @@ export default function App() {
     refreshBillingStatus()
   }, [user?.id, refreshBillingStatus])
 
+  // Read-only guard: when the trial has lapsed the server blocks writes with 402.
+  // There is no central fetch wrapper, so patch window.fetch once for the app's
+  // lifetime to turn any 402 into a single explanatory toast (throttled) and a
+  // billing refresh, instead of a silent failure. Reads (GET) are never blocked.
+  useEffect(() => {
+    const orig = window.fetch
+    const boundOrig = orig.bind(window)
+    let lastPrompt = 0
+    window.fetch = async (...args: Parameters<typeof orig>) => {
+      const res = await boundOrig(...args)
+      // Only react to OUR backend's 402 (read-only paywall); ignore any 402 from a
+      // third-party script so its quota/billing error never shows our trial toast.
+      if (res.status === 402) {
+        const req = args[0]
+        const url = typeof req === 'string' ? req : req instanceof URL ? req.href : (req as Request).url
+        const ourApi = url.startsWith('/api/') || url.startsWith(`${window.location.origin}/api/`)
+        const now = Date.now()
+        if (ourApi && now - lastPrompt > 4000) {
+          lastPrompt = now
+          toast.error('Changes are locked', { description: 'This workspace is read-only. Open billing to restore access.' })
+          refreshBillingStatus()
+        }
+      }
+      return res
+    }
+    return () => { window.fetch = orig }
+  }, [refreshBillingStatus])
+
   // Return-from-Stripe handling: funding=success|cancel (company bank Checkout)
   // and payouts=return|refresh (Express onboarding links). Refetch status, toast,
   // and strip the params so a reload doesn't replay the message.
@@ -3882,6 +3910,9 @@ export default function App() {
     localStorage.removeItem('swiftshift-pending-invite')
     setOnboardingIntent(null)
     setOnboardingStatus((s: any) => ({ ...(s || {}), needs: null, onboarding_complete: true }))
+    // A manager who just created their company started a 30-day trial, so refresh
+    // billing to surface the trial countdown in the nav right away.
+    refreshBillingStatus()
   }
   // Session-memory dismissal only - no persistence, so the prompt returns next login.
   // Also drop the create-company intent: an employee who misclicked
@@ -3973,13 +4004,24 @@ export default function App() {
 
   const navUnlockedAchievements = appGState.unlockedAchievements
 
-  // A user "is Pro" whenever their company/account is entitled: covers active
-  // subscriptions, active trials, and grandfathered accounts. Drives the premium
-  // nav treatment and the "Pro" badge that replaces "Upgrade".
-  const isPro = billingStatus?.entitled === true
+  // Subscription-driven nav state. The "Pro" badge shows ONLY for a genuinely
+  // paid subscription (status 'active'); a free trial shows the "Upgrade" CTA
+  // plus a days-left countdown; an ended trial / lapsed subscription drops the
+  // workspace into read-only mode (writes blocked server-side until upgrade).
+  const billingState: string | undefined = billingStatus?.status
+  const isPaid = billingState === 'active'
+  const isTrialing = billingState === 'trialing' && billingStatus?.entitled === true
+  const trialDaysLeft: number | null =
+    isTrialing && typeof billingStatus?.trial_days_left === 'number' ? billingStatus.trial_days_left : null
+  const trialDaysLabel = trialDaysLeft != null ? `${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} left in free trial` : ''
+  // Read-only mirrors the server's gate exactly: only when billing is fully
+  // configured (Stripe secret + price). Without that the backend fails open and
+  // every write succeeds, so the banner must NOT claim read-only.
+  const isReadOnly = billingStatus != null && billingStatus.entitled === false &&
+    billingStatus.configured === true && billingStatus.price_configured === true
 
   return (
-    <div className="ta-app" data-theme={theme} data-bg={backgroundStyle} data-overdrive={isOvertimeOverdrive ? 'true' : undefined} data-pro={isPro ? 'true' : undefined}>
+    <div className="ta-app" data-theme={theme} data-bg={backgroundStyle} data-overdrive={isOvertimeOverdrive ? 'true' : undefined} data-pro={isPaid ? 'true' : undefined}>
       {backgroundStyle === 'gravity-grid' && <GravityGridBackground />}
       {backgroundStyle === 'gravity-dots' && <GravityDots className="ta-gravity-dots" />}
       {isDemoTour && (
@@ -4020,8 +4062,10 @@ export default function App() {
             <span className="hidden md:inline">Search</span>
             <kbd className="hidden md:inline md:ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 border border-white/10 leading-none">⌘K</kbd>
           </button>
-          {/* Pro badge for subscribers, Upgrade CTA for everyone else - left of achievements */}
-          {isPro ? (
+          {/* Paid subscribers get the "Pro" badge; everyone else gets the
+              "Upgrade" CTA. Trial users also get a days-left countdown chip
+              (turns amber in the final week) to nudge the upgrade. */}
+          {isPaid ? (
             <button
               onClick={() => navTo('pricing')}
               title="SwiftShift Pro - manage billing"
@@ -4037,18 +4081,35 @@ export default function App() {
               Pro
             </button>
           ) : (
-            <button
-              onClick={() => navTo('pricing')}
-              className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-full transition-all hover:scale-105 active:scale-95"
-              style={{
-                background: 'var(--accent-color)',
-                color: '#000',
-                boxShadow: '0 0 12px 2px rgba(var(--accent-color-rgb), 0.45)',
-              }}
-            >
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 11 12 6 7 11"/><line x1="12" y1="18" x2="12" y2="6"/></svg>
-              Upgrade
-            </button>
+            <>
+              {isTrialing && trialDaysLeft != null && (
+                <button
+                  onClick={() => navTo('pricing')}
+                  title={trialDaysLabel}
+                  className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full border transition-all hover:scale-105 active:scale-95 ${trialDaysLeft <= 7 ? 'animate-pulse' : ''}`}
+                  style={{
+                    color: trialDaysLeft <= 7 ? '#fbbf24' : 'var(--accent-color)',
+                    borderColor: trialDaysLeft <= 7 ? 'rgba(251,191,36,0.5)' : 'rgba(var(--accent-color-rgb), 0.4)',
+                    background: trialDaysLeft <= 7 ? 'rgba(251,191,36,0.10)' : 'rgba(var(--accent-color-rgb), 0.06)',
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+                  {trialDaysLabel}
+                </button>
+              )}
+              <button
+                onClick={() => navTo('pricing')}
+                className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-full transition-all hover:scale-105 active:scale-95"
+                style={{
+                  background: 'var(--accent-color)',
+                  color: '#000',
+                  boxShadow: '0 0 12px 2px rgba(var(--accent-color-rgb), 0.45)',
+                }}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 11 12 6 7 11"/><line x1="12" y1="18" x2="12" y2="6"/></svg>
+                Upgrade
+              </button>
+            </>
           )}
           {/* Achievements badge */}
           <div className="relative group hidden sm:block">
@@ -4110,17 +4171,17 @@ export default function App() {
               {profilePicUrl
                 ? <span
                     className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 inline-flex"
-                    style={{ boxShadow: `0 0 0 2px ${getXPLevelRingColor(appCurrentLevel.level)}${avatarFrame === 'glow' ? `, 0 0 8px ${getXPLevelRingColor(appCurrentLevel.level)}` : ''}${isPro ? ', 0 0 0 4px rgba(var(--accent-color-rgb), 0.22)' : ''}` }}
+                    style={{ boxShadow: `0 0 0 2px ${getXPLevelRingColor(appCurrentLevel.level)}${avatarFrame === 'glow' ? `, 0 0 8px ${getXPLevelRingColor(appCurrentLevel.level)}` : ''}${isPaid ? ', 0 0 0 4px rgba(var(--accent-color-rgb), 0.22)' : ''}` }}
                   >
                     <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover" style={{ objectPosition: `${profilePicX}% ${profilePicY}%`, transform: `scale(${profilePicZoom})`, transformOrigin: `${profilePicX}% ${profilePicY}%` }} />
                   </span>
                 : <span
                     className="w-6 h-6 rounded-full bg-white/10 flex-shrink-0 inline-flex items-center justify-center text-xs text-zinc-400"
-                    style={{ boxShadow: `0 0 0 2px ${getXPLevelRingColor(appCurrentLevel.level)}${avatarFrame === 'glow' ? `, 0 0 8px ${getXPLevelRingColor(appCurrentLevel.level)}` : ''}${isPro ? ', 0 0 0 4px rgba(var(--accent-color-rgb), 0.22)' : ''}` }}
+                    style={{ boxShadow: `0 0 0 2px ${getXPLevelRingColor(appCurrentLevel.level)}${avatarFrame === 'glow' ? `, 0 0 8px ${getXPLevelRingColor(appCurrentLevel.level)}` : ''}${isPaid ? ', 0 0 0 4px rgba(var(--accent-color-rgb), 0.22)' : ''}` }}
                   >{user.first_name?.[0]?.toUpperCase()}</span>
               }
               <span className="hidden sm:inline">Hi, {user.first_name}</span>
-              {isPro && <span className="hidden sm:inline text-[9px] tracking-[0.12em] px-1.5 py-0.5 rounded-full ml-1.5 border" style={{ color: 'var(--accent-color)', borderColor: 'rgba(var(--accent-color-rgb), 0.5)', background: 'rgba(var(--accent-color-rgb), 0.08)', fontWeight: 800 }}>PRO</span>}
+              {isPaid && <span className="hidden sm:inline text-[9px] tracking-[0.12em] px-1.5 py-0.5 rounded-full ml-1.5 border" style={{ color: 'var(--accent-color)', borderColor: 'rgba(var(--accent-color-rgb), 0.5)', background: 'rgba(var(--accent-color-rgb), 0.08)', fontWeight: 800 }}>PRO</span>}
               <span className="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded-full ml-1" style={{ backgroundColor: 'var(--accent-color)', color: '#000', fontWeight: 700 }}>Lv.{appCurrentLevel.level}</span> ▾
             </button>
             <div onClick={() => setUserMenuOpen(false)} style={userMenuOpen ? { display: 'block' } : undefined} className="absolute right-0 top-full w-56 bg-zinc-900 border border-white/10 rounded-xl shadow-lg hidden group-hover:block group-focus-within:block z-50 pt-1">
@@ -4135,12 +4196,18 @@ export default function App() {
                 >
                   Achievements
                 </button>
+                {isTrialing && trialDaysLeft != null && (
+                  <div className="px-4 py-2 text-xs font-semibold flex items-center gap-1.5" style={{ color: trialDaysLeft <= 7 ? '#fbbf24' : 'var(--accent-color)' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+                    {trialDaysLabel}
+                  </div>
+                )}
                 <button
                   onClick={() => navTo('pricing')}
                   className="w-full text-left px-4 py-2 text-sm font-bold hover:bg-white/5 flex items-center gap-1.5"
                   style={{ color: 'var(--accent-color)' }}
                 >
-                  {isPro ? (
+                  {isPaid ? (
                     <>
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                       SwiftShift Pro
@@ -4206,6 +4273,33 @@ export default function App() {
           </div>
         </div>
       </nav>
+
+      {/* Read-only paywall banner: shown once the free trial / subscription has
+          lapsed. The app stays fully viewable, but writes are blocked server-side
+          (HTTP 402) until the workspace upgrades. */}
+      {isReadOnly && (
+        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 px-4 py-2 text-sm text-center" style={{ background: 'rgba(251,191,36,0.12)', borderBottom: '1px solid rgba(251,191,36,0.35)', color: '#fde68a' }}>
+          <span className="font-semibold">
+            {billingState === 'past_due' ? 'Your subscription payment failed.'
+              : billingState === 'canceled' ? 'Your subscription has ended.'
+              : 'Your free trial has ended.'}
+          </span>
+          <span style={{ color: 'rgba(253,230,138,0.8)' }}>You're in read-only mode, you can view your data but not make changes.</span>
+          {billingStatus?.is_manager ? (
+            billingState === 'past_due' ? (
+              <button onClick={handleManageBilling} disabled={billingBusy} className="font-bold underline underline-offset-2 hover:opacity-80 disabled:opacity-60" style={{ color: '#fbbf24' }}>Update payment method →</button>
+            ) : (
+              <button onClick={() => navTo('pricing')} className="font-bold underline underline-offset-2 hover:opacity-80" style={{ color: '#fbbf24' }}>
+                {billingState === 'canceled' ? 'Resubscribe →' : 'Upgrade to continue →'}
+              </button>
+            )
+          ) : (
+            <span style={{ color: 'rgba(253,230,138,0.8)' }}>
+              {billingState === 'past_due' ? 'Ask your manager to update billing.' : 'Ask your manager to upgrade.'}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Mobile sidebar backdrop */}
       <div
@@ -8991,9 +9085,10 @@ export default function App() {
           )}
         </main>
 
-        {/* First-run onboarding wizards - rendered before the tour, which waits
-            (gated on !onboardingActive) until onboarding finishes or is skipped */}
-        {onboardingActive && onboardingMode === 'manager_setup' && (
+        {/* First-run onboarding wizards - gated on !showTour so a fresh signup
+            sees the guided tour FIRST, then lands in the company/employee setup
+            wizard once the tour is finished or skipped. */}
+        {!showTour && onboardingActive && onboardingMode === 'manager_setup' && (
           <ManagerOnboarding
             user={user}
             company={onboardingStatus?.company ?? null}
@@ -9001,7 +9096,7 @@ export default function App() {
             onSkip={handleOnboardingSkip}
           />
         )}
-        {onboardingActive && (onboardingMode === 'employee_link' || onboardingMode === 'employee_wizard') && (
+        {!showTour && onboardingActive && (onboardingMode === 'employee_link' || onboardingMode === 'employee_wizard') && (
           <EmployeeOnboarding
             user={user}
             mode={onboardingMode === 'employee_link' ? 'link' : 'wizard'}
@@ -9015,10 +9110,10 @@ export default function App() {
           />
         )}
 
-        {/* Guided tour modal - also waits for the onboarding status fetch to
-            resolve so a fresh signup's tour isn't yanked mid-display when the
-            wizard turns out to be needed */}
-        {showTour && (isDemoTour || (!onboardingActive && onboardingStatus !== null)) && (
+        {/* Guided tour modal - shown FIRST for fresh signups (and demo visitors).
+            The onboarding wizard above waits on !showTour, so the tour is never
+            yanked mid-display; when it closes, the setup wizard takes over. */}
+        {showTour && (
           <Tour
             onClose={() => {
               setShowTour(false)
