@@ -3,10 +3,23 @@ from datetime import datetime, timedelta, timezone
 from flask import Blueprint, jsonify, request
 
 from audit import log_event
-from db import get_db
+from db import get_db, safe_bootstrap
 from permissions import current_uid
 
 bp = Blueprint("clock_sessions", __name__)
+
+
+def _ensure_columns():
+    """Additive: store second-precise worked time alongside the existing
+    minute-granular duration. duration_minutes is left exactly as-is so payroll
+    and reports (which read it) are unchanged; duration_seconds is the precise
+    value the clock UI prefers for to-the-second totals."""
+    with get_db() as db:
+        db.execute("ALTER TABLE clock_sessions ADD COLUMN IF NOT EXISTS duration_seconds REAL")
+        db.commit()
+
+
+safe_bootstrap(_ensure_columns)
 
 
 def _resolve_punch_ts(client_ts):
@@ -110,6 +123,13 @@ def _compute_session_duration(clock_in_str: str, until=None) -> int:
     return int(((until or datetime.now(timezone.utc).replace(tzinfo=None)) - clock_in).total_seconds() / 60)
 
 
+def _compute_session_seconds(clock_in_str: str, until=None) -> float:
+    """Total elapsed seconds for a session (no minute truncation)."""
+    clock_in = datetime.fromisoformat(clock_in_str)
+    end = until or datetime.now(timezone.utc).replace(tzinfo=None)
+    return max(0.0, (end - clock_in).total_seconds())
+
+
 @bp.route("/api/clock-sessions/<int:session_id>", methods=["PUT"])
 def clock_out(session_id):
     data = request.get_json() or {}
@@ -117,6 +137,15 @@ def clock_out(session_id):
         unpaid_break_minutes = max(0, int(data.get("break_minutes", 0) or 0))
     except (TypeError, ValueError):
         return jsonify({"error": "break_minutes must be a number"}), 400
+    # Optional second-precise break (sent alongside break_minutes). Falls back to
+    # minutes*60 so older clients and the payroll path stay consistent.
+    if data.get("break_seconds") is not None:
+        try:
+            unpaid_break_seconds = max(0, int(round(float(data.get("break_seconds")))))
+        except (TypeError, ValueError):
+            return jsonify({"error": "break_seconds must be a number"}), 400
+    else:
+        unpaid_break_seconds = unpaid_break_minutes * 60
     punch_ts = _resolve_punch_ts(data.get("client_ts"))
     now = punch_ts.isoformat()
     with get_db() as db:
@@ -138,9 +167,12 @@ def clock_out(session_id):
             pass
         total_minutes = max(0, _compute_session_duration(row["clock_in"], punch_ts))
         net_minutes = max(0, total_minutes - unpaid_break_minutes)
+        # Second-precise net worked time (payroll still reads duration_minutes).
+        total_seconds = _compute_session_seconds(row["clock_in"], punch_ts)
+        net_seconds = max(0, round(total_seconds - unpaid_break_seconds))
         db.execute(
-            "UPDATE clock_sessions SET clock_out = ?, duration_minutes = ?, break_minutes = ? WHERE id = ?",
-            (now, net_minutes, unpaid_break_minutes, session_id),
+            "UPDATE clock_sessions SET clock_out = ?, duration_minutes = ?, duration_seconds = ?, break_minutes = ? WHERE id = ?",
+            (now, net_minutes, net_seconds, unpaid_break_minutes, session_id),
         )
         db.commit()
         row = db.execute("SELECT * FROM clock_sessions WHERE id = ?", (session_id,)).fetchone()

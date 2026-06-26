@@ -3093,19 +3093,23 @@ export default function App() {
         const periodStartStr = localDay(currentPeriod.start)
         const periodEndStr = localDay(currentPeriod.end)
 
-        // Sum duration_minutes for today's completed sessions, and for the full pay period
+        // Sum worked time for today's completed sessions and for the full pay
+        // period. Prefer the second-precise duration_seconds; fall back to the
+        // minute-granular duration_minutes for legacy sessions / manual entries
+        // that don't carry it, so totals stay accurate to the second going forward.
         let todayMs = 0
         let periodMs = 0
         for (const row of allRows) {
           if (!row.clock_in) continue
           const d = localDay(parseServerDate(row.clock_in))
+          const rowMs = row.duration_seconds != null
+            ? Number(row.duration_seconds) * 1000
+            : (Number(row.duration_minutes) || 0) * 60 * 1000
           if (d === todayStr) {
-            const mins = Number(row.duration_minutes) || 0
-            todayMs += mins * 60 * 1000
+            todayMs += rowMs
           }
           if (d >= periodStartStr && d <= periodEndStr) {
-            const mins = Number(row.duration_minutes) || 0
-            periodMs += mins * 60 * 1000
+            periodMs += rowMs
           }
         }
 
@@ -3702,7 +3706,7 @@ export default function App() {
           fetch(`${API_BASE}/api/clock-sessions/${sid}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ break_minutes: unpaidBreakMin, client_ts: punchTs }),
+            body: JSON.stringify({ break_minutes: unpaidBreakMin, break_seconds: Math.round(unpaidAccum / 1000), client_ts: punchTs }),
           })
             .then(r => { if (!r.ok) throw new Error('clock-out not saved') })
             .catch(queueOffline)
