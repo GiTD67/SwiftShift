@@ -164,6 +164,39 @@
   background: transparent;
 }
 
+/* Premium (Pro) shell treatment: a faint accent sheen on the chrome so a paid
+   account feels elevated without changing layout. Driven by data-pro on .ta-app,
+   so it adopts whatever accent theme the user has selected. */
+.ta-app[data-pro] .ta-navbar {
+  border-bottom-color: rgba(var(--accent-color-rgb), 0.22);
+  box-shadow:
+    var(--shadow-1),
+    0 1px 0 0 rgba(var(--accent-color-rgb), 0.10),
+    0 8px 28px -18px rgba(var(--accent-color-rgb), 0.55);
+}
+.ta-app[data-pro] .ta-sidebar {
+  border-right-color: rgba(var(--accent-color-rgb), 0.16);
+}
+
+/* Gentle pulse ring on the navbar "Pro" badge. */
+.ta-pro-badge { position: relative; }
+.ta-pro-badge::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  animation: ta-pro-pulse 2.6s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes ta-pro-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(var(--accent-color-rgb), 0.40); }
+  70% { box-shadow: 0 0 0 7px rgba(var(--accent-color-rgb), 0); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--accent-color-rgb), 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ta-pro-badge::after { animation: none; }
+}
+
 .ta-nav {
   display: flex;
   flex-direction: column;

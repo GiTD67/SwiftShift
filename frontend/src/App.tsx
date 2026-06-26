@@ -40,6 +40,10 @@ interface PersistedBreakState {
   breakType: 'paid' | 'unpaid' | null
   breakMsAccum: number
   paidBreakMsAccum: number
+  // Which meal-break reminders ('first'/'second') have already fired this clock
+  // session. Persisted so a page refresh does not re-pop the "take your break"
+  // warning for a break the employee already took.
+  firedReminders?: string[]
 }
 function readBreakState(): PersistedBreakState | null {
   try {
@@ -3077,6 +3081,9 @@ export default function App() {
               setBreakType(savedBreak.breakType)
               setBreakMsAccum(Number(savedBreak.breakMsAccum) || 0)
               setPaidBreakMsAccum(Number(savedBreak.paidBreakMsAccum) || 0)
+              // Restore which break reminders already fired so the popup isn't
+              // re-triggered for a break taken before this refresh.
+              breakReminderFiredRef.current = new Set(savedBreak.firedReminders ?? [])
             } else {
               setBreakStartedAt(null)
               setBreakType(null)
@@ -3496,6 +3503,7 @@ export default function App() {
       breakType: next.breakType,
       breakMsAccum: next.breakMsAccum,
       paidBreakMsAccum: next.paidBreakMsAccum,
+      firedReminders: [...breakReminderFiredRef.current],
     })
   }
 
@@ -3542,7 +3550,18 @@ export default function App() {
   // Reset break reminder tracking when clocking in
   useEffect(() => {
     if (isClockedIn) {
-      breakReminderFiredRef.current = new Set()
+      // A genuine new clock-in clears the persisted break state first (see
+      // handleClockIn), so the saved record won't match this clock-in and we
+      // correctly start clean. A page refresh, however, restores the same
+      // clock-in from localStorage/DB: rehydrate which reminders already fired
+      // so the meal-break popup doesn't falsely re-trigger for a break already
+      // taken. Without this, the ref resets to empty on every refresh and the
+      // first 1s tick re-pops the warning.
+      const saved = readBreakState()
+      breakReminderFiredRef.current =
+        saved && clockInAt && Math.abs(new Date(saved.clockInRef).getTime() - clockInAt.getTime()) < 2000
+          ? new Set(saved.firedReminders ?? [])
+          : new Set()
       setShowBreakReminder(false)
       // Ask for desktop-notification permission at a natural moment so a user
       // whose tab is backgrounded still gets an OS pop-up when a break is due.
@@ -3563,6 +3582,8 @@ export default function App() {
     // First meal break check
     if (hoursWorked >= rule.triggerAfterHours && !breakReminderFiredRef.current.has('first')) {
       breakReminderFiredRef.current.add('first')
+      // Persist immediately so a refresh right after the reminder doesn't re-pop it.
+      persistBreak({ breakStartedAt, breakType, breakMsAccum, paidBreakMsAccum })
       setBreakReminderIsSecond(false)
       setShowBreakReminder(true)
       fireBreakDesktopNotif(rule.name, rule.mealBreakMinutes, false)
@@ -3575,6 +3596,7 @@ export default function App() {
       !breakReminderFiredRef.current.has('second')
     ) {
       breakReminderFiredRef.current.add('second')
+      persistBreak({ breakStartedAt, breakType, breakMsAccum, paidBreakMsAccum })
       setBreakReminderIsSecond(true)
       setShowBreakReminder(true)
       fireBreakDesktopNotif(rule.name, rule.mealBreakMinutes, true)
@@ -3868,8 +3890,13 @@ export default function App() {
 
   const navUnlockedAchievements = appGState.unlockedAchievements
 
+  // A user "is Pro" whenever their company/account is entitled: covers active
+  // subscriptions, active trials, and grandfathered accounts. Drives the premium
+  // nav treatment and the "Pro" badge that replaces "Upgrade".
+  const isPro = billingStatus?.entitled === true
+
   return (
-    <div className="ta-app" data-theme={theme} data-bg={backgroundStyle} data-overdrive={isOvertimeOverdrive ? 'true' : undefined}>
+    <div className="ta-app" data-theme={theme} data-bg={backgroundStyle} data-overdrive={isOvertimeOverdrive ? 'true' : undefined} data-pro={isPro ? 'true' : undefined}>
       {backgroundStyle === 'gravity-grid' && <GravityGridBackground />}
       {backgroundStyle === 'gravity-dots' && <GravityDots className="ta-gravity-dots" />}
       {isDemoTour && (
@@ -3910,19 +3937,36 @@ export default function App() {
             <span className="hidden md:inline">Search</span>
             <kbd className="hidden md:inline md:ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 border border-white/10 leading-none">⌘K</kbd>
           </button>
-          {/* Upgrade CTA - prominent, left of achievements */}
-          <button
-            onClick={() => navTo('pricing')}
-            className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-full transition-all hover:scale-105 active:scale-95"
-            style={{
-              background: 'var(--accent-color)',
-              color: '#000',
-              boxShadow: '0 0 12px 2px rgba(var(--accent-color-rgb), 0.45)',
-            }}
-          >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 11 12 6 7 11"/><line x1="12" y1="18" x2="12" y2="6"/></svg>
-            Upgrade
-          </button>
+          {/* Pro badge for subscribers, Upgrade CTA for everyone else - left of achievements */}
+          {isPro ? (
+            <button
+              onClick={() => navTo('pricing')}
+              title="SwiftShift Pro - manage billing"
+              className="ta-pro-badge hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-full transition-all hover:scale-105 active:scale-95"
+              style={{
+                color: 'var(--accent-color)',
+                background: 'rgba(var(--accent-color-rgb), 0.10)',
+                border: '1px solid rgba(var(--accent-color-rgb), 0.45)',
+                boxShadow: '0 0 14px -2px rgba(var(--accent-color-rgb), 0.35)',
+              }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              Pro
+            </button>
+          ) : (
+            <button
+              onClick={() => navTo('pricing')}
+              className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-full transition-all hover:scale-105 active:scale-95"
+              style={{
+                background: 'var(--accent-color)',
+                color: '#000',
+                boxShadow: '0 0 12px 2px rgba(var(--accent-color-rgb), 0.45)',
+              }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 11 12 6 7 11"/><line x1="12" y1="18" x2="12" y2="6"/></svg>
+              Upgrade
+            </button>
+          )}
           {/* Achievements badge */}
           <div className="relative group hidden sm:block">
             <button
@@ -3983,16 +4027,18 @@ export default function App() {
               {profilePicUrl
                 ? <span
                     className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 inline-flex"
-                    style={{ boxShadow: `0 0 0 2px ${getXPLevelRingColor(appCurrentLevel.level)}${avatarFrame === 'glow' ? `, 0 0 8px ${getXPLevelRingColor(appCurrentLevel.level)}` : ''}` }}
+                    style={{ boxShadow: `0 0 0 2px ${getXPLevelRingColor(appCurrentLevel.level)}${avatarFrame === 'glow' ? `, 0 0 8px ${getXPLevelRingColor(appCurrentLevel.level)}` : ''}${isPro ? ', 0 0 0 4px rgba(var(--accent-color-rgb), 0.22)' : ''}` }}
                   >
                     <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover" style={{ objectPosition: `${profilePicX}% ${profilePicY}%`, transform: `scale(${profilePicZoom})`, transformOrigin: `${profilePicX}% ${profilePicY}%` }} />
                   </span>
                 : <span
                     className="w-6 h-6 rounded-full bg-white/10 flex-shrink-0 inline-flex items-center justify-center text-xs text-zinc-400"
-                    style={{ boxShadow: `0 0 0 2px ${getXPLevelRingColor(appCurrentLevel.level)}${avatarFrame === 'glow' ? `, 0 0 8px ${getXPLevelRingColor(appCurrentLevel.level)}` : ''}` }}
+                    style={{ boxShadow: `0 0 0 2px ${getXPLevelRingColor(appCurrentLevel.level)}${avatarFrame === 'glow' ? `, 0 0 8px ${getXPLevelRingColor(appCurrentLevel.level)}` : ''}${isPro ? ', 0 0 0 4px rgba(var(--accent-color-rgb), 0.22)' : ''}` }}
                   >{user.first_name?.[0]?.toUpperCase()}</span>
               }
-              <span className="hidden sm:inline">Hi, {user.first_name}</span> <span className="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded-full ml-1" style={{ backgroundColor: 'var(--accent-color)', color: '#000', fontWeight: 700 }}>Lv.{appCurrentLevel.level}</span> ▾
+              <span className="hidden sm:inline">Hi, {user.first_name}</span>
+              {isPro && <span className="hidden sm:inline text-[9px] tracking-[0.12em] px-1.5 py-0.5 rounded-full ml-1.5 border" style={{ color: 'var(--accent-color)', borderColor: 'rgba(var(--accent-color-rgb), 0.5)', background: 'rgba(var(--accent-color-rgb), 0.08)', fontWeight: 800 }}>PRO</span>}
+              <span className="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded-full ml-1" style={{ backgroundColor: 'var(--accent-color)', color: '#000', fontWeight: 700 }}>Lv.{appCurrentLevel.level}</span> ▾
             </button>
             <div onClick={() => setUserMenuOpen(false)} style={userMenuOpen ? { display: 'block' } : undefined} className="absolute right-0 top-full w-56 bg-zinc-900 border border-white/10 rounded-xl shadow-lg hidden group-hover:block group-focus-within:block z-50 pt-1">
               {/* Mobile-only rows - shown as navbar pills on ≥sm */}
@@ -4008,10 +4054,15 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => navTo('pricing')}
-                  className="w-full text-left px-4 py-2 text-sm font-bold hover:bg-white/5"
+                  className="w-full text-left px-4 py-2 text-sm font-bold hover:bg-white/5 flex items-center gap-1.5"
                   style={{ color: 'var(--accent-color)' }}
                 >
-                  Upgrade
+                  {isPro ? (
+                    <>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                      SwiftShift Pro
+                    </>
+                  ) : 'Upgrade'}
                 </button>
               </div>
               <button
