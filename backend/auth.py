@@ -1,6 +1,7 @@
 """Auth routes: signup, signin, Google OAuth, forgot/reset password, 2FA."""
 import hashlib
 import json
+import os
 import secrets
 import time
 import uuid
@@ -185,6 +186,8 @@ def _ensure_users_table():
             "filing_status TEXT DEFAULT 'single'",
             "extra_withholding REAL DEFAULT 0",
             "notification_prefs TEXT",
+            "user_preferences TEXT",
+            "google_sub TEXT",
         ):
             db.execute(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col_def}")
         # Add break_minutes to clock_sessions if upgrading from older schema
@@ -399,7 +402,9 @@ def signin():
             "SELECT * FROM users WHERE LOWER(email) = LOWER(?) ORDER BY (email = ?) DESC, id ASC LIMIT 1",
             (email, email),
         ).fetchone()
-    if not row or not check_password_hash(row["password_hash"], password):
+    # OAuth-only accounts have no usable password hash (a sentinel or NULL), so
+    # password sign-in must fail closed and send them to "Continue with Google".
+    if not row or not row.get("password_hash") or not check_password_hash(row["password_hash"], password):
         return jsonify({"error": "invalid credentials"}), 401
     if row.get("totp_enabled"):
         # Password is correct but 2FA is on: don't authenticate yet. Stash a
@@ -419,21 +424,54 @@ def signin():
 @limiter.limit("10 per minute")
 def google_auth():
     data = request.get_json() or {}
+    credential = data.get("credential")
     access_token = data.get("access_token")
-    if not access_token:
-        return jsonify({"error": "access_token required"}), 400
 
-    try:
-        resp = http_requests.get(
-            "https://www.googleapis.com/oauth2/v3/userinfo",
-            headers={"Authorization": f"Bearer {access_token}"},
-            timeout=10,
-        )
-        if not resp.ok:
-            return jsonify({"error": "Invalid Google token"}), 401
-        google_user = resp.json()
-    except Exception:
-        return jsonify({"error": "Google verification failed"}), 500
+    google_user = None
+    google_sub = None
+    email_verified_claim = False
+
+    if credential:
+        # Google Identity Services "Sign in with Google" issues a credential (an
+        # id_token JWT). Verify it via Google's tokeninfo endpoint and confirm the
+        # audience is OUR client id, so a token minted for another app is rejected.
+        client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+        if not client_id:
+            return jsonify({"error": "Google sign-in is not configured"}), 503
+        try:
+            resp = http_requests.get(
+                "https://oauth2.googleapis.com/tokeninfo",
+                params={"id_token": credential},
+                timeout=10,
+            )
+            if not resp.ok:
+                return jsonify({"error": "Invalid Google token"}), 401
+            tok = resp.json()
+        except Exception:
+            return jsonify({"error": "Google verification failed"}), 500
+        if tok.get("aud") != client_id:
+            return jsonify({"error": "Google token audience mismatch"}), 401
+        google_user = tok
+        google_sub = tok.get("sub")
+        email_verified_claim = str(tok.get("email_verified", "")).lower() == "true"
+    elif access_token:
+        # Legacy access-token flow (older Google Sign-In JS SDK). Kept for
+        # backward compatibility.
+        try:
+            resp = http_requests.get(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=10,
+            )
+            if not resp.ok:
+                return jsonify({"error": "Invalid Google token"}), 401
+            google_user = resp.json()
+        except Exception:
+            return jsonify({"error": "Google verification failed"}), 500
+        google_sub = google_user.get("sub")
+        email_verified_claim = bool(google_user.get("email_verified"))
+    else:
+        return jsonify({"error": "credential or access_token required"}), 400
 
     email = google_user.get("email", "")
     given_name = google_user.get("given_name") or ""
@@ -449,12 +487,20 @@ def google_auth():
         is_new_account = row is None
         if not row:
             row = db.execute(
-                "INSERT INTO users (first_name, last_name, email, password_hash, is_fulltime, is_manager)"
-                " VALUES (?, ?, ?, ?, 1, ?)"
+                "INSERT INTO users (first_name, last_name, email, password_hash, is_fulltime, is_manager, email_verified, google_sub)"
+                " VALUES (?, ?, ?, ?, 1, ?, ?, ?)"
                 " RETURNING id, first_name, last_name, email, job_role, manager_name, is_fulltime, pay, salary, hourly_rate, pto_accrual_rate, streak_count, streak_last_date, is_manager",
                 (given_name or "Google", family_name or "User", email, "google-oauth",
-                 email.strip().lower() == FOUNDER_EMAIL),
+                 email.strip().lower() == FOUNDER_EMAIL, email_verified_claim, google_sub),
             ).fetchone()
+        else:
+            # Bind the stable Google sub to an existing account and trust Google's
+            # verified-email claim so a linked account isn't stuck unverified.
+            if google_sub:
+                db.execute("UPDATE users SET google_sub = COALESCE(google_sub, ?) WHERE id = ?", (google_sub, row["id"]))
+            if email_verified_claim:
+                db.execute("UPDATE users SET email_verified = TRUE WHERE id = ? AND email_verified IS NOT TRUE", (row["id"],))
+        db.commit()
 
     if row.get("totp_enabled"):
         # Same 2FA gate as password signin - Google proving the email must not
@@ -468,7 +514,7 @@ def google_auth():
     # Brand-new Google accounts need a verification email too. Password signup
     # already sends one; Google signup previously sent nothing, so these accounts
     # could never verify. Best-effort, mirroring signup().
-    if is_new_account:
+    if is_new_account and not email_verified_claim:
         try:
             _issue_verification_email(row["id"], row["email"])
         except Exception:

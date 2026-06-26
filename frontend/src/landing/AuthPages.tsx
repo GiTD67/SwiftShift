@@ -1,7 +1,68 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './landing.css'
 import { API_BASE, LogoSVG, getThemeAccentHex } from './shared'
 import { FeaturePreview } from '../components/FeaturePreview'
+
+// "Continue with Google" via Google Identity Services. Gated: renders nothing
+// unless VITE_GOOGLE_CLIENT_ID is set at build time, so the flow stays inert
+// until the owner provisions a Google OAuth client id. On success it posts the
+// credential (id_token) to /api/auth/google and hands the auth payload back.
+function GoogleSignInButton({ onSuccess, text }: { onSuccess: (data: any) => void; text?: string }) {
+  const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID as string | undefined
+  const ref = useRef<HTMLDivElement>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    if (!clientId || !ref.current) return
+    let tries = 0
+    let cancelled = false
+    const render = () => {
+      if (cancelled) return
+      const g = (window as any).google
+      if (g?.accounts?.id) {
+        try {
+          g.accounts.id.initialize({
+            client_id: clientId,
+            callback: async (resp: any) => {
+              try {
+                const r = await fetch(`${API_BASE}/api/auth/google`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ credential: resp.credential }),
+                })
+                const data = await r.json()
+                if (r.ok && !data.error) onSuccess(data)
+                else setFailed(true)
+              } catch { setFailed(true) }
+            },
+          })
+          if (ref.current) {
+            g.accounts.id.renderButton(ref.current, {
+              theme: 'filled_black', size: 'large', shape: 'pill', width: 320, text: text || 'continue_with',
+            })
+          }
+        } catch { setFailed(true) }
+        return
+      }
+      if (tries++ < 30) setTimeout(render, 200) // GIS script loads async
+    }
+    render()
+    return () => { cancelled = true }
+  }, [clientId])
+
+  if (!clientId) return null
+  return (
+    <div className="pt-1">
+      <div className="flex items-center gap-3 my-3">
+        <div className="h-px flex-1" style={{ background: 'var(--lp-hairline)' }} />
+        <span className="text-[11px]" style={{ color: 'var(--lp-faint)' }}>or</span>
+        <div className="h-px flex-1" style={{ background: 'var(--lp-hairline)' }} />
+      </div>
+      <div ref={ref} className="flex justify-center" />
+      {failed && <div className="text-xs text-red-400 mt-2 text-center">Google sign-in failed. Please use email instead.</div>}
+    </div>
+  )
+}
 
 // Launch the full guided product tour as a guest: drop the visitor into the
 // real app in a sandboxed demo session (App.tsx synthesizes a demo user when
@@ -474,6 +535,18 @@ export function LoginPage() {
         <button type="submit" disabled={loading} className="lpa-submit">
           {loading ? 'Signing in…' : 'Sign in →'}
         </button>
+        <GoogleSignInButton
+          text="signin_with"
+          onSuccess={(data) => {
+            if (data.totp_required) {
+              setError('This account has two-factor enabled. Please sign in with your email and password.')
+              return
+            }
+            localStorage.setItem('user', JSON.stringify(data))
+            if (data.email) localStorage.setItem('lastEmail', data.email)
+            window.location.href = '.'
+          }}
+        />
         <div className="flex justify-between text-sm pt-1">
           <button type="button" onClick={() => setShowForgotPassword(true)} className="text-zinc-500 hover:text-white transition-colors">Forgot password?</button>
           <a href="signup" className="text-zinc-400 hover:text-white underline underline-offset-4">Create account, it's free</a>
@@ -704,6 +777,32 @@ export function SignupPage() {
         <button type="submit" disabled={loading || inviteInfo?.valid === false} className="lpa-submit">
           {loading ? 'Creating account…' : 'Create account →'}
         </button>
+        <GoogleSignInButton
+          text="signup_with"
+          onSuccess={async (data) => {
+            if (data.totp_required) {
+              setError('This account has two-factor enabled. Please sign in with your email and password.')
+              return
+            }
+            localStorage.setItem('user', JSON.stringify(data))
+            if (data.email) localStorage.setItem('lastEmail', data.email)
+            localStorage.setItem('swiftshift-tour-pending', '1')
+            const code = inviteCode.trim().toUpperCase()
+            if (code) {
+              // Same invite linking as the password path (the Google response
+              // already set the session cookie); stash the code on failure.
+              try {
+                const acceptRes = await fetch(`${API_BASE}/api/onboarding/invites/accept`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ code }),
+                })
+                if (!acceptRes.ok) localStorage.setItem('swiftshift-pending-invite', code)
+              } catch { localStorage.setItem('swiftshift-pending-invite', code) }
+            }
+            window.location.href = '.'
+          }}
+        />
         <div className="text-center text-sm pt-1">
           <a href="login" className="text-zinc-400 hover:text-white underline underline-offset-4">Already have an account?</a>
         </div>
