@@ -5,6 +5,7 @@ import Lenis from 'lenis'
 import '@fontsource/caveat/600.css'
 import './landing.css'
 import { LogoSVG } from './shared'
+import { LiveChatWidget } from '../components/LiveChatWidget'
 import { WordReveal, HeroHeadline, LiveMoney, DepositCanvas, HandwrittenNote, CountUp, GravityDots, WorkdayMorph, EarningsTickerDemo } from './effects'
 
 gsap.registerPlugin(ScrollTrigger)
@@ -542,6 +543,8 @@ export default function LandingPage() {
           </span>
         </footer>
       </section>
+
+      <LiveChatWidget />
     </div>
   )
 }

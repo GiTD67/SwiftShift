@@ -1,4 +1,5 @@
 import { LogoSVG } from './shared'
+import { LiveChatWidget } from '../components/LiveChatWidget'
 import './landing.css'
 
 // Public "Contact us" page, served at /contact (logged-out friendly). Matches the
@@ -73,6 +74,8 @@ export function ContactPage() {
           <a href="." className="lp-btn lp-btn--ghost">Back to home</a>
         </div>
       </main>
+
+      <LiveChatWidget />
     </div>
   )
 }

@@ -9,7 +9,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from db import get_db  # noqa: F401  # ensure db module is loaded
 from limiter import limiter
-from routes import health_bp, employees_bp, time_entries_bp, clock_sessions_bp, users_bp, grok_bp, jobs_bp, timesheet_submissions_bp, pto_bp, availability_bp, shift_swaps_bp, holidays_bp, reports_bp, audit_log_bp, corrections_bp, org_settings_bp, open_shifts_bp, export_bp, onboarding_bp, payments_bp, billing_bp
+from routes import health_bp, employees_bp, time_entries_bp, clock_sessions_bp, users_bp, grok_bp, jobs_bp, timesheet_submissions_bp, pto_bp, availability_bp, shift_swaps_bp, holidays_bp, reports_bp, audit_log_bp, corrections_bp, org_settings_bp, open_shifts_bp, export_bp, onboarding_bp, payments_bp, billing_bp, live_chat_bp
 from auth import bp as auth_bp
 
 frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
@@ -45,7 +45,7 @@ CORS(app, origins=_allowed_origins, supports_credentials=True)
 limiter.init_app(app)
 
 # Routes that don't require a logged-in session.
-_PUBLIC_API_PREFIXES = ("/api/auth/", "/api/kalshi/")
+_PUBLIC_API_PREFIXES = ("/api/auth/", "/api/kalshi/", "/api/live-chat/")
 _PUBLIC_API_PATHS = ("/api/health", "/api/onboarding/invites/lookup", "/api/stripe/webhook", "/api/stripe/billing-webhook")
 
 
@@ -134,6 +134,7 @@ app.register_blueprint(export_bp)
 app.register_blueprint(onboarding_bp)
 app.register_blueprint(payments_bp)
 app.register_blueprint(billing_bp)
+app.register_blueprint(live_chat_bp)
 
 
 # --- Frontend SPA ---
