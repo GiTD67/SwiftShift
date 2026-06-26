@@ -3508,6 +3508,18 @@ export default function App() {
           setLastStreakDate(todayStr)
           localStorage.setItem('streak', String(newStreak))
           localStorage.setItem('lastStreakDate', todayStr)
+          // Keep the cached `user` object in sync. The streak state seeds from
+          // user.streak_count first on mount (it wins over the 'streak' key), so
+          // if we leave the cached user holding the stale login-time value, a
+          // refresh reverts the pill (e.g. shows "2" clocked in, "1" after reload).
+          try {
+            const cachedUser = JSON.parse(localStorage.getItem('user') || 'null')
+            if (cachedUser) {
+              cachedUser.streak_count = newStreak
+              cachedUser.streak_last_date = todayStr
+              localStorage.setItem('user', JSON.stringify(cachedUser))
+            }
+          } catch { /* ignore */ }
           // Persist streak to DB
           if (user?.id) {
             fetch(`${API_BASE}/api/users/${user.id}`, {
