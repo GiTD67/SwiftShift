@@ -27,6 +27,7 @@ from flask import Blueprint, current_app, jsonify, request
 
 from audit import log_event
 from db import get_db, safe_bootstrap
+from notifications import notify_bank_connected, notify_paycheck_sent
 from permissions import current_uid, is_manager, manager_required
 from routes.reports import (
     _OT_PREMIUM,
@@ -457,10 +458,19 @@ def _store_verified_funding_pm(pm):
     bank = pm.get("us_bank_account") or {}
     customer_ref = pm.get("customer")
     customer_id = customer_ref if isinstance(customer_ref, str) else (customer_ref or {}).get("id")
+    company_id = None
+    was_verified = True  # default true so we never email on an unknown/no-op path
     with get_db() as db:
         settings_id = _settings_id_for_customer(db, customer_id)
         if settings_id is None:
             return  # not one of our funding customers - nothing to attach to
+        existing = db.execute(
+            "SELECT company_id, funding_status FROM payment_settings WHERE id = ?",
+            (settings_id,),
+        ).fetchone()
+        if existing:
+            company_id = existing["company_id"]
+            was_verified = existing["funding_status"] == "verified"
         _set_payment_settings(
             db,
             settings_id,
@@ -469,6 +479,10 @@ def _store_verified_funding_pm(pm):
             funding_last4=bank.get("last4"),
             funding_status="verified",
         )
+    # Email the company's managers, but only on the transition into "verified"
+    # so repeated webhooks / self-heal GETs don't re-notify.
+    if not was_verified:
+        notify_bank_connected(company_id, bank.get("bank_name"), bank.get("last4"))
 
 
 # GET /api/payments/company/funding
@@ -1069,6 +1083,11 @@ def _execute_transfers(run_id):
             """,
             (run_id,),
         ).fetchall()
+        run_row = db.execute(
+            "SELECT period_start, period_end FROM payroll_runs WHERE id = ?", (run_id,)
+        ).fetchone()
+    period_start = run_row["period_start"] if run_row else ""
+    period_end = run_row["period_end"] if run_row else ""
     for item in to_send:
         try:
             transfer = _stripe(
@@ -1089,6 +1108,11 @@ def _execute_transfers(run_id):
                     (transfer["id"], item["id"]),
                 )
                 db.commit()
+            # Tell the employee they've been paid (best-effort; never raises).
+            notify_paycheck_sent(
+                item["user_id"], item["gross_cents"], item["hours"],
+                item["overtime_hours"], period_start, period_end,
+            )
         except StripeError as exc:
             with get_db() as db:
                 db.execute(

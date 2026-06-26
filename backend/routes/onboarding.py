@@ -12,6 +12,8 @@ from flask import Blueprint, jsonify, request
 
 import auth  # noqa: F401  # ensures the users table exists before the ALTERs below
 from db import get_db, safe_bootstrap
+from mailer import APP_BASE_URL
+from notifications import notify_invite
 from permissions import current_uid, manager_required
 
 bp = Blueprint("onboarding", __name__)
@@ -179,6 +181,13 @@ def _create_invite(db, company_id, manager_id, name, email=None, job_role=None, 
                 (company_id, code, name, email, job_role, hourly_rate, manager_id),
             ).fetchone()
             db.execute("RELEASE SAVEPOINT invite_insert")
+            # Deliver the invite by email when an address was supplied. Best-effort:
+            # notify_invite swallows its own errors so a mail failure never blocks
+            # invite creation.
+            if email:
+                crow = db.execute("SELECT name FROM companies WHERE id = ?", (company_id,)).fetchone()
+                company_name = crow["name"] if crow else None
+                notify_invite(email, name, code, company_name, f"{APP_BASE_URL}/signup?invite={code}")
             return dict(row)
         except Exception as e:
             if "duplicate" in str(e).lower() or "unique" in str(e).lower():

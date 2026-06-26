@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, request
 
 from audit import log_event
 from db import get_db
+from notifications import notify_pto_decision
 from permissions import current_uid, is_manager, manager_required
 
 bp = Blueprint("pto", __name__)
@@ -290,6 +291,10 @@ def update_request(req_id):
             current_uid(), None,
             "pto_approve" if status == "approved" else "pto_deny",
             f"PTO request #{req_id} ({row['hours_requested']}h, user #{row['user_id']}) {status}",
+        )
+        notify_pto_decision(
+            row["user_id"], status, row["hours_requested"],
+            row["start_date"], row["end_date"],
         )
     return jsonify(dict(row))
 

@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, request
 
 from audit import log_event
 from db import get_db
+from notifications import notify_correction_decision
 from permissions import current_uid, manager_required
 
 bp = Blueprint("corrections", __name__)
@@ -200,6 +201,7 @@ def approve_correction(req_id):
         current_uid(), None, "correction_approve",
         f"Time correction #{req_id} (session #{row['session_id']}, user #{row['user_id']}) approved",
     )
+    notify_correction_decision(row["user_id"], "approved")
     return jsonify(dict(row))
 
 
@@ -237,4 +239,5 @@ def deny_correction(req_id):
         current_uid(), None, "correction_deny",
         f"Time correction #{req_id} (session #{row['session_id']}, user #{row['user_id']}) denied",
     )
+    notify_correction_decision(row["user_id"], "denied")
     return jsonify(dict(row))

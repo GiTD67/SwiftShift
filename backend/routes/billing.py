@@ -27,6 +27,7 @@ from flask import Blueprint, current_app, jsonify, request
 
 from audit import log_event
 from db import get_db
+from notifications import notify_billing_event
 from permissions import current_uid, is_manager, manager_required
 from routes.payments import StripeError, _stripe
 
@@ -418,10 +419,20 @@ def _apply_subscription(sub):
 
 
 def _set_status_by_customer(customer_id, status, plan=None):
+    """Update a company's subscription status by Stripe customer.
+
+    Returns (company_id, prior_status) so the caller can email on real
+    transitions (and skip a renewal that was already active). Returns
+    (None, None) when the customer maps to no known company.
+    """
     with get_db() as db:
         company_id = _company_id_for_customer(db, customer_id)
         if company_id is None:
-            return
+            return None, None
+        prior = db.execute(
+            "SELECT subscription_status FROM companies WHERE id = ?", (company_id,)
+        ).fetchone()
+        prior_status = prior["subscription_status"] if prior else None
         if plan is not None:
             db.execute(
                 "UPDATE companies SET subscription_status = ?, plan = ? WHERE id = ?",
@@ -433,6 +444,7 @@ def _set_status_by_customer(customer_id, status, plan=None):
                 (status, company_id),
             )
         db.commit()
+    return company_id, prior_status
 
 
 def _handle_billing_event(event_type, event):
@@ -444,11 +456,18 @@ def _handle_billing_event(event_type, event):
     elif event_type in ("customer.subscription.created", "customer.subscription.updated"):
         _apply_subscription(obj)
     elif event_type == "customer.subscription.deleted":
-        _set_status_by_customer(_customer_id_of(obj), "canceled", plan="starter")
+        cid, _prior = _set_status_by_customer(_customer_id_of(obj), "canceled", plan="starter")
+        if cid is not None:
+            notify_billing_event(cid, "canceled")
     elif event_type == "invoice.payment_failed":
-        _set_status_by_customer(_customer_id_of(obj), "past_due")
+        cid, _prior = _set_status_by_customer(_customer_id_of(obj), "past_due")
+        if cid is not None:
+            notify_billing_event(cid, "payment_failed")
     elif event_type in ("invoice.paid", "invoice.payment_succeeded"):
-        _set_status_by_customer(_customer_id_of(obj), "active", plan="pro")
+        cid, prior = _set_status_by_customer(_customer_id_of(obj), "active", plan="pro")
+        # Only on the transition into active, so monthly renewals don't re-email.
+        if cid is not None and prior != "active":
+            notify_billing_event(cid, "activated")
     # anything else: ignore
 
 
