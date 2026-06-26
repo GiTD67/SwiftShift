@@ -385,6 +385,15 @@ def signup():
     return jsonify(user), 201
 
 
+@bp.route("/config", methods=["GET"])
+def auth_config():
+    """Public, non-secret client config for the login/signup UI. A Google OAuth
+    client id is a public identifier (it is embedded in the page for the GIS
+    button anyway), so serving it at runtime lets the button appear as soon as
+    GOOGLE_CLIENT_ID is set on the backend, with no frontend rebuild required."""
+    return jsonify({"google_client_id": os.environ.get("GOOGLE_CLIENT_ID", "")})
+
+
 @bp.route("/signin", methods=["POST"])
 @limiter.limit("10 per minute")
 def signin():

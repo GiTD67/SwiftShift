@@ -8,9 +8,21 @@ import { FeaturePreview } from '../components/FeaturePreview'
 // until the owner provisions a Google OAuth client id. On success it posts the
 // credential (id_token) to /api/auth/google and hands the auth payload back.
 function GoogleSignInButton({ onSuccess, text }: { onSuccess: (data: any) => void; text?: string }) {
-  const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID as string | undefined
+  const buildTimeId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID as string | undefined
+  // Prefer a build-time id if present, otherwise fetch it from the backend at
+  // runtime. The id is public, so this just means the button appears whenever
+  // GOOGLE_CLIENT_ID is set on the server - no VITE_ var or rebuild needed.
+  const [clientId, setClientId] = useState<string | undefined>(buildTimeId || undefined)
   const ref = useRef<HTMLDivElement>(null)
   const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    if (clientId) return
+    fetch(`${API_BASE}/api/auth/config`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d && d.google_client_id) setClientId(d.google_client_id) })
+      .catch(() => {})
+  }, [clientId])
 
   useEffect(() => {
     if (!clientId || !ref.current) return
