@@ -2951,6 +2951,58 @@ export default function App() {
   // Tracks which reminder thresholds have already fired this clock session (reset on clock-in)
   const breakReminderFiredRef = useRef<Set<string>>(new Set())
 
+  // Cross-device preference sync. Customizations (theme, background, avatar frame,
+  // sidebar order, favorite tabs, work state) used to live only in localStorage,
+  // so they didn't follow a user to a new browser or device. Hydrate them from
+  // the server on login, then debounce-save changes back. localStorage stays as
+  // an instant-load cache and offline fallback.
+  const prefsHydratedRef = useRef(false)
+  useEffect(() => {
+    if (!user?.id) return
+    fetch(`${API_BASE}/api/users/me/preferences`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(p => {
+        if (p && typeof p === 'object' && !p.error) {
+          // Only apply keys the server has actually stored; absent keys keep the
+          // current (localStorage-derived) value, which the save effect then
+          // pushes up - migrating existing users' local prefs to the server.
+          if (typeof p.theme === 'string') setTheme(p.theme as typeof theme)
+          if (typeof p.customAccent === 'string') setCustomAccentColor(p.customAccent)
+          if (typeof p.backgroundStyle === 'string') setBackgroundStyle(p.backgroundStyle)
+          if (typeof p.avatarFrame === 'string') setAvatarFrame(p.avatarFrame)
+          if (typeof p.masterMode === 'boolean') setIsMasterMode(p.masterMode)
+          if (Array.isArray(p.sidebarOrder)) setSidebarOrder(p.sidebarOrder)
+          if (Array.isArray(p.favoriteTabs)) setFavoriteTabs(p.favoriteTabs)
+          if (typeof p.workState === 'string') setWorkState(p.workState)
+        }
+      })
+      .catch(() => {})
+      .finally(() => { prefsHydratedRef.current = true })
+  }, [user?.id])
+
+  useEffect(() => {
+    // Wait until the initial hydrate has run so we never clobber the server with
+    // first-render defaults before we've loaded what's stored.
+    if (!user?.id || !prefsHydratedRef.current) return
+    const t = setTimeout(() => {
+      fetch(`${API_BASE}/api/users/me/preferences`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          theme,
+          customAccent: customAccentColor,
+          backgroundStyle,
+          avatarFrame,
+          masterMode: isMasterMode,
+          sidebarOrder,
+          favoriteTabs,
+          workState,
+        }),
+      }).catch(() => {})
+    }, 600)
+    return () => clearTimeout(t)
+  }, [user?.id, theme, customAccentColor, backgroundStyle, avatarFrame, isMasterMode, sidebarOrder, favoriteTabs, workState])
+
   // Daily streak counter (gamified punctuality) - prefer DB values, fall back to localStorage
   const [streak, setStreak] = useState<number>(() => {
     if (user?.streak_count != null) return Number(user.streak_count)

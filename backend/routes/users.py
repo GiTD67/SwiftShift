@@ -288,6 +288,69 @@ def update_my_notification_prefs():
     return jsonify(prefs)
 
 
+# ── UI preferences (theme, background, avatar frame, sidebar order, etc.) ────────
+# Stored as one opaque JSON blob so new preference keys never need a migration,
+# matching the notification_prefs pattern above. This is what makes a user's
+# customizations follow them across browsers and devices.
+
+_ALLOWED_PREF_KEYS = {
+    "theme", "customAccent", "backgroundStyle", "avatarFrame", "masterMode",
+    "sidebarOrder", "favoriteTabs", "workState",
+}
+_MAX_PREFS_BYTES = 20000  # generous cap; guards against a runaway/abusive blob
+
+
+def _load_preferences(db, uid):
+    """Return the user's stored preferences dict (only explicitly-saved keys), or
+    None if the user is gone. Unset keys are absent so the client can distinguish
+    'never saved' from 'saved to a default' and seed the server from localStorage."""
+    db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS user_preferences TEXT")
+    row = db.execute("SELECT user_preferences FROM users WHERE id = ?", (uid,)).fetchone()
+    if not row:
+        return None
+    try:
+        saved = json.loads(row["user_preferences"] or "{}")
+        return saved if isinstance(saved, dict) else {}
+    except (TypeError, ValueError):
+        return {}
+
+
+@bp.route("/api/users/me/preferences", methods=["GET"])
+def get_my_preferences():
+    uid = current_uid()
+    if not uid:
+        return jsonify({"error": "authentication required"}), 401
+    with get_db() as db:
+        prefs = _load_preferences(db, uid)
+        db.commit()
+    if prefs is None:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(prefs)
+
+
+@bp.route("/api/users/me/preferences", methods=["PUT"])
+def update_my_preferences():
+    uid = current_uid()
+    if not uid:
+        return jsonify({"error": "authentication required"}), 401
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "invalid body"}), 400
+    with get_db() as db:
+        prefs = _load_preferences(db, uid)
+        if prefs is None:
+            return jsonify({"error": "not found"}), 404
+        for key, value in data.items():
+            if key in _ALLOWED_PREF_KEYS:
+                prefs[key] = value
+        serialized = json.dumps(prefs)
+        if len(serialized) > _MAX_PREFS_BYTES:
+            return jsonify({"error": "preferences too large"}), 413
+        db.execute("UPDATE users SET user_preferences = ? WHERE id = ?", (serialized, uid))
+        db.commit()
+    return jsonify(prefs)
+
+
 @bp.route("/api/users/<int:target_id>", methods=["DELETE"])
 def delete_user(target_id):
     caller = current_uid()
